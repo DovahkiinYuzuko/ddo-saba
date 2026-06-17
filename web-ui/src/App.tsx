@@ -51,6 +51,7 @@ interface LocaleStrings {
   until: string;
   thinking: string;
   close: string;
+  sendOnEnter: string;
 }
 
 const locales: Record<'en' | 'ja', LocaleStrings> = {
@@ -87,7 +88,8 @@ const locales: Record<'en' | 'ja', LocaleStrings> = {
     device: "Device",
     until: "Unload In",
     thinking: "Thinking Process",
-    close: "Close"
+    close: "Close",
+    sendOnEnter: "Press Enter to send (Shift+Enter for newline)"
   },
   ja: {
     title: "DDO Saba コントロールパネル",
@@ -122,15 +124,25 @@ const locales: Record<'en' | 'ja', LocaleStrings> = {
     device: "デバイス",
     until: "アンロードまで",
     thinking: "思考プロセス",
-    close: "閉じる"
+    close: "閉じる",
+    sendOnEnter: "Enterキーで送信する (Shift+Enterで改行)"
   }
 };
+
+interface MessageMetrics {
+  totalDurationSec?: number;
+  promptTokens?: number;
+  evalTokens?: number;
+  tokensPerSec?: number;
+  thinkDurationSec?: number;
+}
 
 interface Message {
   id?: string;
   role: 'user' | 'assistant' | 'system';
   content: string;
   sender?: string;
+  metrics?: MessageMetrics; /* ponytail: store inference performance stats */
 }
 
 interface ChatSession {
@@ -181,6 +193,8 @@ export default function App() {
   const [psInfo, setPsInfo] = useState<PsModelInfo | null>(null);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const [sendOnEnter, setSendOnEnter] = useState<boolean>(true); /* ponytail: toggle send action shortcut */
+  const [contextUsed, setContextUsed] = useState<number>(0); /* ponytail: track active context token usage */
   // ponytail: Separate model fallback logic to avoid timing/closure issues
   useEffect(() => {
     if (models.length > 0) {
@@ -400,7 +414,8 @@ export default function App() {
         if (c.id === activeChatId) {
           return {
             ...c,
-            messages: [...c.messages, { id: assistantMsgId, role: 'assistant', content: '', sender: 'AI' }]
+            // ponytail: Use the selected activeModel name as the sender signature
+            messages: [...c.messages, { id: assistantMsgId, role: 'assistant', content: '', sender: activeModel }]
           };
         }
         return c;
@@ -409,6 +424,8 @@ export default function App() {
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
       let accumulatedContent = '';
+      let thinkStartTime = 0;
+      let thinkEndTime = 0;
 
       if (reader) {
         while (true) {
@@ -422,6 +439,15 @@ export default function App() {
             if (!line.trim()) continue;
             try {
               const parsed = JSON.parse(line);
+              
+              // ponytail: Record timestamps for CoT (think) duration
+              if (!thinkStartTime) {
+                thinkStartTime = performance.now();
+              }
+              if (accumulatedContent.includes('</think>') && !thinkEndTime) {
+                thinkEndTime = performance.now();
+              }
+
               if (parsed.message?.content) {
                 accumulatedContent += parsed.message.content;
                 
@@ -433,6 +459,40 @@ export default function App() {
                       messages: c.messages.map(m => {
                         if (m.id === assistantMsgId) {
                           return { ...m, content: accumulatedContent };
+                        }
+                        return m;
+                      })
+                    };
+                  }
+                  return c;
+                }));
+              }
+
+              // ponytail: Capture inference metrics at the end of the stream
+              if (parsed.done) {
+                const totalDurationSec = parsed.total_duration ? (parsed.total_duration / 1e9) : 0;
+                const evalDurationSec = parsed.eval_duration ? (parsed.eval_duration / 1e9) : 0;
+                const tokensPerSec = (parsed.eval_count && evalDurationSec > 0) ? (parsed.eval_count / evalDurationSec) : 0;
+                const thinkDurationSec = (thinkStartTime > 0 && thinkEndTime > 0) ? ((thinkEndTime - thinkStartTime) / 1000) : 0;
+
+                const metrics: MessageMetrics = {
+                  totalDurationSec: parseFloat(totalDurationSec.toFixed(2)),
+                  promptTokens: parsed.prompt_eval_count || 0,
+                  evalTokens: parsed.eval_count || 0,
+                  tokensPerSec: parseFloat(tokensPerSec.toFixed(1)),
+                  thinkDurationSec: parseFloat(thinkDurationSec.toFixed(2))
+                };
+
+                // Update total context token usage stats
+                setContextUsed((parsed.prompt_eval_count || 0) + (parsed.eval_count || 0));
+
+                setChats(prev => prev.map(c => {
+                  if (c.id === activeChatId) {
+                    return {
+                      ...c,
+                      messages: c.messages.map(m => {
+                        if (m.id === assistantMsgId) {
+                          return { ...m, metrics };
                         }
                         return m;
                       })
@@ -455,7 +515,7 @@ export default function App() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              sender: 'AI',
+              sender: activeModel,
               role: 'assistant',
               content: accumulatedContent
             })
@@ -693,13 +753,22 @@ export default function App() {
           {activeChatId && chats.find(c => c.id === activeChatId)?.messages.map((m, idx) => (
             <div key={idx} className={`message-row ${m.role}`}>
               <div className="message-avatar">
-                {m.role === 'user' ? (m.sender?.slice(0,2).toUpperCase() || 'US') : 'AI'}
+                {m.role === 'user' 
+                  ? (m.sender?.slice(0, 2).toUpperCase() || 'US') 
+                  : (m.sender?.slice(0, 2).toUpperCase() || 'AI')}
               </div>
               <div className="message-bubble">
                 {m.sender && <div className="message-sender">{m.sender}</div>}
                 <div className="message-text">
                   {parseMessageContent(m.content)}
                 </div>
+                {/* ponytail: Display assistant performance metrics below the bubble */}
+                {m.role === 'assistant' && m.metrics && (
+                  <div className="message-metrics">
+                    {m.metrics.thinkDurationSec && m.metrics.thinkDurationSec > 0 ? `Think: ${m.metrics.thinkDurationSec}s | ` : ''}
+                    {`Time: ${m.metrics.totalDurationSec}s | Speed: ${m.metrics.tokensPerSec} tok/s | Tokens: ${m.metrics.evalTokens} (gen) / ${m.metrics.promptTokens} (prompt)`}
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -712,9 +781,15 @@ export default function App() {
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  sendMessage();
+                // ponytail: dynamically evaluate keyboard send shortcuts based on configuration toggle
+                if (e.key === 'Enter') {
+                  if (sendOnEnter && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                  } else if (!sendOnEnter && e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                  }
                 }
               }}
               placeholder={t.placeholder}
@@ -871,6 +946,37 @@ export default function App() {
             <p className="no-status-text">{t.noLoadedModel}</p>
           )}
         </div>
+
+        {/* ponytail: Context usage progress and details */}
+        <div className="column-section status-section">
+          <h3><Sliders size={16} /> Context Memory</h3>
+          <div className="status-card">
+            <div className="status-row">
+              <span className="label">Used / Limit:</span>
+              <span className="val">{contextUsed} / {parameters.num_ctx} Tokens</span>
+            </div>
+            <div style={{
+              width: '100%',
+              height: '6px',
+              backgroundColor: 'hsl(var(--border))',
+              borderRadius: '3px',
+              marginTop: '8px',
+              overflow: 'hidden'
+            }}>
+              <div style={{
+                width: `${parameters.num_ctx > 0 ? Math.min(100, (contextUsed / parameters.num_ctx) * 100) : 0}%`,
+                height: '100%',
+                backgroundColor: (contextUsed / parameters.num_ctx) > 0.8 ? 'hsl(var(--danger))' : 'hsl(var(--accent))',
+                transition: 'width 0.3s ease'
+              }} />
+            </div>
+            <div className="status-row" style={{ marginTop: '4px', fontSize: '0.75rem', justifyContent: 'flex-end' }}>
+              <span className="val text-muted">
+                {parameters.num_ctx > 0 ? `${Math.min(100, Math.round((contextUsed / parameters.num_ctx) * 100))}%` : '0%'}
+              </span>
+            </div>
+          </div>
+        </div>
       </aside>
 
       {/* 4. Settings Popup / Modal */}
@@ -920,6 +1026,19 @@ export default function App() {
                     onChange={(e) => setSettings(prev => ({ ...prev, isSharedMode: e.target.checked }))} 
                   />
                   <label htmlFor="shared-toggle"></label>
+                </div>
+              </div>
+
+              <div className="form-group inline-group">
+                <label>{t.sendOnEnter}</label>
+                <div className="toggle-switch">
+                  <input 
+                    type="checkbox" 
+                    id="send-toggle" 
+                    checked={sendOnEnter} 
+                    onChange={(e) => setSendOnEnter(e.target.checked)} 
+                  />
+                  <label htmlFor="send-toggle"></label>
                 </div>
               </div>
 

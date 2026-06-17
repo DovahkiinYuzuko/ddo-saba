@@ -71,18 +71,18 @@ h1, h2, h3, h4, h5, h6 {
 
 /* Scrollbar Styling */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px; /* ponytail: slightly wider for touch/drag ease */
+  height: 8px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: hsl(var(--border));
+  background: hsl(var(--text-muted) / 0.35); /* ponytail: visible thumb color */
   border-radius: var(--radius-sm);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(var(--text-muted));
+  background: hsl(var(--text-muted) / 0.7);
 }
 
 /* 3-Columns Grid Layout */
@@ -218,6 +218,7 @@ h1, h2, h3, h4, h5, h6 {
   flex-direction: column;
   height: 100%;
   background-color: hsl(var(--bg-app));
+  overflow: hidden; /* ponytail: lock container height to prevent global layout overflow */
 }
 
 .chat-header {
@@ -281,6 +282,7 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  min-height: 0; /* ponytail: allows flex child to shrink below contents and scroll */
 }
 
 .empty-state {
@@ -361,6 +363,19 @@ h1, h2, h3, h4, h5, h6 {
   font-size: 0.75rem;
   color: hsl(var(--text-muted));
   padding-left: 4px;
+}
+
+.message-metrics {
+  font-size: 0.75rem;
+  color: hsl(var(--text-muted) / 0.85);
+  padding-left: 4px;
+  margin-top: 4px;
+  font-family: monospace;
+}
+
+.user .message-metrics {
+  text-align: right;
+  padding-right: 4px;
 }
 
 .user .message-sender {
