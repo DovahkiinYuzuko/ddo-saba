@@ -163,9 +163,10 @@ All states defined below use React's `useState` or `useRef`.
 - **Return Value:** JSX element.
 
 ### `parseMessageContent`
-- **Description:** Parses chat message contents to extract `<think>` blocks, and delegates rendering to `renderMarkdownContent` for both thought processes and answers.
+- **Description:** Parses chat message contents to extract `<think>` blocks, and delegates rendering to `renderMarkdownContent` for both thought processes and answers. The thinking block utilizes a `<details>` accordion. When folded, it avoids rendering the internal thinking content to prevent unnecessary DOM overhead, defaulting to a collapsed state if `collapseThinking` is enabled.
 - **Arguments:**
   - `content` (`string`): The raw message content to parse.
+  - `msgKey` (`string`): A unique identifier for the message bubble to track its accordion expanded state.
 - **Return Value:** JSX element.
 
 ### `renderMarkdownContent` (nested inside `parseMessageContent`)

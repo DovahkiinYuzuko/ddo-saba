@@ -864,7 +864,7 @@ export default function App() {
     };
 
     if (thinkStart !== -1) {
-      const isThinkingExpanded = expandedThinking[msgKey] ?? (thinkEnd === -1 ? true : !collapseThinking);
+      const isThinkingExpanded = expandedThinking[msgKey] ?? !collapseThinking;
       if (thinkEnd !== -1) {
         const thinking = content.slice(thinkStart + 7, thinkEnd).trim();
         const answer = content.slice(thinkEnd + 8).trim();
@@ -876,7 +876,7 @@ export default function App() {
               onToggle={(e) => handleThinkingToggle(msgKey, e.currentTarget.open)}
             >
               <summary className="cot-summary">{t.thinking}</summary>
-              <div className="cot-content">{renderMarkdownContent(thinking)}</div>
+              {isThinkingExpanded && <div className="cot-content">{renderMarkdownContent(thinking)}</div>}
             </details>
             <div className="cot-answer">{renderMarkdownContent(answer)}</div>
           </div>
@@ -894,7 +894,7 @@ export default function App() {
                 <Loader2 className="animate-spin" size={14} />
                 <span>{t.thinking}...</span>
               </summary>
-              <div className="cot-content">{renderMarkdownContent(thinking)}</div>
+              {isThinkingExpanded && <div className="cot-content">{renderMarkdownContent(thinking)}</div>}
             </details>
           </div>
         );
@@ -976,57 +976,42 @@ export default function App() {
       {/* 2. Middle Column: Main Chat Room */}
       <main className="chat-column">
         <header className="chat-header">
-          <div className="model-selector-wrap" style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
-              <select 
-                value={activeModel} 
-                onChange={(e) => {
-                  const selected = e.target.value;
-                  setActiveModel(selected);
-                  loadModelOnSelection(selected);
-                }}
-                disabled={isModelLoading}
-                className="model-select"
-                style={{ flex: 1 }}
+          <div className="model-selector-wrap">
+            <select 
+              value={activeModel} 
+              onChange={(e) => {
+                const selected = e.target.value;
+                setActiveModel(selected);
+                loadModelOnSelection(selected);
+              }}
+              disabled={isModelLoading}
+              className="model-select"
+              style={{ flex: 1 }}
+            >
+              <option value="">{models.length === 0 ? "No models detected" : (t.selectModel || "Select a model...")}</option>
+              {models.map(m => (
+                <option key={m.name} value={m.name}>
+                  {m.name} {m.size ? `(${formatBytes(m.size)})` : ''}
+                </option>
+              ))}
+            </select>
+            {psInfo && (
+              <button 
+                onClick={unloadModel} 
+                className="unload-btn" 
+                title={lang === 'ja' ? 'VRAMからアンロード' : 'Unload from VRAM'}
               >
-                <option value="">{models.length === 0 ? "No models detected" : (t.selectModel || "Select a model...")}</option>
-                {models.map(m => (
-                  <option key={m.name} value={m.name}>
-                    {m.name} {m.size ? `(${formatBytes(m.size)})` : ''}
-                  </option>
-                ))}
-              </select>
-              {psInfo && (
-                <button 
-                  onClick={unloadModel} 
-                  className="btn-secondary" 
-                  title={lang === 'ja' ? 'VRAMからアンロード' : 'Unload from VRAM'}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '8px',
-                    cursor: 'pointer',
-                    height: '38px',
-                    width: '38px',
-                    backgroundColor: 'hsl(var(--danger-muted, var(--bg-input)))',
-                    border: '1px solid hsl(var(--border))',
-                    borderRadius: 'var(--radius-md)',
-                    color: 'hsl(var(--danger, #ef4444))'
-                  }}
-                >
-                  <LogOut size={16} />
-                </button>
-              )}
-            </div>
+                <LogOut size={16} />
+              </button>
+            )}
             {isModelLoading && (
-              <div className="model-loading-indicator" style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'hsl(var(--accent))', fontSize: '0.8em', fontWeight: 500 }}>
+              <div className="model-loading-indicator">
                 <Loader2 className="animate-spin" size={14} />
                 <span>Loading Model...</span>
               </div>
             )}
             {modelLoadError && (
-              <div className="model-load-error" style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'hsl(var(--danger))', fontSize: '0.8em', fontWeight: 500 }}>
+              <div className="model-load-error">
                 <AlertTriangle size={14} />
                 <span>{modelLoadError}</span>
               </div>
@@ -1134,22 +1119,14 @@ export default function App() {
         <div className="column-section">
           <h3><Sliders size={16} /> {t.modelParameters}</h3>
           
-          <div className="preset-name-input-group" style={{ margin: '8px 0' }}>
+          <div className="input-group">
+            <label>{lang === 'ja' ? 'プリセット名' : 'Preset Name'}</label>
             <input
               type="text"
               className="preset-name-input"
               value={presetName}
               onChange={(e) => setPresetName(e.target.value)}
-              placeholder={lang === 'ja' ? 'プリセット名' : 'Preset Name'}
-              style={{
-                width: '100%',
-                padding: '6px 10px',
-                backgroundColor: 'hsl(var(--bg-input))',
-                border: '1px solid hsl(var(--border))',
-                borderRadius: 'var(--radius-md)',
-                color: 'hsl(var(--text-primary))',
-                fontSize: '0.9em'
-              }}
+              placeholder={lang === 'ja' ? 'プリセット名を入力...' : 'Enter preset name...'}
             />
           </div>
 
@@ -1289,12 +1266,12 @@ export default function App() {
           </div>
 
           {/* Preset Export / Import Actions */}
-          <div className="preset-actions-group" style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
-            <button className="btn-secondary" onClick={exportPreset} style={{ flex: 1, fontSize: '0.85em', padding: '6px' }}>
-              {lang === 'ja' ? '設定書き出し' : 'Export Preset'}
+          <div className="preset-actions-group">
+            <button className="btn-secondary" onClick={exportPreset}>
+              Export
             </button>
-            <label className="btn-secondary" style={{ flex: 1, fontSize: '0.85em', padding: '6px', textAlign: 'center', cursor: 'pointer', display: 'inline-block' }}>
-              {lang === 'ja' ? '設定読み込み' : 'Import Preset'}
+            <label className="btn-secondary clickable">
+              Import
               <input type="file" accept=".json" onChange={importPreset} style={{ display: 'none' }} />
             </label>
           </div>
