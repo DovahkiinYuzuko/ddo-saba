@@ -1033,3 +1033,13 @@ input[type="range"]::-webkit-slider-thumb:hover {
   margin: 8px 0;
 }
 
+/* ponytail: Disabled inputs opacity and cursor feedback */
+input[disabled], select[disabled], textarea[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+input[type="range"][disabled]::-webkit-slider-thumb {
+  background-color: hsl(var(--border));
+  cursor: not-allowed;
+}
+

@@ -225,10 +225,6 @@ export default function App() {
   const [isModelLoading, setIsModelLoading] = useState<boolean>(false);
   const [activeModel, setActiveModel] = useState<string>('');
   const [systemPrompt, setSystemPrompt] = useState<string>('You are a helpful assistant.');
-  // ponytail: Temporarily log new variables to prevent TS unused local variable compilation errors
-  if (false) {
-    console.log(presetName, numPredictEnabled, isModelLoading, setPresetName, setNumPredictEnabled, setIsModelLoading, formatBytes, exportPreset, importPreset);
-  }
   const [parameters, setParameters] = useState({
     temperature: 0.7,
     num_ctx: 2048,
@@ -938,7 +934,11 @@ export default function App() {
               {models.length === 0 ? (
                 <option value="">No models detected</option>
               ) : (
-                models.map(m => <option key={m.name} value={m.name}>{m.name}</option>)
+                models.map(m => (
+                  <option key={m.name} value={m.name}>
+                    {m.name} {m.size ? `(${formatBytes(m.size)})` : ''}
+                  </option>
+                ))
               )}
             </select>
           </div>
@@ -1004,6 +1004,7 @@ export default function App() {
           <div className="input-wrap">
             <textarea 
               value={inputText}
+              disabled={isGenerating || isModelLoading}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={(e) => {
                 // ponytail: dynamically evaluate keyboard send shortcuts based on configuration toggle
@@ -1021,12 +1022,17 @@ export default function App() {
               rows={2}
               className="input-textarea"
             />
-            {isGenerating ? (
+            {isModelLoading ? (
+              <button className="action-btn send-btn" disabled style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Loader2 className="animate-spin" size={16} />
+                <span style={{ fontSize: '0.85em' }}>Loading...</span>
+              </button>
+            ) : isGenerating ? (
               <button className="action-btn stop-btn" onClick={stopGeneration}>
                 <Square size={16} />
               </button>
             ) : (
-              <button className="action-btn send-btn" onClick={sendMessage} disabled={!inputText.trim()}>
+              <button className="action-btn send-btn" onClick={sendMessage} disabled={!inputText.trim() || isModelLoading}>
                 <Send size={16} />
               </button>
             )}
@@ -1043,6 +1049,25 @@ export default function App() {
         <div className="column-section">
           <h3><Sliders size={16} /> {t.modelParameters}</h3>
           
+          <div className="preset-name-input-group" style={{ margin: '8px 0' }}>
+            <input
+              type="text"
+              className="preset-name-input"
+              value={presetName}
+              onChange={(e) => setPresetName(e.target.value)}
+              placeholder={lang === 'ja' ? 'プリセット名' : 'Preset Name'}
+              style={{
+                width: '100%',
+                padding: '6px 10px',
+                backgroundColor: 'hsl(var(--bg-input))',
+                border: '1px solid hsl(var(--border))',
+                borderRadius: 'var(--radius-md)',
+                color: 'hsl(var(--text-primary))',
+                fontSize: '0.9em'
+              }}
+            />
+          </div>
+
           <div className="input-group">
             <label>{t.reasoningMode}</label>
             <div className="toggle-switch">
@@ -1118,15 +1143,23 @@ export default function App() {
             />
           </div>
 
-          {/* Context Size Slider */}
+          {/* Max Output Tokens Slider with Toggle */}
           <div className="slider-group">
-            <div className="slider-header">
-              <label>{t.maxTokens}</label>
-              <span>{parameters.num_predict}</span>
+            <div className="slider-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                <input 
+                  type="checkbox" 
+                  checked={numPredictEnabled} 
+                  onChange={(e) => setNumPredictEnabled(e.target.checked)} 
+                />
+                {t.maxTokens}
+              </label>
+              <span>{numPredictEnabled ? parameters.num_predict : (lang === 'ja' ? '無制限' : 'Unlimited')}</span>
             </div>
             <input 
-              type="range" min="-1" max="4096" step="64" 
+              type="range" min="128" max="16384" step="128" 
               value={parameters.num_predict} 
+              disabled={!numPredictEnabled}
               onChange={(e) => setParameters(prev => ({ ...prev, num_predict: parseInt(e.target.value) }))}
             />
           </div>
@@ -1134,7 +1167,7 @@ export default function App() {
           {/* ponytail: Context Limit Slider */}
           <div className="slider-group">
             <div className="slider-header">
-              <label>Context Limit (num_ctx)</label>
+              <label>{t.contextLimit || "Context Limit (num_ctx)"}</label>
               <span>{parameters.num_ctx}</span>
             </div>
             <input 
@@ -1155,6 +1188,17 @@ export default function App() {
               value={parameters.repeat_penalty} 
               onChange={(e) => setParameters(prev => ({ ...prev, repeat_penalty: parseFloat(e.target.value) }))}
             />
+          </div>
+
+          {/* Preset Export / Import Actions */}
+          <div className="preset-actions-group" style={{ display: 'flex', gap: '8px', marginTop: '16px' }}>
+            <button className="btn-secondary" onClick={exportPreset} style={{ flex: 1, fontSize: '0.85em', padding: '6px' }}>
+              {lang === 'ja' ? '設定書き出し' : 'Export Preset'}
+            </button>
+            <label className="btn-secondary" style={{ flex: 1, fontSize: '0.85em', padding: '6px', textAlign: 'center', cursor: 'pointer', display: 'inline-block' }}>
+              {lang === 'ja' ? '設定読み込み' : 'Import Preset'}
+              <input type="file" accept=".json" onChange={importPreset} style={{ display: 'none' }} />
+            </label>
           </div>
         </div>
 
