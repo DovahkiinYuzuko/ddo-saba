@@ -87,6 +87,14 @@ All states defined below use React's `useState` or `useRef`.
 - **Type:** `boolean`
 - **Description:** Tracks if a background model pre-loading process is active.
 
+### `modelLoadError`
+- **Type:** `string`
+- **Description:** Holds descriptive error strings when background model loading fetches fail.
+
+### `collapseThinking`
+- **Type:** `boolean`
+- **Description:** Toggles whether the reasoning process (thinking blocks) defaults to collapsed/folded state in UI rendering.
+
 ---
 
 ## 2. Functions
@@ -242,6 +250,7 @@ graph TD
     exportPreset --> thinkMode
     exportPreset --> sendOnEnter
     exportPreset --> numPredictEnabled
+    exportPreset --> collapseThinking
 
     importPreset --> presetName
     importPreset --> systemPrompt
@@ -249,9 +258,11 @@ graph TD
     importPreset --> thinkMode
     importPreset --> sendOnEnter
     importPreset --> numPredictEnabled
+    importPreset --> collapseThinking
 
     loadModelOnSelection --> settings
     loadModelOnSelection --> isModelLoading
+    loadModelOnSelection --> modelLoadError
 ```
 
 ---

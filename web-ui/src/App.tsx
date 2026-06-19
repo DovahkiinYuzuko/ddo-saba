@@ -62,6 +62,8 @@ interface LocaleStrings {
   close: string;
   sendOnEnter: string;
   contextLimit: string;
+  selectModel: string;
+  collapseThinking: string;
 }
 
 const locales: Record<'en' | 'ja', LocaleStrings> = {
@@ -100,7 +102,9 @@ const locales: Record<'en' | 'ja', LocaleStrings> = {
     thinking: "Thinking Process",
     close: "Close",
     sendOnEnter: "Press Enter to send (Shift+Enter for newline)",
-    contextLimit: "Context Limit (num_ctx)"
+    contextLimit: "Context Limit (num_ctx)",
+    selectModel: "Select a model...",
+    collapseThinking: "Collapse Thinking Process"
   },
   ja: {
     title: "DDO Saba コントロールパネル",
@@ -137,7 +141,9 @@ const locales: Record<'en' | 'ja', LocaleStrings> = {
     thinking: "思考プロセス",
     close: "閉じる",
     sendOnEnter: "Enterキーで送信する (Shift+Enterで改行)",
-    contextLimit: "コンテキスト制限 (num_ctx)"
+    contextLimit: "コンテキスト制限 (num_ctx)",
+    selectModel: "モデルを選択してください",
+    collapseThinking: "思考プロセスを折りたたむ"
   }
 };
 
@@ -220,9 +226,19 @@ export default function App() {
   });
 
   const [models, setModels] = useState<{ name: string; size?: number }[]>([]);
+  const [expandedThinking, setExpandedThinking] = useState<Record<string, boolean>>({});
+
+  const handleThinkingToggle = (msgKey: string, isOpen: boolean) => {
+    setExpandedThinking(prev => {
+      if (prev[msgKey] === isOpen) return prev;
+      return { ...prev, [msgKey]: isOpen };
+    });
+  };
   const [presetName, setPresetName] = useState<string>("My Preset");
   const [numPredictEnabled, setNumPredictEnabled] = useState<boolean>(true);
   const [isModelLoading, setIsModelLoading] = useState<boolean>(false);
+  const [modelLoadError, setModelLoadError] = useState<string>('');
+  const [collapseThinking, setCollapseThinking] = useState<boolean>(true);
   const [activeModel, setActiveModel] = useState<string>('');
   const [systemPrompt, setSystemPrompt] = useState<string>('You are a helpful assistant.');
   const [parameters, setParameters] = useState({
@@ -242,13 +258,13 @@ export default function App() {
   const [contextUsed, setContextUsed] = useState<number>(0); /* ponytail: track active context token usage */
   // ponytail: Separate model fallback logic to avoid timing/closure issues
   useEffect(() => {
-    if (models.length > 0) {
+    if (activeModel) {
       const modelNames = models.map(m => m.name);
-      if (!activeModel || !modelNames.includes(activeModel)) {
+      if (models.length > 0 && !modelNames.includes(activeModel)) {
         setActiveModel(models[0].name);
+      } else if (models.length === 0) {
+        setActiveModel('');
       }
-    } else {
-      setActiveModel('');
     }
   }, [models, activeModel]);
 
@@ -256,24 +272,32 @@ export default function App() {
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
 
   const loadModelOnSelection = async (modelName: string) => {
-    if (!modelName) return;
+    if (!modelName) {
+      setModelLoadError('');
+      return;
+    }
     setIsModelLoading(true);
+    setModelLoadError('');
     try {
       const headers: HeadersInit = { 'Content-Type': 'application/json' };
       if (settings.accessToken) {
         headers['X-DDO-Token'] = settings.accessToken;
       }
-      await fetch(`${settings.connectionUrl}/api/chat`, {
+      const res = await fetch(`${settings.connectionUrl}/api/generate`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
           model: modelName,
-          messages: [],
           keep_alive: 300
         })
       });
-    } catch (e) {
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      }
+    } catch (e: any) {
       console.error("Failed to pre-load model into VRAM", e);
+      setModelLoadError(e.message || "Failed to load model");
+      setActiveModel('');
     } finally {
       setIsModelLoading(false);
     }
@@ -281,7 +305,7 @@ export default function App() {
 
   // ponytail: Active session background keep-alive refresh
   useEffect(() => {
-    if (!activeModel || isGenerating) return;
+    if (!activeModel || activeModel === "" || isGenerating) return;
     const interval = setInterval(async () => {
       try {
         const headers: HeadersInit = { 'Content-Type': 'application/json' };
@@ -555,6 +579,8 @@ export default function App() {
       let accumulatedContent = '';
       let thinkStartTime = 0;
       let thinkEndTime = 0;
+      let isThinkingState = false;
+      let hasThoughtEndedState = false;
 
       if (reader) {
         while (true) {
@@ -573,13 +599,23 @@ export default function App() {
               if (!thinkStartTime) {
                 thinkStartTime = performance.now();
               }
-              if (accumulatedContent.includes('</think>') && !thinkEndTime) {
-                thinkEndTime = performance.now();
+
+              if (parsed.message?.thinking) {
+                if (!isThinkingState) {
+                  isThinkingState = true;
+                  accumulatedContent += '<think>\n';
+                }
+                accumulatedContent += parsed.message.thinking;
+              } else if (parsed.message?.content) {
+                if (isThinkingState && !hasThoughtEndedState) {
+                  accumulatedContent += '\n</think>\n';
+                  hasThoughtEndedState = true;
+                  thinkEndTime = performance.now();
+                }
+                accumulatedContent += parsed.message.content;
               }
 
-              if (parsed.message?.content) {
-                accumulatedContent += parsed.message.content;
-                
+              if (accumulatedContent) {
                 // Update assistant message state incrementally (streaming UI typewriter effect)
                 setChats(prev => prev.map(c => {
                   if (c.id === activeChatId) {
@@ -599,6 +635,11 @@ export default function App() {
 
               // ponytail: Capture inference metrics at the end of the stream
               if (parsed.done) {
+                if (isThinkingState && !hasThoughtEndedState) {
+                  accumulatedContent += '\n</think>\n';
+                  hasThoughtEndedState = true;
+                  thinkEndTime = performance.now();
+                }
                 const totalDurationSec = parsed.total_duration ? (parsed.total_duration / 1e9) : 0;
                 const evalDurationSec = parsed.eval_duration ? (parsed.eval_duration / 1e9) : 0;
                 const tokensPerSec = (parsed.eval_count && evalDurationSec > 0) ? (parsed.eval_count / evalDurationSec) : 0;
@@ -621,7 +662,7 @@ export default function App() {
                       ...c,
                       messages: c.messages.map(m => {
                         if (m.id === assistantMsgId) {
-                          return { ...m, metrics };
+                          return { ...m, metrics, content: accumulatedContent };
                         }
                         return m;
                       })
@@ -742,7 +783,8 @@ export default function App() {
       parameters,
       thinkMode,
       sendOnEnter,
-      numPredictEnabled
+      numPredictEnabled,
+      collapseThinking
     };
 
     const blob = new Blob([JSON.stringify(presetData, null, 2)], { type: 'application/json' });
@@ -776,6 +818,7 @@ export default function App() {
           if (data.thinkMode !== undefined) setThinkMode(data.thinkMode);
           if (data.sendOnEnter !== undefined) setSendOnEnter(data.sendOnEnter);
           if (data.numPredictEnabled !== undefined) setNumPredictEnabled(data.numPredictEnabled);
+          if (data.collapseThinking !== undefined) setCollapseThinking(data.collapseThinking);
         } else {
           alert("Invalid preset file format. Make sure version matches.");
         }
@@ -787,7 +830,7 @@ export default function App() {
   };
 
   // Helper parser to extract <think> blocks and render Markdown / LaTeX with Syntax Highlighting
-  const parseMessageContent = (content: string) => {
+  const parseMessageContent = (content: string, msgKey: string) => {
     const thinkStart = content.indexOf('<think>');
     const thinkEnd = content.indexOf('</think>');
 
@@ -821,12 +864,17 @@ export default function App() {
     };
 
     if (thinkStart !== -1) {
+      const isThinkingExpanded = expandedThinking[msgKey] ?? (thinkEnd === -1 ? true : !collapseThinking);
       if (thinkEnd !== -1) {
-        const thinking = content.slice(thinkStart + 7, thinkEnd);
-        const answer = content.slice(thinkEnd + 8);
+        const thinking = content.slice(thinkStart + 7, thinkEnd).trim();
+        const answer = content.slice(thinkEnd + 8).trim();
         return (
           <div className="message-cot-container">
-            <details className="cot-details" open>
+            <details 
+              className="cot-details" 
+              open={isThinkingExpanded}
+              onToggle={(e) => handleThinkingToggle(msgKey, e.currentTarget.open)}
+            >
               <summary className="cot-summary">{t.thinking}</summary>
               <div className="cot-content">{renderMarkdownContent(thinking)}</div>
             </details>
@@ -834,11 +882,18 @@ export default function App() {
           </div>
         );
       } else {
-        const thinking = content.slice(thinkStart + 7);
+        const thinking = content.slice(thinkStart + 7).trim();
         return (
           <div className="message-cot-container">
-            <details className="cot-details" open>
-              <summary className="cot-summary">{t.thinking}...</summary>
+            <details 
+              className="cot-details" 
+              open={isThinkingExpanded}
+              onToggle={(e) => handleThinkingToggle(msgKey, e.currentTarget.open)}
+            >
+              <summary className="cot-summary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Loader2 className="animate-spin" size={14} />
+                <span>{t.thinking}...</span>
+              </summary>
               <div className="cot-content">{renderMarkdownContent(thinking)}</div>
             </details>
           </div>
@@ -921,26 +976,61 @@ export default function App() {
       {/* 2. Middle Column: Main Chat Room */}
       <main className="chat-column">
         <header className="chat-header">
-          <div className="model-selector-wrap">
-            <select 
-              value={activeModel} 
-              onChange={(e) => {
-                const selected = e.target.value;
-                setActiveModel(selected);
-                loadModelOnSelection(selected);
-              }}
-              className="model-select"
-            >
-              {models.length === 0 ? (
-                <option value="">No models detected</option>
-              ) : (
-                models.map(m => (
+          <div className="model-selector-wrap" style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
+              <select 
+                value={activeModel} 
+                onChange={(e) => {
+                  const selected = e.target.value;
+                  setActiveModel(selected);
+                  loadModelOnSelection(selected);
+                }}
+                disabled={isModelLoading}
+                className="model-select"
+                style={{ flex: 1 }}
+              >
+                <option value="">{models.length === 0 ? "No models detected" : (t.selectModel || "Select a model...")}</option>
+                {models.map(m => (
                   <option key={m.name} value={m.name}>
                     {m.name} {m.size ? `(${formatBytes(m.size)})` : ''}
                   </option>
-                ))
+                ))}
+              </select>
+              {psInfo && (
+                <button 
+                  onClick={unloadModel} 
+                  className="btn-secondary" 
+                  title={lang === 'ja' ? 'VRAMからアンロード' : 'Unload from VRAM'}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '8px',
+                    cursor: 'pointer',
+                    height: '38px',
+                    width: '38px',
+                    backgroundColor: 'hsl(var(--danger-muted, var(--bg-input)))',
+                    border: '1px solid hsl(var(--border))',
+                    borderRadius: 'var(--radius-md)',
+                    color: 'hsl(var(--danger, #ef4444))'
+                  }}
+                >
+                  <LogOut size={16} />
+                </button>
               )}
-            </select>
+            </div>
+            {isModelLoading && (
+              <div className="model-loading-indicator" style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'hsl(var(--accent))', fontSize: '0.8em', fontWeight: 500 }}>
+                <Loader2 className="animate-spin" size={14} />
+                <span>Loading Model...</span>
+              </div>
+            )}
+            {modelLoadError && (
+              <div className="model-load-error" style={{ display: 'flex', alignItems: 'center', gap: '6px', color: 'hsl(var(--danger))', fontSize: '0.8em', fontWeight: 500 }}>
+                <AlertTriangle size={14} />
+                <span>{modelLoadError}</span>
+              </div>
+            )}
           </div>
 
           <div className="header-actions">
@@ -978,7 +1068,7 @@ export default function App() {
               <div className="message-bubble">
                 {m.sender && <div className="message-sender">{m.sender}</div>}
                 <div className="message-text">
-                  {m.content ? parseMessageContent(m.content) : (
+                  {m.content ? parseMessageContent(m.content, m.id || `msg_${idx}`) : (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'hsl(var(--text-muted))' }}>
                       <Loader2 size={16} className="animate-spin" />
                       <span>Thinking...</span>
@@ -1022,12 +1112,7 @@ export default function App() {
               rows={2}
               className="input-textarea"
             />
-            {isModelLoading ? (
-              <button className="action-btn send-btn" disabled style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Loader2 className="animate-spin" size={16} />
-                <span style={{ fontSize: '0.85em' }}>Loading...</span>
-              </button>
-            ) : isGenerating ? (
+            {isGenerating ? (
               <button className="action-btn stop-btn" onClick={stopGeneration}>
                 <Square size={16} />
               </button>
@@ -1078,6 +1163,19 @@ export default function App() {
                 onChange={(e) => setThinkMode(e.target.checked)} 
               />
               <label htmlFor="think-toggle"></label>
+            </div>
+          </div>
+
+          <div className="input-group">
+            <label>{t.collapseThinking}</label>
+            <div className="toggle-switch">
+              <input 
+                type="checkbox" 
+                id="collapse-think-toggle" 
+                checked={collapseThinking} 
+                onChange={(e) => setCollapseThinking(e.target.checked)} 
+              />
+              <label htmlFor="collapse-think-toggle"></label>
             </div>
           </div>
 
@@ -1211,22 +1309,6 @@ export default function App() {
                 <span className="label">Model:</span>
                 <span className="val font-semibold flex items-center gap-2">
                   {psInfo.name}
-                  <button 
-                    onClick={unloadModel} 
-                    className="unload-btn-icon" 
-                    title="Unload model from VRAM"
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: 'hsl(var(--danger))',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      padding: '2px'
-                    }}
-                  >
-                    <LogOut size={14} />
-                  </button>
                 </span>
               </div>
               <div className="status-row">
