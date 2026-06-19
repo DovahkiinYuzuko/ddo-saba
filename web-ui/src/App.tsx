@@ -283,11 +283,16 @@ export default function App() {
       if (settings.accessToken) {
         headers['X-DDO-Token'] = settings.accessToken;
       }
+      const optionsPayload: Record<string, any> = { ...parameters };
+      if (!numPredictEnabled) {
+        delete optionsPayload.num_predict;
+      }
       const res = await fetch(`${settings.connectionUrl}/api/generate`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
           model: modelName,
+          options: optionsPayload,
           keep_alive: 300
         })
       });
@@ -977,6 +982,7 @@ export default function App() {
       <main className="chat-column">
         <header className="chat-header">
           <div className="model-selector-wrap">
+            {isModelLoading && <Loader2 className="animate-spin" size={16} style={{ color: 'hsl(var(--accent))', flexShrink: 0 }} />}
             <select 
               value={activeModel} 
               onChange={(e) => {
@@ -988,7 +994,7 @@ export default function App() {
               className="model-select"
               style={{ flex: 1 }}
             >
-              <option value="">{models.length === 0 ? "No models detected" : (t.selectModel || "Select a model...")}</option>
+              <option value="">{isModelLoading ? (lang === 'ja' ? 'モデルをロード中...' : 'Loading Model...') : (models.length === 0 ? "No models detected" : (t.selectModel || "Select a model..."))}</option>
               {models.map(m => (
                 <option key={m.name} value={m.name}>
                   {m.name} {m.size ? `(${formatBytes(m.size)})` : ''}
@@ -1004,14 +1010,8 @@ export default function App() {
                 <LogOut size={16} />
               </button>
             )}
-            {isModelLoading && (
-              <div className="model-loading-indicator">
-                <Loader2 className="animate-spin" size={14} />
-                <span>Loading Model...</span>
-              </div>
-            )}
             {modelLoadError && (
-              <div className="model-load-error">
+              <div style={{ color: 'hsl(var(--danger))', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px', marginLeft: '8px', flexShrink: 0 }}>
                 <AlertTriangle size={14} />
                 <span>{modelLoadError}</span>
               </div>

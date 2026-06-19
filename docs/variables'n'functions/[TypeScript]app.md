@@ -186,7 +186,7 @@ All states defined below use React's `useState` or `useRef`.
 - **Arguments:**
   - `modelName` (`string`): Target model configuration string.
 - **Return Value:** `Promise<void>`
-- **Dependencies:** Relies on `settings`, modifies `isModelLoading`.
+- **Dependencies:** Relies on `settings`, `parameters`, `numPredictEnabled`, modifies `isModelLoading`, `modelLoadError`.
 
 ### `exportPreset`
 - **Description:** Bundles system prompts, parameters, think mode, key shortcut configurations, and preset names into a JSON object and triggers local browser file download.
@@ -264,6 +264,8 @@ graph TD
     loadModelOnSelection --> settings
     loadModelOnSelection --> isModelLoading
     loadModelOnSelection --> modelLoadError
+    loadModelOnSelection --> parameters
+    loadModelOnSelection --> numPredictEnabled
 ```
 
 ---

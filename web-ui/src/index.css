@@ -1048,24 +1048,6 @@ input[type="range"][disabled]::-webkit-slider-thumb {
 }
 
 /* UI Enhancements */
-.model-loading-indicator,
-.model-load-error {
-  position: absolute;
-  bottom: -18px;
-  left: 0;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.75rem;
-  font-weight: 500;
-  white-space: nowrap;
-}
-.model-loading-indicator {
-  color: hsl(var(--accent));
-}
-.model-load-error {
-  color: hsl(var(--danger));
-}
 
 .unload-btn {
   display: flex;
