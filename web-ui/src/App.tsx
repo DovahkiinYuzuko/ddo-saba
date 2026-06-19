@@ -170,6 +170,15 @@ interface PsModelInfo {
   until: string;
 }
 
+function formatBytes(bytes?: number) {
+  if (bytes === undefined || bytes === null) return '';
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
 // ponytail: Helper component to copy raw markdown text to clipboard with feedback
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -218,7 +227,7 @@ export default function App() {
   const [systemPrompt, setSystemPrompt] = useState<string>('You are a helpful assistant.');
   // ponytail: Temporarily log new variables to prevent TS unused local variable compilation errors
   if (false) {
-    console.log(presetName, numPredictEnabled, isModelLoading, setPresetName, setNumPredictEnabled, setIsModelLoading);
+    console.log(presetName, numPredictEnabled, isModelLoading, setPresetName, setNumPredictEnabled, setIsModelLoading, formatBytes);
   }
   const [parameters, setParameters] = useState({
     temperature: 0.7,
@@ -249,6 +258,55 @@ export default function App() {
 
   const [inputText, setInputText] = useState<string>('');
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
+
+  const loadModelOnSelection = async (modelName: string) => {
+    if (!modelName) return;
+    setIsModelLoading(true);
+    try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (settings.accessToken) {
+        headers['X-DDO-Token'] = settings.accessToken;
+      }
+      await fetch(`${settings.connectionUrl}/api/chat`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          model: modelName,
+          messages: [],
+          keep_alive: 300
+        })
+      });
+    } catch (e) {
+      console.error("Failed to pre-load model into VRAM", e);
+    } finally {
+      setIsModelLoading(false);
+    }
+  };
+
+  // ponytail: Active session background keep-alive refresh
+  useEffect(() => {
+    if (!activeModel || isGenerating) return;
+    const interval = setInterval(async () => {
+      try {
+        const headers: HeadersInit = { 'Content-Type': 'application/json' };
+        if (settings.accessToken) {
+          headers['X-DDO-Token'] = settings.accessToken;
+        }
+        await fetch(`${settings.connectionUrl}/api/chat`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            model: activeModel,
+            messages: [],
+            keep_alive: 300
+          })
+        });
+      } catch (e) {
+        console.error("Keep alive refresh failed", e);
+      }
+    }, 240000); // 4 minutes
+    return () => clearInterval(interval);
+  }, [activeModel, settings.connectionUrl, settings.accessToken, isGenerating]);
   const [lastPolledMsgId, setLastPolledMsgId] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -461,6 +519,11 @@ export default function App() {
     abortControllerRef.current = new AbortController();
 
     try {
+      const optionsPayload: Record<string, any> = { ...parameters };
+      if (!numPredictEnabled) {
+        delete optionsPayload.num_predict;
+      }
+
       const res = await fetch(`${settings.connectionUrl}/api/chat`, {
         method: 'POST',
         headers,
@@ -468,7 +531,7 @@ export default function App() {
         body: JSON.stringify({
           model: activeModel,
           messages: requestMessages,
-          options: parameters,
+          options: optionsPayload,
           think: thinkMode,
           stream: true
         })
@@ -813,7 +876,11 @@ export default function App() {
           <div className="model-selector-wrap">
             <select 
               value={activeModel} 
-              onChange={(e) => setActiveModel(e.target.value)}
+              onChange={(e) => {
+                const selected = e.target.value;
+                setActiveModel(selected);
+                loadModelOnSelection(selected);
+              }}
               className="model-select"
             >
               {models.length === 0 ? (
