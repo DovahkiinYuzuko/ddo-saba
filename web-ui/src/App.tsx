@@ -61,6 +61,7 @@ interface LocaleStrings {
   thinking: string;
   close: string;
   sendOnEnter: string;
+  contextLimit: string;
 }
 
 const locales: Record<'en' | 'ja', LocaleStrings> = {
@@ -98,7 +99,8 @@ const locales: Record<'en' | 'ja', LocaleStrings> = {
     until: "Unload In",
     thinking: "Thinking Process",
     close: "Close",
-    sendOnEnter: "Press Enter to send (Shift+Enter for newline)"
+    sendOnEnter: "Press Enter to send (Shift+Enter for newline)",
+    contextLimit: "Context Limit (num_ctx)"
   },
   ja: {
     title: "DDO Saba コントロールパネル",
@@ -134,7 +136,8 @@ const locales: Record<'en' | 'ja', LocaleStrings> = {
     until: "アンロードまで",
     thinking: "思考プロセス",
     close: "閉じる",
-    sendOnEnter: "Enterキーで送信する (Shift+Enterで改行)"
+    sendOnEnter: "Enterキーで送信する (Shift+Enterで改行)",
+    contextLimit: "コンテキスト制限 (num_ctx)"
   }
 };
 
@@ -207,9 +210,16 @@ export default function App() {
     username: 'Guest_' + Math.floor(Math.random() * 1000)
   });
 
-  const [models, setModels] = useState<string[]>([]);
+  const [models, setModels] = useState<{ name: string; size?: number }[]>([]);
+  const [presetName, setPresetName] = useState<string>("My Preset");
+  const [numPredictEnabled, setNumPredictEnabled] = useState<boolean>(true);
+  const [isModelLoading, setIsModelLoading] = useState<boolean>(false);
   const [activeModel, setActiveModel] = useState<string>('');
   const [systemPrompt, setSystemPrompt] = useState<string>('You are a helpful assistant.');
+  // ponytail: Temporarily log new variables to prevent TS unused local variable compilation errors
+  if (false) {
+    console.log(presetName, numPredictEnabled, isModelLoading, setPresetName, setNumPredictEnabled, setIsModelLoading);
+  }
   const [parameters, setParameters] = useState({
     temperature: 0.7,
     num_ctx: 2048,
@@ -228,8 +238,9 @@ export default function App() {
   // ponytail: Separate model fallback logic to avoid timing/closure issues
   useEffect(() => {
     if (models.length > 0) {
-      if (!activeModel || !models.includes(activeModel)) {
-        setActiveModel(models[0]);
+      const modelNames = models.map(m => m.name);
+      if (!activeModel || !modelNames.includes(activeModel)) {
+        setActiveModel(models[0].name);
       }
     } else {
       setActiveModel('');
@@ -304,12 +315,15 @@ export default function App() {
       const tagsRes = await fetch(`${settings.connectionUrl}/api/tags`, { headers });
       if (tagsRes.ok) {
         const data = await tagsRes.json();
-        const modelNames = data.models?.map((m: any) => m.name) || [];
+        const modelObjects = data.models?.map((m: any) => ({
+          name: m.name,
+          size: m.size
+        })) || [];
         
         // Prevent state update if the model list hasn't changed
         setModels(prev => {
-          if (JSON.stringify(prev) === JSON.stringify(modelNames)) return prev;
-          return modelNames;
+          if (JSON.stringify(prev) === JSON.stringify(modelObjects)) return prev;
+          return modelObjects;
         });
 
         // ponytail: Fallback logic is handled by a dedicated useEffect above
@@ -805,7 +819,7 @@ export default function App() {
               {models.length === 0 ? (
                 <option value="">No models detected</option>
               ) : (
-                models.map(m => <option key={m} value={m}>{m}</option>)
+                models.map(m => <option key={m.name} value={m.name}>{m.name}</option>)
               )}
             </select>
           </div>
