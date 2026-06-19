@@ -455,7 +455,6 @@ h1, h2, h3, h4, h5, h6 {
   line-height: 1.5;
   color: hsl(var(--text-muted));
   border-top: 1px solid hsl(var(--border));
-  white-space: pre-wrap;
   background-color: hsl(var(--bg-app) / 0.4);
 }
 
@@ -463,9 +462,7 @@ h1, h2, h3, h4, h5, h6 {
   white-space: pre-wrap;
 }
 
-.raw-content {
-  white-space: pre-wrap;
-}
+
 
 /* Input area */
 .chat-input-bar {
