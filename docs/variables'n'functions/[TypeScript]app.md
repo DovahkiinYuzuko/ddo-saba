@@ -100,7 +100,7 @@ All states defined below use React's `useState` or `useRef`.
 ## 2. Functions
 
 ### `sendMessage`
-- **Description:** Initiates a chat request, sends user prompt, handles responses stream, and triggers Nginx broadcast if shared room mode is active.
+- **Description:** Initiates a chat request, sends user prompt, handles responses stream, and triggers Nginx broadcast if shared room mode is active. Logs details about the payload, response status, and inference performance metrics to the browser console.
 - **Arguments:**
   - `content` (`string`): The user's input prompt text.
 - **Return Value:** `Promise<void>`
@@ -151,7 +151,7 @@ All states defined below use React's `useState` or `useRef`.
 - **Dependencies:** Modifies `models` and `psInfo`.
 
 ### `unloadModel`
-- **Description:** Sends a request to `/api/chat` with an empty message array and `keep_alive: 0` to unload the model from VRAM, then refreshes the model list.
+- **Description:** Sends a request to `/api/chat` with an empty message array and `keep_alive: 0` to unload the model from VRAM, then refreshes the model list. Logs the unload action status to the browser console.
 - **Arguments:** None.
 - **Return Value:** `Promise<void>`
 - **Dependencies:** Relies on `psInfo`, `settings`.
