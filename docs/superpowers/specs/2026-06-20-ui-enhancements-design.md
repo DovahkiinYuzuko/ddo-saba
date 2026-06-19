@@ -17,20 +17,25 @@ This document specifies the design and behavior changes for the DDO Saba Web UI,
 - **API Payload Integration**:
   - If `numPredictEnabled` is `false`, the `num_predict` key is omitted from the options payload in `/api/chat` (Ollama defaults to unlimited/model limit when omitted).
 
-### 1.2 Model Size Display & Automatic VRAM Load
-- **Objective**: Display model files sizes in the UI and trigger pre-loading on selection to prevent latency spikes during first chat requests.
+### 1.2 Model Size Display, Automatic VRAM Load & Selection Blocking
+- **Objective**: Display model files sizes in the UI, trigger pre-loading on selection, and safely manage loading states to prevent concurrent request conflicts.
 - **State Changes**:
-  - `models` (`Array<{ name: string, size?: number }>`): Updated from `string[]` to hold size metadata.
+  - `models` (`Array<{ name: string; size?: number }>`): Updated from `string[]` to hold size metadata.
   - `isModelLoading` (`boolean`, default: `false`): Tracks active background model load operations.
+  - `modelLoadError` (`string | null`, default: `null`): Holds load error messages to display when load fetches fail (e.g. Nginx 503/504 errors).
 - **Formatting Helper**:
   - `formatBytes(bytes: number)`: Utility function converting raw bytes into a human-readable format (`MB`, `GB`, `TB`).
-- **UI Dropdown**:
+- **UI Dropdown & Unselected State**:
+  - Initial `activeModel` is set to `""` (empty string).
+  - The dropdown features a default unselected option: `モデルを選択してください (Select a model)` with a value of `""`.
   - Option text formatted as `${model.name} (${formatBytes(model.size)})`.
+  - While `isModelLoading` is `true`, the dropdown select input itself is `disabled` to prevent rapid switching.
 - **Auto-Load & Block Trigger**:
-  - Changing the selected model triggers an immediate background POST to `${settings.connectionUrl}/api/chat` with an empty message array `messages: []` and the target model name.
-  - Sets `isModelLoading` to `true`.
-  - While `isModelLoading` is `true`, the chat input text box and "Send" button are `disabled`. The Send button label displays "Loading Model..." with a spinning loading icon.
-  - Reverts `isModelLoading` to `false` when the load request resolves (success or fail).
+  - Selecting a valid model (value != `""`) triggers an immediate background POST to `${settings.connectionUrl}/api/chat` with an empty message array `messages: []` and the target model name.
+  - Sets `isModelLoading` to `true` and clears `modelLoadError`.
+  - While `isModelLoading` is `true`, the chat input text box, "Send" button, and model select dropdown are `disabled`. The Send button label displays "Loading Model..." with a spinning loading icon.
+  - Reverts `isModelLoading` to `false` when the load request resolves.
+  - If the load request returns a non-OK status (e.g. Nginx 503/504), sets `modelLoadError` to a descriptive error message and resets `activeModel` to `""`.
 
 ### 1.3 Localization (ja) Completeness
 - **Objective**: Ensure parameters labels are fully translated into Japanese.
@@ -41,7 +46,7 @@ This document specifies the design and behavior changes for the DDO Saba Web UI,
 ### 1.4 Active Session Keep-Alive
 - **Objective**: Keep the active model in VRAM as long as the user has the browser tab open, preventing Ollama's default 5-minute timeout.
 - **Mechanism**:
-  - A background interval timer running every 240 seconds (4 minutes) when `activeModel` is set and `isGenerating` is `false`.
+  - A background interval timer running every 240 seconds (4 minutes) when `activeModel` is set, `activeModel !== ""`, and `isGenerating` is `false`.
   - Sends a background POST to `${settings.connectionUrl}/api/chat` with an empty message array (`messages: []`) to reset Ollama's internal keep-alive timer.
 
 ### 1.5 Parameter Preset Export & Import
