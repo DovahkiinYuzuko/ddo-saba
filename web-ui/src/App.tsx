@@ -227,7 +227,7 @@ export default function App() {
   const [systemPrompt, setSystemPrompt] = useState<string>('You are a helpful assistant.');
   // ponytail: Temporarily log new variables to prevent TS unused local variable compilation errors
   if (false) {
-    console.log(presetName, numPredictEnabled, isModelLoading, setPresetName, setNumPredictEnabled, setIsModelLoading, formatBytes);
+    console.log(presetName, numPredictEnabled, isModelLoading, setPresetName, setNumPredictEnabled, setIsModelLoading, formatBytes, exportPreset, importPreset);
   }
   const [parameters, setParameters] = useState({
     temperature: 0.7,
@@ -733,6 +733,58 @@ export default function App() {
         }
       } catch (err) {
         alert("Failed to parse cassette JSON file. Make sure it conforms to DDO Saba specifications.");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  function exportPreset() {
+    const presetData = {
+      version: "1.0-preset",
+      presetName,
+      systemPrompt,
+      parameters,
+      thinkMode,
+      sendOnEnter,
+      numPredictEnabled
+    };
+
+    const blob = new Blob([JSON.stringify(presetData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const sanitizedPresetName = presetName.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    a.download = `preset-${sanitizedPresetName}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  function importPreset(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const data = JSON.parse(event.target?.result as string);
+        if (data.version === "1.0-preset") {
+          if (data.presetName) setPresetName(data.presetName);
+          if (data.systemPrompt) setSystemPrompt(data.systemPrompt);
+          if (data.options) {
+            setParameters(prev => ({ ...prev, ...data.options }));
+          } else if (data.parameters) {
+            setParameters(prev => ({ ...prev, ...data.parameters }));
+          }
+          if (data.thinkMode !== undefined) setThinkMode(data.thinkMode);
+          if (data.sendOnEnter !== undefined) setSendOnEnter(data.sendOnEnter);
+          if (data.numPredictEnabled !== undefined) setNumPredictEnabled(data.numPredictEnabled);
+        } else {
+          alert("Invalid preset file format. Make sure version matches.");
+        }
+      } catch (err) {
+        alert("Failed to parse preset JSON file.");
       }
     };
     reader.readAsText(file);
