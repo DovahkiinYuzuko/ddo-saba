@@ -45,12 +45,15 @@ This document specifies the design and behavior changes for the DDO Saba Web UI,
   - Sends a background POST to `${settings.connectionUrl}/api/chat` with an empty message array (`messages: []`) to reset Ollama's internal keep-alive timer.
 
 ### 1.5 Parameter Preset Export & Import
-- **Objective**: Save and restore system prompt and parameters configurations independently from message histories.
+- **Objective**: Save, name, and restore system prompt and parameters configurations independently from message histories.
+- **State Changes**:
+  - `presetName` (`string`, default: `"My Preset"`): Tracks the custom name of the current parameters preset configuration.
 - **Format**:
-  - A JSON structure:
+  - A JSON structure including the preset name:
     ```json
     {
       "version": "1.0-preset",
+      "presetName": "string",
       "systemPrompt": "string",
       "parameters": {
         "temperature": "number",
@@ -67,8 +70,9 @@ This document specifies the design and behavior changes for the DDO Saba Web UI,
     }
     ```
 - **UI Elements**:
-  - "Export Preset" and "Import Preset" buttons placed at the bottom of the parameter side-bar.
-  - Triggering file downloads and parsing uploads respectively.
+  - A text input field at the top of the parameter settings section to allow users to edit the `presetName`.
+  - "Export Preset" and "Import Preset" buttons placed at the bottom of the parameter sidebar.
+  - File download named dynamically using the slugified `presetName` (e.g., `preset-my-preset.json`).
 
 ---
 
