@@ -75,6 +75,18 @@ All states defined below use React's `useState` or `useRef`.
 - **Type:** `number`
 - **Description:** Tracks total token usage of the current chat message (prompt + response tokens).
 
+### `presetName`
+- **Type:** `string`
+- **Description:** Tracks the custom name assigned to the current model generation parameters configuration.
+
+### `numPredictEnabled`
+- **Type:** `boolean`
+- **Description:** Toggles whether the `num_predict` parameter is included in the Ollama request options payload.
+
+### `isModelLoading`
+- **Type:** `boolean`
+- **Description:** Tracks if a background model pre-loading process is active.
+
 ---
 
 ## 2. Functions
@@ -154,6 +166,32 @@ All states defined below use React's `useState` or `useRef`.
   - `txt` (`string`): Raw text to render.
 - **Return Value:** JSX element.
 
+### `formatBytes`
+- **Description:** Helper utility converting numeric byte values to readable size text formats (MB, GB, TB).
+- **Arguments:**
+  - `bytes` (`number`): The raw byte size value.
+- **Return Value:** `string`
+
+### `loadModelOnSelection`
+- **Description:** Sends background dummy POST requests to initialize target model loading directly in host Ollama VRAM.
+- **Arguments:**
+  - `modelName` (`string`): Target model configuration string.
+- **Return Value:** `Promise<void>`
+- **Dependencies:** Relies on `settings`, modifies `isModelLoading`.
+
+### `exportPreset`
+- **Description:** Bundles system prompts, parameters, think mode, key shortcut configurations, and preset names into a JSON object and triggers local browser file download.
+- **Arguments:** None.
+- **Return Value:** `void`
+- **Dependencies:** Relies on `presetName`, `systemPrompt`, `parameters`, `thinkMode`, `sendOnEnter`, `numPredictEnabled`.
+
+### `importPreset`
+- **Description:** Parses an uploaded JSON file and applies configured system prompt, parameters, and preset names.
+- **Arguments:**
+  - `e` (`React.ChangeEvent<HTMLInputElement>`): Trigger event containing target file metadata.
+- **Return Value:** `void`
+- **Dependencies:** Modifies `presetName`, `systemPrompt`, `parameters`, `thinkMode`, `sendOnEnter`, `numPredictEnabled`.
+
 ---
 
 ## 3. Dependency Mapping
@@ -197,6 +235,23 @@ graph TD
     unloadModel --> settings
 
     parseMessageContent --> renderMarkdownContent
+
+    exportPreset --> presetName
+    exportPreset --> systemPrompt
+    exportPreset --> parameters
+    exportPreset --> thinkMode
+    exportPreset --> sendOnEnter
+    exportPreset --> numPredictEnabled
+
+    importPreset --> presetName
+    importPreset --> systemPrompt
+    importPreset --> parameters
+    importPreset --> thinkMode
+    importPreset --> sendOnEnter
+    importPreset --> numPredictEnabled
+
+    loadModelOnSelection --> settings
+    loadModelOnSelection --> isModelLoading
 ```
 
 ---
