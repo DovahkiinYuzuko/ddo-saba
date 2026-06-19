@@ -223,7 +223,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .chat-header {
-  height: 57px;
+  height: 68px;
   border-bottom: 1px solid hsl(var(--border));
   padding: 0 20px;
   display: flex;
@@ -238,7 +238,7 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   position: relative;
   flex: 1;
-  max-width: 400px;
+  max-width: 600px;
   gap: 8px;
 }
 
