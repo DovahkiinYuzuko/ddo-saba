@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css'); /* ponytail: LaTeX math fonts support */
 
 :root {
   /* Japanese & OS UI Optimized Font Stack */
@@ -944,3 +945,91 @@ input[type="range"]::-webkit-slider-thumb:hover {
   background-color: hsl(var(--accent));
   color: #fff;
 }
+
+/* ponytail: Spinning animation for Loader icons */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* ponytail: Copy button position outside the bubble, appears on hover */
+.message-row {
+  position: relative;
+}
+.copy-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+  background-color: hsl(var(--bg-panel));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius-sm);
+  color: hsl(var(--text-muted));
+  padding: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+.message-row.user .copy-btn {
+  left: -40px;
+}
+.message-row.assistant .copy-btn {
+  right: -40px;
+}
+.message-row:hover .copy-btn {
+  opacity: 1;
+}
+.copy-btn:hover {
+  background-color: hsl(var(--bg-panel-hover));
+  color: hsl(var(--text-primary));
+  border-color: hsl(var(--border-focus));
+}
+
+/* ponytail: Markdown rendering elements typography and spacing */
+.message-text p {
+  margin-bottom: 8px;
+}
+.message-text p:last-child {
+  margin-bottom: 0;
+}
+.message-text ul, .message-text ol {
+  margin-left: 20px;
+  margin-bottom: 8px;
+}
+.message-text li {
+  margin-bottom: 4px;
+}
+.message-text code {
+  font-family: monospace;
+  background-color: hsl(var(--bg-input));
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  border: 1px solid hsl(var(--border));
+  font-size: 0.85em;
+  color: hsl(var(--accent-hover));
+}
+.message-text pre {
+  margin: 8px 0;
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+}
+.message-text pre code {
+  background-color: transparent;
+  padding: 0;
+  border: none;
+  font-size: 0.9em;
+  color: inherit;
+}
+.message-text blockquote {
+  border-left: 3px solid hsl(var(--accent));
+  padding-left: 10px;
+  color: hsl(var(--text-muted));
+  margin: 8px 0;
+}
+

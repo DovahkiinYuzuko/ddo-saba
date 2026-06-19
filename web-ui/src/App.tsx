@@ -1,4 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { 
   Send, 
   Square, 
@@ -13,7 +18,11 @@ import {
   Sliders, 
   MessageSquare,
   AlertTriangle,
-  FolderOpen
+  FolderOpen,
+  Copy,
+  Check,
+  Loader2,
+  LogOut
 } from 'lucide-react';
 
 // Multi-language locale dictionary (defaults to English, supports Japanese)
@@ -158,6 +167,27 @@ interface PsModelInfo {
   until: string;
 }
 
+// ponytail: Helper component to copy raw markdown text to clipboard with feedback
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy text:", err);
+    }
+  };
+
+  return (
+    <button className="copy-btn" onClick={handleCopy} title="Copy raw markdown text">
+      {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
+    </button>
+  );
+}
+
 export default function App() {
   const [lang, setLang] = useState<'en' | 'ja'>(
     navigator.language.startsWith('ja') ? 'ja' : 'en'
@@ -229,6 +259,32 @@ export default function App() {
     const interval = setInterval(startBroadcastPolling, 1500);
     return () => clearInterval(interval);
   }, [settings.isSharedMode, chats, activeChatId, lastPolledMsgId]);
+
+  // ponytail: Unload model from VRAM by calling API with keep_alive: 0
+  const unloadModel = async () => {
+    if (!psInfo) return;
+    try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (settings.accessToken) {
+        headers['X-DDO-Token'] = settings.accessToken;
+      }
+      
+      await fetch(`${settings.connectionUrl}/api/chat`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          model: psInfo.name,
+          messages: [],
+          keep_alive: 0
+        })
+      });
+      
+      setPsInfo(null);
+      fetchModelsAndPs();
+    } catch (e) {
+      console.error("Failed to unload model", e);
+    }
+  };
 
   // Create default tab if none exists
   useEffect(() => {
@@ -605,10 +661,39 @@ export default function App() {
     reader.readAsText(file);
   };
 
-  // Helper parser to extract <think> blocks and return collapsible accordion DOM nodes
+  // Helper parser to extract <think> blocks and render Markdown / LaTeX with Syntax Highlighting
   const parseMessageContent = (content: string) => {
     const thinkStart = content.indexOf('<think>');
     const thinkEnd = content.indexOf('</think>');
+
+    const renderMarkdownContent = (txt: string) => {
+      return (
+        <ReactMarkdown
+          remarkPlugins={[remarkMath]}
+          rehypePlugins={[rehypeKatex]}
+          components={{
+            code({ node, inline, className, children, ...props }: any) {
+              const match = /language-(\w+)/.exec(className || '');
+              return !inline && match ? (
+                <SyntaxHighlighter
+                  {...props}
+                  children={String(children).replace(/\n$/, '')}
+                  style={oneDark}
+                  language={match[1]}
+                  PreTag="div"
+                />
+              ) : (
+                <code {...props} className={className}>
+                  {children}
+                </code>
+              );
+            }
+          }}
+        >
+          {txt}
+        </ReactMarkdown>
+      );
+    };
 
     if (thinkStart !== -1) {
       if (thinkEnd !== -1) {
@@ -618,9 +703,9 @@ export default function App() {
           <div className="message-cot-container">
             <details className="cot-details" open>
               <summary className="cot-summary">{t.thinking}</summary>
-              <div className="cot-content">{thinking}</div>
+              <div className="cot-content">{renderMarkdownContent(thinking)}</div>
             </details>
-            <div className="cot-answer">{answer}</div>
+            <div className="cot-answer">{renderMarkdownContent(answer)}</div>
           </div>
         );
       } else {
@@ -629,13 +714,13 @@ export default function App() {
           <div className="message-cot-container">
             <details className="cot-details" open>
               <summary className="cot-summary">{t.thinking}...</summary>
-              <div className="cot-content">{thinking}</div>
+              <div className="cot-content">{renderMarkdownContent(thinking)}</div>
             </details>
           </div>
         );
       }
     }
-    return <div className="raw-content">{content}</div>;
+    return <div className="raw-content">{renderMarkdownContent(content)}</div>;
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -760,7 +845,12 @@ export default function App() {
               <div className="message-bubble">
                 {m.sender && <div className="message-sender">{m.sender}</div>}
                 <div className="message-text">
-                  {parseMessageContent(m.content)}
+                  {m.content ? parseMessageContent(m.content) : (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'hsl(var(--text-muted))' }}>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Thinking...</span>
+                    </div>
+                  )}
                 </div>
                 {/* ponytail: Display assistant performance metrics below the bubble */}
                 {m.role === 'assistant' && m.metrics && (
@@ -770,6 +860,8 @@ export default function App() {
                   </div>
                 )}
               </div>
+              {/* ponytail: Hover Copy button (copies Raw Markdown source) */}
+              {m.content && <CopyButton text={m.content} />}
             </div>
           ))}
           <div ref={messagesEndRef} />
@@ -874,7 +966,7 @@ export default function App() {
               <span>{parameters.top_p}</span>
             </div>
             <input 
-              type="range" min="0.0" max="1.0" step="0.05" 
+              type="range" min="0.0" max="1.0" step="0.01" 
               value={parameters.top_p} 
               onChange={(e) => setParameters(prev => ({ ...prev, top_p: parseFloat(e.target.value) }))}
             />
@@ -906,6 +998,19 @@ export default function App() {
             />
           </div>
 
+          {/* ponytail: Context Limit Slider */}
+          <div className="slider-group">
+            <div className="slider-header">
+              <label>Context Limit (num_ctx)</label>
+              <span>{parameters.num_ctx}</span>
+            </div>
+            <input 
+              type="range" min="1024" max="32768" step="1024" 
+              value={parameters.num_ctx} 
+              onChange={(e) => setParameters(prev => ({ ...prev, num_ctx: parseInt(e.target.value) }))}
+            />
+          </div>
+
           {/* Repeat Penalty Slider */}
           <div className="slider-group">
             <div className="slider-header">
@@ -927,7 +1032,25 @@ export default function App() {
             <div className="status-card">
               <div className="status-row">
                 <span className="label">Model:</span>
-                <span className="val font-semibold">{psInfo.name}</span>
+                <span className="val font-semibold flex items-center gap-2">
+                  {psInfo.name}
+                  <button 
+                    onClick={unloadModel} 
+                    className="unload-btn-icon" 
+                    title="Unload model from VRAM"
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: 'hsl(var(--danger))',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      padding: '2px'
+                    }}
+                  >
+                    <LogOut size={14} />
+                  </button>
+                </span>
               </div>
               <div className="status-row">
                 <span className="label">{t.vram}:</span>

@@ -1,0 +1,25 @@
+*
+
+!.gitignore
+
+# Docs variables and functions only
+!docs/
+!docs/variables'n'functions/
+!docs/variables'n'functions/**
+
+# Start scripts
+!start_server.bat
+!start_server.sh
+!bin/
+!bin/**
+
+# Nginx config and scripts
+!nginx/
+nginx/html/
+nginx/temp/
+nginx/logs/
+
+# Web UI source files
+!web-ui/
+web-ui/node_modules/
+web-ui/dist/
