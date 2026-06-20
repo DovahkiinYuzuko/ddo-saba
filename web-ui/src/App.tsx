@@ -232,11 +232,14 @@ export default function App() {
   useEffect(() => {
     lastPolledMsgIdRef.current = lastPolledMsgId;
   }, [lastPolledMsgId]);
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Sync scroll on new messages
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const el = messagesContainerRef.current;
+    if (el) {
+      el.scrollTop = el.scrollHeight;
+    }
   }, [chats, activeChatId]);
 
   // Initial tags/ps fetch and interval polling
@@ -838,6 +841,7 @@ export default function App() {
         </header>
 
         <ChatMessages 
+          ref={messagesContainerRef}
           messages={activeChat?.messages || []}
           onImportCassette={importCassette}
           expandedThinking={expandedThinking}
@@ -919,7 +923,6 @@ export default function App() {
         t={t}
       />
 
-      <div ref={messagesEndRef} />
     </div>
   );
 }

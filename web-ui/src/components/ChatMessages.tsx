@@ -43,14 +43,14 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-export default function ChatMessages({
+export default React.forwardRef<HTMLDivElement, ChatMessagesProps>(function ChatMessages({
   messages,
   onImportCassette,
   expandedThinking,
   onToggleThinking,
   collapseThinking,
   t
-}: ChatMessagesProps) {
+}: ChatMessagesProps, ref) {
 
   // Helper parser to extract <think> blocks and render Markdown / LaTeX with Syntax Highlighting
   const parseMessageContent = (content: string, msgKey: string) => {
@@ -128,7 +128,7 @@ export default function ChatMessages({
   };
 
   return (
-    <div className="chat-messages-scroll">
+    <div className="chat-messages-scroll" ref={ref}>
       {messages.length === 0 && (
         <div className="empty-state">
           <FolderOpen size={48} className="empty-icon" />
@@ -172,4 +172,4 @@ export default function ChatMessages({
       ))}
     </div>
   );
-}
+});

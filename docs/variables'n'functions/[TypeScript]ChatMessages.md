@@ -22,6 +22,7 @@ This document specifies the chat messages display layout, empty-state landing tr
 - `collapseThinking` (`boolean`): Default state configurations.
 - `t` (`LocaleStrings`): Target localized language dictionaries.
 - `lang` (`'en' | 'ja'`): Active locale.
+- `ref` (`React.Ref<HTMLDivElement>`): Forwarded ref to expose the `.chat-messages-scroll` DOM element for scroll control.
 
 ---
 
