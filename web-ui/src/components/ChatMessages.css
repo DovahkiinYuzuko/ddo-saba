@@ -450,7 +450,12 @@
   }
 
   .chat-header {
-    padding: 0 12px;
+    height: auto;
+    min-height: 60px;
+    padding-top: calc(12px + env(safe-area-inset-top, 0px));
+    padding-bottom: 12px;
+    padding-left: 12px;
+    padding-right: 12px;
     gap: 8px;
   }
 
@@ -458,29 +463,30 @@
   .model-selector-wrap {
     flex: 1;
     max-width: none;
-    justify-content: center;
+    justify-content: flex-start;
+    margin: 0 4px;
   }
 
   .model-select {
     width: 100%;
-    max-width: 200px;
-    font-size: 0.8rem;
-    padding: 4px 8px;
+    max-width: 240px;
+    font-size: 0.85rem;
+    padding: 6px 10px;
   }
 
   /* Adjust header icons */
   .header-actions {
-    gap: 6px;
+    gap: 8px;
   }
 
   .lang-toggle {
-    padding: 4px 8px;
-    font-size: 0.7rem;
+    padding: 5px 8px;
+    font-size: 0.75rem;
   }
 
   .unload-btn {
-    width: 28px;
-    height: 28px;
+    width: 32px;
+    height: 32px;
   }
 
   /* Adjust messages */
