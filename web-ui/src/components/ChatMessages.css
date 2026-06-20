@@ -8,6 +8,10 @@
   overflow: hidden;
 }
 
+.mobile-toggle-btn {
+  display: none;
+}
+
 .chat-header {
   height: 68px;
   border-bottom: 1px solid hsl(var(--border));
@@ -423,4 +427,95 @@
 .unload-btn:hover {
   background-color: hsl(var(--danger-light) / 0.3);
   color: hsl(var(--danger-hover));
+}
+
+/* Mobile responsive layout */
+@media (max-width: 1024px) {
+  .mobile-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: hsl(var(--text-secondary));
+    cursor: pointer;
+    padding: 8px;
+    border-radius: var(--radius-md);
+    transition: all 0.15s ease;
+  }
+
+  .mobile-toggle-btn:hover {
+    background-color: hsl(var(--bg-panel-hover));
+    color: hsl(var(--text-primary));
+  }
+
+  .chat-header {
+    padding: 0 12px;
+    gap: 8px;
+  }
+
+  /* Make sure model selector does not take too much space on small devices */
+  .model-selector-wrap {
+    flex: 1;
+    max-width: none;
+    justify-content: center;
+  }
+
+  .model-select {
+    width: 100%;
+    max-width: 200px;
+    font-size: 0.8rem;
+    padding: 4px 8px;
+  }
+
+  /* Adjust header icons */
+  .header-actions {
+    gap: 6px;
+  }
+
+  .lang-toggle {
+    padding: 4px 8px;
+    font-size: 0.7rem;
+  }
+
+  .unload-btn {
+    width: 28px;
+    height: 28px;
+  }
+
+  /* Adjust messages */
+  .chat-messages-scroll {
+    padding: 16px 12px;
+    gap: 16px;
+  }
+
+  .message-row {
+    max-width: 92%;
+    gap: 8px;
+  }
+
+  /* Copy button adjustments for mobile touch */
+  .copy-btn {
+    position: relative;
+    top: auto;
+    transform: none;
+    opacity: 1;
+    display: inline-flex;
+    margin-top: 6px;
+    align-self: flex-start;
+  }
+
+  .message-row.user .copy-btn {
+    left: auto;
+    align-self: flex-end;
+  }
+
+  .message-row.assistant .copy-btn {
+    right: auto;
+    align-self: flex-start;
+  }
+
+  .message-bubble {
+    width: 100%;
+  }
 }

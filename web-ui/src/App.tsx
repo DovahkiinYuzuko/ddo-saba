@@ -9,7 +9,9 @@ import {
   Lock, 
   Loader2, 
   LogOut,
-  AlertTriangle
+  AlertTriangle,
+  Menu,
+  SlidersHorizontal
 } from 'lucide-react';
 import type { 
   Message, 
@@ -126,6 +128,8 @@ export default function App() {
   // State Definitions matching the variable specification document
   const [chats, setChats] = useState<ChatSession[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
+  const [isParamsOpen, setIsParamsOpen] = useState<boolean>(false);
   
   const [settings, setSettings] = useState<DdoSettings>(() => ({
     connectionUrl: window.location.origin.includes('localhost:3000') 
@@ -715,8 +719,19 @@ export default function App() {
   const activeChat = chats.find(c => c.id === activeChatId);
 
   return (
-    <div className="app-container" onDragOver={handleDragOver} onDrop={handleDrop}>
+    <div className={`app-container ${isSidebarOpen ? 'sidebar-open' : ''} ${isParamsOpen ? 'params-open' : ''}`} onDragOver={handleDragOver} onDrop={handleDrop}>
       
+      {/* Mobile Overlay to tap-close side drawers */}
+      {(isSidebarOpen || isParamsOpen) && (
+        <div
+          className="mobile-overlay"
+          onClick={() => {
+            setIsSidebarOpen(false);
+            setIsParamsOpen(false);
+          }}
+        />
+      )}
+
       {/* 1. Left Column: Chat Tab Manager */}
       <aside className="sidebar-column">
         <div className="sidebar-header">
@@ -731,7 +746,10 @@ export default function App() {
             <div 
               key={c.id} 
               className={`tab-item ${activeChatId === c.id ? 'active' : ''}`}
-              onClick={() => setActiveChatId(c.id)}
+              onClick={() => {
+                setActiveChatId(c.id);
+                setIsSidebarOpen(false);
+              }}
             >
               <Trash2 size={16} className="tab-icon" />
               <span className="tab-title">{c.title}</span>
@@ -753,6 +771,14 @@ export default function App() {
       {/* 2. Middle Column: Main Chat Room */}
       <main className="chat-column">
         <header className="chat-header">
+          <button
+            className="mobile-toggle-btn"
+            onClick={() => setIsSidebarOpen(prev => !prev)}
+            title={lang === 'ja' ? 'メニューをトグル' : 'Toggle menu'}
+          >
+            <Menu size={20} />
+          </button>
+
           <div className="model-selector-wrap">
             {isModelLoading && <Loader2 className="animate-spin" size={16} style={{ color: 'hsl(var(--accent))', flexShrink: 0 }} />}
             <select 
@@ -793,6 +819,13 @@ export default function App() {
           <div className="header-actions">
             <button className="lang-toggle" onClick={() => setLang(l => l === 'en' ? 'ja' : 'en')}>
               {lang === 'en' ? 'JP' : 'EN'}
+            </button>
+            <button
+              className="mobile-toggle-btn"
+              onClick={() => setIsParamsOpen(prev => !prev)}
+              title={lang === 'ja' ? 'パラメータをトグル' : 'Toggle parameters'}
+            >
+              <SlidersHorizontal size={20} />
             </button>
             <button className="icon-btn" onClick={() => setShowSettingsModal(true)}>
               <Settings size={20} />

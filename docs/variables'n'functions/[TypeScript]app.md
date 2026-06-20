@@ -92,6 +92,14 @@ All states defined below use React's `useState` or `useRef`.
 - **Type:** `React.MutableRefObject<string>`
 - **Description:** A React `useRef` holding `lastPolledMsgId` to avoid interval resets.
 
+### `isSidebarOpen`
+- **Type:** `boolean`
+- **Description:** Tracks mobile left sidebar status.
+
+### `isParamsOpen`
+- **Type:** `boolean`
+- **Description:** Tracks mobile right panel status.
+
 ---
 
 ## 2. Functions
@@ -130,7 +138,10 @@ graph TD
     App --> SettingsModal
     App --> ParameterPanel
     App --> ChatMessages
-    
+
+    App --> isSidebarOpen
+    App --> isParamsOpen
+
     sendMessage --> activeModel
     sendMessage --> systemPrompt
     sendMessage --> parameters

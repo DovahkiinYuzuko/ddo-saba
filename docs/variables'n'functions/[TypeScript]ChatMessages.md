@@ -39,3 +39,15 @@ This document specifies the chat messages display layout, empty-state landing tr
 - **Arguments:**
   - `txt` (`string`): Raw text string.
 - **Return Value:** JSX Element
+
+---
+
+## 3. Dependency Mapping
+
+```mermaid
+graph TD
+    ChatMessages --> parseMessageContent
+    ChatMessages --> renderMarkdownContent
+    ChatMessages --> onImportCassette
+    ChatMessages --> onToggleThinking
+```

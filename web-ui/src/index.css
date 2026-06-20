@@ -279,3 +279,44 @@ input[disabled], select[disabled], textarea[disabled] {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+/* Mobile responsive layout */
+@media (max-width: 1024px) {
+  .app-container {
+    grid-template-columns: 1fr; /* Chat column takes full width */
+  }
+
+  .sidebar-column {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    z-index: 100;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.5);
+  }
+
+  .app-container.sidebar-open .sidebar-column {
+    transform: translateX(0);
+  }
+
+  /* Always show close buttons in tabs on mobile for tap ability */
+  .tab-close-btn {
+    display: flex !important;
+  }
+
+  /* Mobile overlay styling */
+  .mobile-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(2px);
+    z-index: 90;
+    animation: fadeIn 0.2s ease-out;
+  }
+}
