@@ -55,7 +55,7 @@ Since this is a PowerShell script, it runs procedurally rather than using custom
 7. Enters a retry loop (runs up to 5 times, sleeping 2 seconds per cycle):
    - Reads `$logFile` content raw into `$output`.
    - Checks if `$output` matches `$regex`.
-   - On match, stores the URL into `$tunnelUrl`, writes console notification in color, launches the URL in the default browser using `Start-Process $tunnelUrl`, and breaks the loop.
+   - On match, stores the URL into `$tunnelUrl`, writes console notification in color. If `$env:DDO_SABA_TOKEN` is set, also prints a tokenized URL for easy auto-authentication. Bypasses automatic browser launching to respect hosting environments.
 
 ---
 
@@ -68,7 +68,7 @@ graph TD
     LogFile --> |Reads content| Output[$output]
     Output --> |Regex match| RegexMatch[$regex]
     RegexMatch --> |Saves matching group| TunnelURL[$tunnelUrl]
-    TunnelURL --> |Starts browser| LaunchBrowser[Start-Process $tunnelUrl]
+    TunnelURL --> |Prints to Host Console| WriteHost[Write-Host]
 ```
 
 ---

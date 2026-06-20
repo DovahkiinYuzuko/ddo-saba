@@ -48,7 +48,10 @@ for ($i = 0; $i -lt 5; $i++) {
         if ($output -match $regex) {
             $tunnelUrl = $Matches[0]
             Write-Host "Tunnel established! URL: $tunnelUrl" -ForegroundColor Green
-            Start-Process $tunnelUrl
+            if ($env:DDO_SABA_TOKEN) {
+                Write-Host "Auto-Auth client URL: $tunnelUrl?token=$env:DDO_SABA_TOKEN" -ForegroundColor Cyan
+            }
+            # Start-Process $tunnelUrl
             break
         }
     }

@@ -283,7 +283,17 @@ input[disabled], select[disabled], textarea[disabled] {
 /* Mobile responsive layout */
 @media (max-width: 1024px) {
   .app-container {
-    grid-template-columns: 1fr; /* Chat column takes full width */
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100vw;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .chat-column {
+    flex: 1;
+    height: 100%;
   }
 
   .sidebar-column {

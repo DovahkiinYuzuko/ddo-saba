@@ -131,14 +131,18 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
   const [isParamsOpen, setIsParamsOpen] = useState<boolean>(false);
   
-  const [settings, setSettings] = useState<DdoSettings>(() => ({
-    connectionUrl: window.location.origin.includes('localhost:3000') 
-      ? 'http://localhost:8088' 
-      : window.location.origin,
-    accessToken: '',
-    isSharedMode: false,
-    username: 'Guest_' + Math.floor(Math.random() * 1000)
-  }));
+  const [settings, setSettings] = useState<DdoSettings>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tokenFromUrl = params.get('token') || params.get('accessToken') || '';
+    return {
+      connectionUrl: window.location.origin.includes('localhost:3000')
+        ? 'http://localhost:8088'
+        : window.location.origin,
+      accessToken: tokenFromUrl,
+      isSharedMode: false,
+      username: 'Guest_' + Math.floor(Math.random() * 1000)
+    };
+  });
 
   const [models, setModels] = useState<OllamaModelInfo[]>([]);
   const [expandedThinking, setExpandedThinking] = useState<Record<string, boolean>>({});

@@ -18,7 +18,7 @@ All states defined below use React's `useState` or `useRef`.
 
 ### `settings`
 - **Type:** `DdoSettings`
-- **Description:** Tracks host configurations (connectionUrl, accessToken, isSharedMode, username).
+- **Description:** Tracks host configurations (connectionUrl, accessToken, isSharedMode, username). On initial load, parses `token` or `accessToken` from the URL query parameters to auto-populate the `accessToken`.
 
 ### `models`
 - **Type:** `Array` of `OllamaModelInfo`
