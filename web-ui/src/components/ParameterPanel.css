@@ -1,0 +1,230 @@
+/* Parameter Sidebar Panel Styles */
+
+.parameters-column {
+  background-color: hsl(var(--bg-panel));
+  border-left: 1px solid hsl(var(--border));
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.column-section {
+  padding: 20px;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.column-section h3 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: hsl(var(--text-primary));
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.input-group label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: hsl(var(--text-secondary));
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Toggles & Sliders */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-switch label {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: hsl(var(--border));
+  transition: .2s;
+  border-radius: 24px;
+}
+
+.toggle-switch label:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 4px;
+  bottom: 4px;
+  background-color: hsl(var(--text-primary));
+  transition: .2s;
+  border-radius: 50%;
+}
+
+.toggle-switch input:checked + label {
+  background-color: hsl(var(--accent));
+}
+
+.toggle-switch input:checked + label:before {
+  transform: translateX(20px);
+}
+
+.system-prompt-textarea {
+  background-color: hsl(var(--bg-input));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius-md);
+  color: hsl(var(--text-primary));
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  padding: 10px;
+  resize: vertical;
+  outline: none;
+}
+
+.system-prompt-textarea:focus {
+  border-color: hsl(var(--accent) / 0.5);
+}
+
+.slider-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.slider-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.slider-header label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: hsl(var(--text-secondary));
+}
+
+.slider-header span {
+  font-size: 0.75rem;
+  font-family: monospace;
+  color: hsl(var(--text-primary));
+  background-color: hsl(var(--border));
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: hsl(var(--border));
+  outline: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: hsl(var(--accent));
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+input[type="range"][disabled]::-webkit-slider-thumb {
+  background-color: hsl(var(--border));
+  cursor: not-allowed;
+}
+
+/* Loaded Status details */
+.status-section {
+  background-color: hsl(var(--bg-panel) / 0.4);
+}
+
+.no-status-text {
+  font-size: 0.75rem;
+  color: hsl(var(--text-muted));
+  font-style: italic;
+}
+
+.status-card {
+  background-color: hsl(var(--bg-input));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius-md);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.status-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+}
+
+.status-row .label {
+  color: hsl(var(--text-secondary));
+}
+
+.status-row .val {
+  color: hsl(var(--text-primary));
+  text-align: right;
+  word-break: break-all;
+  max-width: 160px;
+}
+
+.badge {
+  background-color: hsl(var(--accent-light));
+  border: 1px solid hsl(var(--accent) / 0.2);
+  color: hsl(var(--text-primary));
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.preset-name-input {
+  background-color: hsl(var(--bg-input));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius-md);
+  color: hsl(var(--text-primary));
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  padding: 8px 12px;
+  outline: none;
+  width: 100%;
+  transition: border-color 0.15s ease;
+}
+
+.preset-name-input:focus {
+  border-color: hsl(var(--accent) / 0.5);
+}
+
+.preset-actions-group {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.preset-actions-group .btn-secondary {
+  flex: 1;
+}

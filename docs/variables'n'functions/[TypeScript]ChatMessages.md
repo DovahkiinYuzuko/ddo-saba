@@ -2,6 +2,10 @@
 
 This document specifies the chat messages display layout, empty-state landing triggers, and parsed CoT (Chain of Thought) accordion renderer logic.
 
+## Stylesheet
+- `ChatMessages.css` [NEW]: Contains styles for the central column, conversation logs, message bubbles, reasoning accordion, and input bars.
+
+
 ---
 
 ## 1. Props and Functions

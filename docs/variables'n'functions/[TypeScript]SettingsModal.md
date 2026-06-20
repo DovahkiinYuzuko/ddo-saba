@@ -2,6 +2,10 @@
 
 This document specifies the popover modal logic for editing connection URLs, authentication access tokens, usernames, and import/export cassette procedures.
 
+## Stylesheet
+- `SettingsModal.css` [NEW]: Contains styles for the modal overlay, forms, inputs, and actions.
+
+
 ---
 
 ## 1. Component State and Props

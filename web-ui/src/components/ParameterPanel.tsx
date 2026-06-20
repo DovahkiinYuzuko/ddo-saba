@@ -1,6 +1,7 @@
 import React from 'react';
 import { Sliders, Cpu } from 'lucide-react';
 import type { DdoParameters, PsModelInfo, LocaleStrings } from '../types';
+import './ParameterPanel.css';
 
 interface ParameterPanelProps {
   parameters: DdoParameters;

@@ -12,6 +12,7 @@ import {
   Copy 
 } from 'lucide-react';
 import type { Message, LocaleStrings } from '../types';
+import './ChatMessages.css';
 
 interface ChatMessagesProps {
   messages: Message[];

@@ -2,6 +2,10 @@
 
 This document specifies the properties, configurations, and callbacks governing the right-hand side panel containing inference controls and loaded model VRAM indicators.
 
+## Stylesheet
+- `ParameterPanel.css` [NEW]: Contains styles for the right-hand side parameters column, custom sliders, toggle switches, and model status card.
+
+
 ---
 
 ## 1. Props

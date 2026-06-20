@@ -1,6 +1,7 @@
 import React from 'react';
 import { Download, Upload } from 'lucide-react';
 import type { DdoSettings, LocaleStrings } from '../types';
+import './SettingsModal.css';
 
 interface SettingsModalProps {
   show: boolean;
