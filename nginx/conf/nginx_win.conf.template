@@ -1,26 +1,19 @@
-# DDO Saba Nginx Configuration
-
-# Load NJS module (Windows DLL and Linux SO handles dynamically)
-# For Windows portable distribution, the dll is placed in the modules/ directory.
-load_module modules/ngx_http_js_module.dll;
+# DDO Saba Nginx Configuration for Windows
 
 events { worker_connections 1024; }
-
-# Environment variable for access authentication (set by host script)
-env DDO_SABA_TOKEN;
 
 http {
     include       mime.types;
     default_type  application/octet-stream;
-    
-    # Shared memory zone for temporary broadcast. Key expires in 30s.
-    js_shared_dict_zone zone=broadcast_zone:1M timeout=30s;
-    
-    # Import njs script
-    js_import conf/broadcast.js;
 
     # Limit maximum concurrent connections to Ollama inference
     limit_conn_zone $binary_remote_addr zone=ollama_limit:10m;
+
+    # Dynamic map-based token verification
+    map $http_x_ddo_token $auth_status {
+        "__DDO_SABA_TOKEN__" "ok";
+        default "fail";
+    }
 
     server {
         listen       8088;
@@ -33,26 +26,58 @@ http {
             try_files $uri $uri/ /index.html;
         }
 
-        # Nginx JS (njs) Poll and Broadcast endpoints
+        # Local PowerShell Broadcast Proxy: Poll
         location /api/poll {
-            auth_request /auth_check;
-            js_content broadcast.get_message;
+            add_header Access-Control-Allow-Origin * always;
+            add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
+            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token" always;
+
+            if ($request_method = OPTIONS) {
+                return 204;
+            }
+
+            if ($auth_status = "fail") {
+                return 403;
+            }
+
+            proxy_pass http://127.0.0.1:8089/api/poll;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
         }
 
+        # Local PowerShell Broadcast Proxy: Broadcast
         location /api/broadcast {
-            auth_request /auth_check;
-            js_content broadcast.post_message;
+            add_header Access-Control-Allow-Origin * always;
+            add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
+            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token" always;
+
+            if ($request_method = OPTIONS) {
+                return 204;
+            }
+
+            if ($auth_status = "fail") {
+                return 403;
+            }
+
+            proxy_pass http://127.0.0.1:8089/api/broadcast;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
         }
 
-        # Auth subrequest checker
-        location = /auth_check {
-            internal;
-            js_content broadcast.auth_check;
-        }
-
-        # Ollama API Proxy (inference: generate/chat)
+        # Ollama API Proxy (inference: chat)
         location /api/chat {
-            auth_request /auth_check;
+            add_header Access-Control-Allow-Origin * always;
+            add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
+            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token" always;
+
+            if ($request_method = OPTIONS) {
+                return 204;
+            }
+
+            if ($auth_status = "fail") {
+                return 403;
+            }
+
             limit_conn ollama_limit 1;
             proxy_pass http://127.0.0.1:11434/api/chat;
             proxy_set_header Host $host;
@@ -62,21 +87,22 @@ http {
             proxy_read_timeout 86400s;
             proxy_connect_timeout 86400s;
             proxy_send_timeout 86400s;
-
-            # CORS Headers
-            add_header Access-Control-Allow-Origin * always;
-            add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
-            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token" always;
-
-            # Handle CORS preflight requests
-            if ($request_method = OPTIONS) {
-                return 204;
-            }
         }
 
         # Ollama API Proxy (generate: pre-load)
         location /api/generate {
-            auth_request /auth_check;
+            add_header Access-Control-Allow-Origin * always;
+            add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
+            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token" always;
+
+            if ($request_method = OPTIONS) {
+                return 204;
+            }
+
+            if ($auth_status = "fail") {
+                return 403;
+            }
+
             limit_conn ollama_limit 1;
             proxy_pass http://127.0.0.1:11434/api/generate;
             proxy_set_header Host $host;
@@ -86,26 +112,29 @@ http {
             proxy_read_timeout 86400s;
             proxy_connect_timeout 86400s;
             proxy_send_timeout 86400s;
-
-            # CORS Headers
-            add_header Access-Control-Allow-Origin * always;
-            add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
-            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token" always;
-
-            # Handle CORS preflight requests
-            if ($request_method = OPTIONS) {
-                return 204;
-            }
         }
 
         # Ollama system status and model lists
         location /api/tags {
-            auth_request /auth_check;
+            add_header Access-Control-Allow-Origin * always;
+            add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
+            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token" always;
+
+            if ($request_method = OPTIONS) {
+                return 204;
+            }
+
+            if ($auth_status = "fail") {
+                return 403;
+            }
+
             proxy_pass http://127.0.0.1:11434/api/tags;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
+        }
 
-            # CORS Headers
+        # Ollama VRAM usage status
+        location /api/ps {
             add_header Access-Control-Allow-Origin * always;
             add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
             add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token" always;
@@ -113,22 +142,14 @@ http {
             if ($request_method = OPTIONS) {
                 return 204;
             }
-        }
 
-        location /api/ps {
-            auth_request /auth_check;
+            if ($auth_status = "fail") {
+                return 403;
+            }
+
             proxy_pass http://127.0.0.1:11434/api/ps;
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
-
-            # CORS Headers
-            add_header Access-Control-Allow-Origin * always;
-            add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
-            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token" always;
-
-            if ($request_method = OPTIONS) {
-                return 204;
-            }
         }
     }
 }

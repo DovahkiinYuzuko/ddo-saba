@@ -22,11 +22,17 @@ if [ ! -f "$NJS_SO" ]; then
     fi
 fi
 
-# Prompt or generate token
+# Prompt or generate token securely
 if [ -z "$DDO_SABA_TOKEN" ]; then
-    read -p "Enter access token (Press Enter to auto-generate a random 6-digit token): " DDO_SABA_TOKEN
+    read -p "Enter access token (Press Enter to auto-generate a secure random token): " DDO_SABA_TOKEN
     if [ -z "$DDO_SABA_TOKEN" ]; then
-        DDO_SABA_TOKEN=$(shuf -i 100000-999999 -n 1)
+        if command -v openssl &> /dev/null; then
+            DDO_SABA_TOKEN=$(openssl rand -hex 16)
+        elif command -v python3 &> /dev/null; then
+            DDO_SABA_TOKEN=$(python3 -c "import secrets; print(secrets.token_hex(16))")
+        else
+            DDO_SABA_TOKEN=$(head -c 16 /dev/urandom | xxd -p | tr -d '\n' 2>/dev/null || shuf -i 10000000-99999999 -n 1)
+        fi
     fi
 fi
 
@@ -63,10 +69,11 @@ else
     echo "Ollama is already running."
 fi
 
-# Setup cloudflared binary
+# Setup cloudflared binary (pinned version)
+CF_VER="2026.2.0"
 CF_BIN="/tmp/cloudflared"
 if [ ! -f "$CF_BIN" ]; then
-    echo "cloudflared binary not found. Downloading..."
+    echo "cloudflared binary not found. Downloading version $CF_VER..."
     ARCH=$(uname -m)
     if [ "$ARCH" = "x86_64" ]; then
         CF_ARCH="amd64"
@@ -76,36 +83,48 @@ if [ ! -f "$CF_BIN" ]; then
         CF_ARCH="386"
     fi
     
-    curl -L -o "$CF_BIN" "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${CF_ARCH}"
+    curl -L -o "$CF_BIN" "https://github.com/cloudflare/cloudflared/releases/download/${CF_VER}/cloudflared-linux-${CF_ARCH}"
     chmod +x "$CF_BIN"
     echo "Download complete."
 fi
 
-# Check for cloudflared update
-echo "Checking for cloudflared updates..."
-"$CF_BIN" update &>/dev/null || echo "Skipping cloudflared auto-update."
+# Auto-updates bypassed to guarantee reproducibility
+echo "Checking for cloudflared updates... (Bypassed by policy)"
 
-# Prepare temporary nginx config for Linux
-TMP_CONF="/tmp/ddo_saba_nginx.conf"
-sed "s|load_module modules/ngx_http_js_module.dll;|load_module $NJS_SO;|g" nginx/conf/nginx.conf > "$TMP_CONF"
+# Prepare active nginx configuration from Linux template
+ACTIVE_CONF="nginx/conf/nginx_active.conf"
+sed -e "s|load_module __NJS_SO__;|load_module $NJS_SO;|g" \
+    -e "s|__DDO_SABA_TOKEN__|${DDO_SABA_TOKEN}|g" \
+    nginx/conf/nginx_linux.conf.template > "$ACTIVE_CONF"
 
-# Cleanup trap on exit
+# Cleanup trap on exit using target PIDs
 cleanup() {
     echo
     echo "Stopping DDO Saba servers..."
-    pkill -f "$CF_BIN"
-    nginx -p "$(pwd)/nginx" -c "$TMP_CONF" -s stop 2>/dev/null
-    rm -f "$TMP_CONF"
+    if [ -f "/tmp/ddo_saba_cloudflared.pid" ]; then
+        kill -TERM $(cat /tmp/ddo_saba_cloudflared.pid) 2>/dev/null
+        rm -f "/tmp/ddo_saba_cloudflared.pid"
+    fi
+    if [ -f "/tmp/ddo_saba_nginx.pid" ]; then
+        kill -TERM $(cat /tmp/ddo_saba_nginx.pid) 2>/dev/null
+        rm -f "/tmp/ddo_saba_nginx.pid"
+    fi
+    rm -f "$ACTIVE_CONF"
     exit 0
 }
 trap cleanup SIGINT SIGTERM EXIT
 
 # Start Nginx
 echo "Starting Nginx server..."
-nginx -p "$(pwd)/nginx" -c "$TMP_CONF"
+nginx -p "$(pwd)/nginx" -c "conf/nginx_active.conf"
 if [ $? -ne 0 ]; then
     echo "[ERROR] Failed to start Nginx. Check configuration or port availability."
     exit 1
+fi
+
+# Locate and store Nginx PID
+if [ -f "$(pwd)/nginx/logs/nginx.pid" ]; then
+    cp "$(pwd)/nginx/logs/nginx.pid" /tmp/ddo_saba_nginx.pid
 fi
 
 # Start Cloudflare Tunnel
@@ -114,6 +133,7 @@ LOG_FILE="/tmp/ddo_saba_tunnel.log"
 rm -f "$LOG_FILE"
 
 "$CF_BIN" tunnel --url http://localhost:8088 > "$LOG_FILE" 2>&1 &
+echo $! > /tmp/ddo_saba_cloudflared.pid
 
 echo "Waiting for Cloudflare Tunnel to initialize..."
 sleep 5
@@ -124,7 +144,7 @@ TUNNEL_URL=""
 for i in {1..5}; do
     if [ -f "$LOG_FILE" ]; then
         TUNNEL_URL=$(grep -o -E "$REGEX" "$LOG_FILE" | head -n 1)
-        if [ -not -z "$TUNNEL_URL" ]; then
+        if [ ! -z "$TUNNEL_URL" ]; then
             echo -e "\e[32mTunnel established! URL: $TUNNEL_URL\e[0m"
             # Try to open browser if xdg-open exists
             if command -v xdg-open &> /dev/null; then

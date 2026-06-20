@@ -2,6 +2,7 @@ $localPort = 8088
 $logFile = "tunnel_output.log"
 $regex = "https://[a-zA-Z0-9-]+\.trycloudflare\.com"
 $tunnelUrl = $null
+$cfVersion = "2026.2.0"
 
 # Ensure bin directory exists
 $binDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -12,19 +13,14 @@ if (-not (Test-Path $binDir)) {
 # Download cloudflared.exe if it doesn't exist
 $cloudflaredPath = Join-Path $binDir "cloudflared.exe"
 if (-not (Test-Path $cloudflaredPath)) {
-    Write-Host "cloudflared.exe not found. Downloading..." -ForegroundColor Yellow
-    $url = "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe"
+    Write-Host "cloudflared.exe not found. Downloading version $cfVersion..." -ForegroundColor Yellow
+    $url = "https://github.com/cloudflare/cloudflared/releases/download/$cfVersion/cloudflared-windows-amd64.exe"
     Invoke-WebRequest -Uri $url -OutFile $cloudflaredPath
     Write-Host "Download complete." -ForegroundColor Green
 }
 
-# Check for cloudflared update
-Write-Host "Checking for cloudflared updates..." -ForegroundColor Gray
-try {
-    Start-Process -FilePath $cloudflaredPath -ArgumentList "update" -NoNewWindow -Wait -ErrorAction SilentlyContinue
-} catch {
-    Write-Host "Skipping cloudflared auto-update (could not connect or execute)." -ForegroundColor Yellow
-}
+# Auto-updates disabled to ensure environment predictability
+Write-Host "Checking for cloudflared updates... (Bypassed by policy)" -ForegroundColor Gray
 
 if (Test-Path $logFile) {
     Remove-Item $logFile -Force
@@ -32,6 +28,10 @@ if (Test-Path $logFile) {
 
 # Start cloudflared
 $process = Start-Process -FilePath $cloudflaredPath -ArgumentList "tunnel", "--url", "http://localhost:$localPort" -NoNewWindow -RedirectStandardError $logFile -PassThru
+
+# Save PID for targeted shutdown
+$pidFile = Join-Path $binDir "cloudflared.pid"
+[System.IO.File]::WriteAllText($pidFile, $process.Id.ToString())
 
 Write-Host "Launched cloudflared process (PID: $($process.Id))." -ForegroundColor Gray
 if ($process.HasExited) {

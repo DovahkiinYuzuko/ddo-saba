@@ -1,18 +1,14 @@
 @echo off
 setlocal enabledelayedexpansion
 
-:: Check if DDO_SABA_TOKEN is already set. If not, generate or prompt.
+:: Check if DDO_SABA_TOKEN is already set. If not, generate.
 if "%DDO_SABA_TOKEN%"=="" (
-    set /p DDO_SABA_TOKEN="Enter access token (Press Enter to auto-generate a random 6-digit token): "
+    set /p DDO_SABA_TOKEN="Enter access token (Press Enter to auto-generate a secure random 32-character token): "
     if "!DDO_SABA_TOKEN!"=="" (
-        :: Generate random 6-character numeric token
-        set /a rand1=%RANDOM% * 9 / 32768 + 1
-        set /a rand2=%RANDOM% * 10 / 32768
-        set /a rand3=%RANDOM% * 10 / 32768
-        set /a rand4=%RANDOM% * 10 / 32768
-        set /a rand5=%RANDOM% * 10 / 32768
-        set /a rand6=%RANDOM% * 10 / 32768
-        set DDO_SABA_TOKEN=!rand1!!rand2!!rand3!!rand4!!rand5!!rand6!
+        :: Generate secure 32-character hex token via PowerShell RNG
+        for /f "usebackq delims=" %%i in (`powershell -NoProfile -Command "[Convert]::ToHexString((System.Security.Cryptography.RandomNumberGenerator::GetBytes(16))).ToLower()"` ) do (
+            set DDO_SABA_TOKEN=%%i
+        )
     )
 )
 
@@ -40,22 +36,17 @@ if !ERRORLEVEL! neq 0 (
     echo Ollama is already running.
 )
 
-:: Start Nginx Server
-echo Starting Nginx server...
-if not exist "nginx\modules\ngx_http_js_module.dll" (
-    echo.
-    echo [CRITICAL ERROR] Nginx JS module (ngx_http_js_module.dll) is missing!
-    echo For security reasons, DDO Saba cannot start without Nginx JS module,
-    echo as it is required to authenticate requests and secure your Ollama API from external access.
-    echo Please make sure the module is correctly installed in 'nginx\modules\' folder.
-    echo.
-    pause
-    exit /b 1
-)
+:: Generate Active Nginx Configuration by replacing placeholder with token
+echo Generating active Nginx configuration...
+powershell -NoProfile -Command "$c = Get-Content 'nginx/conf/nginx_win.conf.template' -Raw; $c = $c -replace '__DDO_SABA_TOKEN__', '!DDO_SABA_TOKEN!'; [System.IO.File]::WriteAllText('nginx/conf/nginx_active.conf', $c)"
 
-:FULL_NGINX
-echo [INFO] Found njs module. Starting Nginx...
-start /B nginx\nginx.exe -p nginx
+:: Start PowerShell Broadcast Server in background
+echo Starting PowerShell Broadcast Server...
+start /B powershell -NoProfile -ExecutionPolicy Bypass -File bin\broadcast_server.ps1
+
+:: Start Nginx Server using the active config
+echo Starting Nginx server...
+start /B nginx\nginx.exe -p nginx -c conf\nginx_active.conf
 
 if !ERRORLEVEL! neq 0 (
     echo.
