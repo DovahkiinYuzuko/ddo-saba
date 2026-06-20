@@ -11,10 +11,10 @@ The shutdown operation targets specific background processes initiated by the st
 ### Windows (`stop_server.bat`)
 *   **Step 1:** Discovers the Nginx process PID from `nginx\logs\nginx.pid` and terminates it gracefully.
     *   *Command:* `nginx\nginx.exe -p nginx -s stop` (sends a stop signal using the active pid).
-    *   *Fallback command:* If Nginx process persists, reads PID and runs `taskkill /f /pid [nginx_pid]`.
-*   **Step 2:** Discovers the Cloudflare Tunnel process PID from `bin\cloudflared.pid` and terminates it.
+    *   *Fallback command:* If Nginx process persists, reads PID via single-line `if exist` (avoiding nested parentheses syntax error) and runs `taskkill /f /pid [nginx_pid]`.
+*   **Step 2:** Discovers the Cloudflare Tunnel process PID from `bin\cloudflared.pid` and terminates it using single-line redirection check.
     *   *Command:* `taskkill /f /pid [cloudflared_pid]`
-*   **Step 3:** Discovers the PowerShell Broadcast Server PID from `bin\broadcast.pid` and terminates it.
+*   **Step 3:** Discovers the PowerShell Broadcast Server PID from `bin\broadcast.pid` and terminates it using single-line redirection check.
     *   *Command:* `taskkill /f /pid [broadcast_pid]`
 *   **Step 4:** Deletes the generated PID files and the active configuration file `nginx\conf\nginx_active.conf`.
 
