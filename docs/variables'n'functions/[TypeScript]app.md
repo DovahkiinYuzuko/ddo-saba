@@ -129,6 +129,12 @@ All states defined below use React's `useState` or `useRef`.
   - `id` (`string`): Target chat session ID.
 - **Return Value:** `void`
 
+### `handleUnloadModel`
+- **Description:** Unloads the currently active model from Ollama VRAM by hitting the API, then updates state `psInfo` to null, triggers `fetchModelsAndPs`, and clears state `activeModel` to resetting the UI select element back to "Select a model...".
+- **Arguments:** None.
+- **Return Value:** `Promise<void>`
+
+
 ---
 
 ## 3. Dependency Mapping

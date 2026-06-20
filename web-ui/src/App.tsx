@@ -32,7 +32,8 @@ import {
 } from './api/ollama';
 import { 
   pollMessage, 
-  broadcastMessage 
+  broadcastMessage,
+  fetchHistory
 } from './api/broadcast';
 import SettingsModal from './components/SettingsModal';
 import ParameterPanel from './components/ParameterPanel';
@@ -308,12 +309,60 @@ export default function App() {
     return () => clearInterval(interval);
   }, [settings.isSharedMode, startBroadcastPolling]);
 
+  // Fetch initial history when Shared Room mode is enabled
+  useEffect(() => {
+    if (!settings.isSharedMode) return;
+    
+    const syncHistory = async () => {
+      try {
+        const historyData = await fetchHistory(settings.connectionUrl, settings.accessToken) as {
+          id?: string;
+          sender?: string;
+          role?: 'user' | 'assistant' | 'system';
+          content?: string;
+        }[];
+        
+        if (historyData && historyData.length > 0 && activeChatId) {
+          // Format messages for UI
+          const syncedMessages = historyData.map(h => ({
+            id: h.id,
+            role: h.role || 'user',
+            content: h.content || '',
+            sender: h.sender
+          }));
+          
+          setChats(prev => prev.map(c => {
+            if (c.id === activeChatId) {
+              return {
+                ...c,
+                messages: syncedMessages
+              };
+            }
+            return c;
+          }));
+
+          // Update last polled message ID to the last one in history to avoid duplicate polling
+          const lastMsg = historyData[historyData.length - 1];
+          if (lastMsg.id) {
+            setLastPolledMsgId(lastMsg.id);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to sync shared room history", e);
+      }
+    };
+    
+    void syncHistory();
+  }, [settings.isSharedMode, activeChatId, settings.connectionUrl, settings.accessToken]);
+
+
   // Unload model from VRAM by calling API with keep_alive: 0
   const handleUnloadModel = async () => {
     if (!psInfo) return;
     try {
       await apiUnloadModel(psInfo.name, settings.connectionUrl, settings.accessToken);
       setPsInfo(null);
+      setActiveModel('');
       fetchModelsAndPs();
     } catch (e) {
       console.error("Failed to unload model", e);

@@ -51,4 +51,5 @@ graph TD
     ChatMessages --> renderMarkdownContent
     ChatMessages --> onImportCassette
     ChatMessages --> onToggleThinking
+    ChatMessages --> CopyButton
 ```

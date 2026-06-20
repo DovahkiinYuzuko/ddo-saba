@@ -35,3 +35,15 @@ export const broadcastMessage = async (
     throw new Error(`HTTP ${res.status}`);
   }
 };
+
+export const fetchHistory = async (
+  connectionUrl: string,
+  accessToken: string
+): Promise<unknown> => {
+  const headers = getHeaders(accessToken);
+  const res = await fetch(`${connectionUrl}/api/history`, { headers });
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+  return res.json();
+};

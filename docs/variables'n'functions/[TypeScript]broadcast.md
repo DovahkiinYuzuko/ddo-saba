@@ -22,3 +22,10 @@ This document specifies the helper functions for room broadcasting (sharing mess
   - `role` (`string`): Message owner ('user' or 'assistant').
   - `content` (`string`): Message body.
 - **Return Value:** `Promise<void>`
+
+### `fetchHistory` (L39-49)
+- **Description:** Requests the full chronological list of messages broadcasted in the shared room from `/api/history`.
+- **Arguments:**
+  - `connectionUrl` (`string`): Host URL.
+  - `accessToken` (`string`): Access token (added for auth verification).
+- **Return Value:** `Promise<any>`
