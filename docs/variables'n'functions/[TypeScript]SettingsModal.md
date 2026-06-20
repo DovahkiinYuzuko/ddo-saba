@@ -20,3 +20,20 @@ This document specifies the popover modal logic for editing connection URLs, aut
 - `onExportCassette` (`() => void`): Triggers file download of the current chat.
 - `onImportCassette` (`(e: React.ChangeEvent<HTMLInputElement>) => void`): Handler triggered when local JSON files are uploaded.
 - `t` (`LocaleStrings`): Localization language mappings.
+
+---
+
+## 2. Shared QR Code Feature
+- Generates a QR Code image using an external API (`api.qrserver.com`) representing `${settings.connectionUrl}?token=${settings.accessToken}` for quick mobile client connection when `settings.connectionUrl` is a public URL (e.g., contains `.trycloudflare.com`).
+
+---
+
+## 3. Dependency Mapping
+
+```mermaid
+graph TD
+    SettingsModal --> settings
+    SettingsModal --> onChangeSettings
+    SettingsModal --> onExportCassette
+    SettingsModal --> onImportCassette
+```

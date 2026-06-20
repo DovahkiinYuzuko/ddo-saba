@@ -150,3 +150,60 @@
 .btn-accent:hover {
   background-color: hsl(var(--accent-hover));
 }
+
+/* QR Code sharing section styles */
+.qr-code-section-wrap {
+  margin-top: 8px;
+}
+
+.qr-code-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.qr-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: hsl(var(--text-secondary));
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.qr-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  background-color: hsl(var(--bg-input));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius-md);
+  padding: 16px;
+  text-align: center;
+}
+
+.qr-image {
+  background-color: white; /* Ensures high contrast for scanners */
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  width: 176px;
+  height: 176px;
+}
+
+.qr-help-text {
+  font-size: 0.75rem;
+  line-height: 1.5;
+  color: hsl(var(--text-muted));
+  margin: 0;
+  max-width: 320px;
+}
+
+.qr-code-section.disabled .qr-container {
+  border-style: dashed;
+  background-color: transparent;
+  padding: 12px 16px;
+}
+
+.qr-code-section.disabled .qr-help-text {
+  color: hsl(var(--text-muted) / 0.7);
+}

@@ -97,6 +97,46 @@ export default function SettingsModal({
             </div>
           </div>
 
+          <div className="qr-code-section-wrap">
+            {(() => {
+              const isJa = t.close === '閉じる';
+              const isPublicOrIp = settings.connectionUrl &&
+                !settings.connectionUrl.includes('localhost') &&
+                !settings.connectionUrl.includes('127.0.0.1');
+
+              if (isPublicOrIp) {
+                const shareUrl = `${settings.connectionUrl}?token=${settings.accessToken}`;
+                const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(shareUrl)}`;
+                return (
+                  <div className="qr-code-section">
+                    <label className="qr-label">{isJa ? 'スマホ接続用QRコード' : 'Mobile Access QR Code'}</label>
+                    <div className="qr-container">
+                      <img src={qrCodeUrl} alt="QR Code for Mobile Access" className="qr-image" />
+                      <p className="qr-help-text">
+                        {isJa
+                          ? 'PC画面のこのQRコードをスマホのカメラでスキャンするだけで、トークンが自動認証された状態でアクセスできます。'
+                          : 'Scan this QR code with your mobile camera to open DDO Saba with automatic token authentication.'}
+                      </p>
+                    </div>
+                  </div>
+                );
+              } else {
+                return (
+                  <div className="qr-code-section disabled">
+                    <label className="qr-label">{isJa ? 'スマホ接続用QRコード' : 'Mobile Access QR Code'}</label>
+                    <div className="qr-container">
+                      <p className="qr-help-text text-muted">
+                        {isJa
+                          ? '公開用のトンネルURL（trycloudflare.comなど）が接続先URLに設定されている場合、ここにスマホ接続用のQRコードが表示されます。'
+                          : 'A QR code for mobile connection will appear here when a public tunnel URL (e.g. trycloudflare.com) is configured.'}
+                      </p>
+                    </div>
+                  </div>
+                );
+              }
+            })()}
+          </div>
+
           <div className="modal-divider"></div>
 
           <div className="form-actions-cassette">
