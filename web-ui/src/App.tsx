@@ -253,6 +253,10 @@ export default function App() {
   const [thinkMode, setThinkMode] = useState<boolean>(true);
   const [psInfo, setPsInfo] = useState<PsModelInfo | null>(null);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const isGeneratingRef = useRef(isGenerating);
+  useEffect(() => {
+    isGeneratingRef.current = isGenerating;
+  }, [isGenerating]);
   const abortControllerRef = useRef<AbortController | null>(null);
   const [sendOnEnter, setSendOnEnter] = useState<boolean>(true); /* ponytail: toggle send action shortcut */
   const [contextUsed, setContextUsed] = useState<number>(0); /* ponytail: track active context token usage */
@@ -310,8 +314,9 @@ export default function App() {
 
   // ponytail: Active session background keep-alive refresh
   useEffect(() => {
-    if (!activeModel || activeModel === "" || isGenerating) return;
+    if (!activeModel || activeModel === "") return;
     const interval = setInterval(async () => {
+      if (isGeneratingRef.current) return;
       try {
         const headers: HeadersInit = { 'Content-Type': 'application/json' };
         if (settings.accessToken) {
@@ -331,8 +336,12 @@ export default function App() {
       }
     }, 240000); // 4 minutes
     return () => clearInterval(interval);
-  }, [activeModel, settings.connectionUrl, settings.accessToken, isGenerating]);
+  }, [activeModel, settings.connectionUrl, settings.accessToken]);
   const [lastPolledMsgId, setLastPolledMsgId] = useState<string>('');
+  const lastPolledMsgIdRef = useRef(lastPolledMsgId);
+  useEffect(() => {
+    lastPolledMsgIdRef.current = lastPolledMsgId;
+  }, [lastPolledMsgId]);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   // Sync scroll on new messages
@@ -352,7 +361,7 @@ export default function App() {
     if (!settings.isSharedMode) return;
     const interval = setInterval(startBroadcastPolling, 1500);
     return () => clearInterval(interval);
-  }, [settings.isSharedMode, chats, activeChatId, lastPolledMsgId]);
+  }, [settings.isSharedMode, activeChatId]);
 
   // ponytail: Unload model from VRAM by calling API with keep_alive: 0
   const unloadModel = async () => {
@@ -439,7 +448,7 @@ export default function App() {
       if (!res.ok) return;
       const data = await res.json();
       
-      if (data.id && data.id !== lastPolledMsgId && data.sender !== settings.username) {
+      if (data.id && data.id !== lastPolledMsgIdRef.current && data.sender !== settings.username) {
         setLastPolledMsgId(data.id);
         
         // Append shared message to currently active chat session

@@ -53,9 +53,6 @@ goto NGINX_STARTED
 echo [WARNING] njs module (ngx_http_js_module.dll) not found.
 echo Starting Nginx in fallback mode (No Shared Room / Access Token)...
 
-:: Generate no-njs fallback configuration
-powershell -Command "$c = Get-Content 'nginx/conf/nginx.conf' -Raw; $c = $c -replace '(?m)^(\s*load_module\s+)', '# `$1' -replace '(?m)^(\s*js_shared_dict_zone\s+)', '# `$1' -replace '(?m)^(\s*js_import\s+)', '# `$1' -replace '(?m)^(\s*js_content\s+)', '# `$1' -replace '(?m)^(\s*auth_request\s+)', '# `$1'; [System.IO.File]::WriteAllText('nginx/conf/nginx_no_njs.conf', $c)"
-
 start /B nginx\nginx.exe -p nginx -c conf/nginx_no_njs.conf
 
 :NGINX_STARTED

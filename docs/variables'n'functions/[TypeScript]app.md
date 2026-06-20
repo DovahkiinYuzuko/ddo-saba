@@ -95,6 +95,14 @@ All states defined below use React's `useState` or `useRef`.
 - **Type:** `boolean`
 - **Description:** Toggles whether the reasoning process (thinking blocks) defaults to collapsed/folded state in UI rendering.
 
+### `lastPolledMsgIdRef`
+- **Type:** `React.MutableRefObject<string>`
+- **Description:** A React `useRef` holding the latest polled message ID to prevent unnecessary re-polling or dependency changes in the broadcast polling interval.
+
+### `isGeneratingRef`
+- **Type:** `React.MutableRefObject<boolean>`
+- **Description:** A React `useRef` holding the active `isGenerating` boolean value to prevent the keep-alive timer `useEffect` from resetting during inference generation cycles.
+
 ---
 
 ## 2. Functions
@@ -229,6 +237,7 @@ graph TD
 
     startBroadcastPolling --> settings
     startBroadcastPolling --> chats
+    startBroadcastPolling --> lastPolledMsgIdRef
 
     fetchModelsAndPs --> models
     fetchModelsAndPs --> psInfo
