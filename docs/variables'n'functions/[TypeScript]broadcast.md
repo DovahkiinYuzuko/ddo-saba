@@ -1,0 +1,24 @@
+# Variable and Function Specifications: `api/broadcast.ts`
+
+This document specifies the helper functions for room broadcasting (sharing messages) using Nginx's custom dict endpoints.
+
+---
+
+## 1. Functions
+
+### `pollMessage` (L9-19)
+- **Description:** Pulls the latest room message from `/api/poll`.
+- **Arguments:**
+  - `connectionUrl` (`string`): Host URL.
+  - `accessToken` (`string`): Access token (added for auth verification).
+- **Return Value:** `Promise<any>`
+
+### `broadcastMessage` (L21-37)
+- **Description:** Sends local user or assistant message to `/api/broadcast` for other peers to capture.
+- **Arguments:**
+  - `connectionUrl` (`string`): Host URL.
+  - `accessToken` (`string`): Access token (added for auth verification).
+  - `sender` (`string`): Username signature.
+  - `role` (`string`): Message owner ('user' or 'assistant').
+  - `content` (`string`): Message body.
+- **Return Value:** `Promise<void>`

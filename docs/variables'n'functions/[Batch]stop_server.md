@@ -11,11 +11,9 @@ The shutdown operation targets specific background processes initiated by the st
 ### Windows (`stop_server.bat`)
 *   **Step 1:** Sends a stop signal to the active Nginx server using the native CLI.
     *   *Command:* `nginx\nginx.exe -p nginx -s stop`
-*   **Step 2:** Sends a fallback stop signal in case Nginx was running in the fallback no-njs mode.
-    *   *Command:* `nginx\nginx.exe -p nginx -c conf\nginx_no_njs.conf -s stop`
-*   **Step 3:** Forces termination of any running Cloudflare Tunnel daemon.
+*   **Step 2:** Forces termination of any running Cloudflare Tunnel daemon.
     *   *Command:* `taskkill /f /im cloudflared.exe`
-*   **Step 4:** Forces cleanup of any stray Nginx zombie worker/master processes.
+*   **Step 3:** Forces cleanup of any stray Nginx zombie worker/master processes.
     *   *Command:* `taskkill /f /im nginx.exe`
 
 ### Linux/macOS (`stop_server.sh`)

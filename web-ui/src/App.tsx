@@ -1,9 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
-import ReactMarkdown from 'react-markdown';
-import remarkMath from 'remark-math';
-import rehypeKatex from 'rehype-katex';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Send, 
   Square, 
@@ -12,59 +7,34 @@ import {
   Trash2, 
   Globe, 
   Lock, 
-  Download, 
-  Upload, 
-  Cpu, 
-  Sliders, 
-  MessageSquare,
-  AlertTriangle,
-  FolderOpen,
-  Copy,
-  Check,
-  Loader2,
-  LogOut
+  Loader2, 
+  LogOut,
+  AlertTriangle
 } from 'lucide-react';
-
-// Multi-language locale dictionary (defaults to English, supports Japanese)
-interface LocaleStrings {
-  title: string;
-  chats: string;
-  newChat: string;
-  noChats: string;
-  temporaryWarning: string;
-  settings: string;
-  modelParameters: string;
-  preset: string;
-  systemPrompt: string;
-  temperature: string;
-  minP: string;
-  topP: string;
-  topK: string;
-  maxTokens: string;
-  repeatPenalty: string;
-  reasoningMode: string;
-  loadedModel: string;
-  noLoadedModel: string;
-  connectionUrl: string;
-  accessToken: string;
-  username: string;
-  sharedRoomMode: string;
-  privateMode: string;
-  export: string;
-  import: string;
-  placeholder: string;
-  send: string;
-  stop: string;
-  vram: string;
-  device: string;
-  until: string;
-  thinking: string;
-  close: string;
-  sendOnEnter: string;
-  contextLimit: string;
-  selectModel: string;
-  collapseThinking: string;
-}
+import type { 
+  Message, 
+  ChatSession, 
+  OllamaModelInfo, 
+  PsModelInfo, 
+  DdoSettings, 
+  DdoParameters,
+  LocaleStrings,
+  MessageMetrics
+} from './types';
+import { 
+  loadModelOnSelection as apiLoadModelOnSelection, 
+  fetchModels, 
+  fetchPs, 
+  keepAliveModel, 
+  unloadModel as apiUnloadModel 
+} from './api/ollama';
+import { 
+  pollMessage, 
+  broadcastMessage 
+} from './api/broadcast';
+import SettingsModal from './components/SettingsModal';
+import ParameterPanel from './components/ParameterPanel';
+import ChatMessages from './components/ChatMessages';
 
 const locales: Record<'en' | 'ja', LocaleStrings> = {
   en: {
@@ -147,65 +117,6 @@ const locales: Record<'en' | 'ja', LocaleStrings> = {
   }
 };
 
-interface MessageMetrics {
-  totalDurationSec?: number;
-  promptTokens?: number;
-  evalTokens?: number;
-  tokensPerSec?: number;
-  thinkDurationSec?: number;
-}
-
-interface Message {
-  id?: string;
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  sender?: string;
-  metrics?: MessageMetrics; /* ponytail: store inference performance stats */
-}
-
-interface ChatSession {
-  id: string;
-  title: string;
-  messages: Message[];
-}
-
-interface PsModelInfo {
-  name: string;
-  size: number;
-  processor: string;
-  until: string;
-}
-
-function formatBytes(bytes?: number) {
-  if (bytes === undefined || bytes === null) return '';
-  if (bytes === 0) return '0 B';
-  const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-}
-
-// ponytail: Helper component to copy raw markdown text to clipboard with feedback
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy text:", err);
-    }
-  };
-
-  return (
-    <button className="copy-btn" onClick={handleCopy} title="Copy raw markdown text">
-      {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
-    </button>
-  );
-}
-
 export default function App() {
   const [lang, setLang] = useState<'en' | 'ja'>(
     navigator.language.startsWith('ja') ? 'ja' : 'en'
@@ -216,16 +127,16 @@ export default function App() {
   const [chats, setChats] = useState<ChatSession[]>([]);
   const [activeChatId, setActiveChatId] = useState<string | null>(null);
   
-  const [settings, setSettings] = useState({
+  const [settings, setSettings] = useState<DdoSettings>(() => ({
     connectionUrl: window.location.origin.includes('localhost:3000') 
       ? 'http://localhost:8088' 
       : window.location.origin,
     accessToken: '',
     isSharedMode: false,
     username: 'Guest_' + Math.floor(Math.random() * 1000)
-  });
+  }));
 
-  const [models, setModels] = useState<{ name: string; size?: number }[]>([]);
+  const [models, setModels] = useState<OllamaModelInfo[]>([]);
   const [expandedThinking, setExpandedThinking] = useState<Record<string, boolean>>({});
 
   const handleThinkingToggle = (msgKey: string, isOpen: boolean) => {
@@ -241,7 +152,7 @@ export default function App() {
   const [collapseThinking, setCollapseThinking] = useState<boolean>(true);
   const [activeModel, setActiveModel] = useState<string>('');
   const [systemPrompt, setSystemPrompt] = useState<string>('You are a helpful assistant.');
-  const [parameters, setParameters] = useState({
+  const [parameters, setParameters] = useState<DdoParameters>({
     temperature: 0.7,
     num_ctx: 2048,
     min_p: 0.05,
@@ -258,16 +169,17 @@ export default function App() {
     isGeneratingRef.current = isGenerating;
   }, [isGenerating]);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const [sendOnEnter, setSendOnEnter] = useState<boolean>(true); /* ponytail: toggle send action shortcut */
-  const [contextUsed, setContextUsed] = useState<number>(0); /* ponytail: track active context token usage */
-  // ponytail: Separate model fallback logic to avoid timing/closure issues
+  const [sendOnEnter, setSendOnEnter] = useState<boolean>(true);
+  const [contextUsed, setContextUsed] = useState<number>(0);
+
+  // Separate model fallback logic
   useEffect(() => {
     if (activeModel) {
       const modelNames = models.map(m => m.name);
       if (models.length > 0 && !modelNames.includes(activeModel)) {
-        setActiveModel(models[0].name);
+        setTimeout(() => setActiveModel(models[0].name), 0);
       } else if (models.length === 0) {
-        setActiveModel('');
+        setTimeout(() => setActiveModel(''), 0);
       }
     }
   }, [models, activeModel]);
@@ -283,60 +195,30 @@ export default function App() {
     setIsModelLoading(true);
     setModelLoadError('');
     try {
-      const headers: HeadersInit = { 'Content-Type': 'application/json' };
-      if (settings.accessToken) {
-        headers['X-DDO-Token'] = settings.accessToken;
-      }
-      const optionsPayload: Record<string, any> = { ...parameters };
-      if (!numPredictEnabled) {
-        delete optionsPayload.num_predict;
-      }
-      const res = await fetch(`${settings.connectionUrl}/api/generate`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          model: modelName,
-          options: optionsPayload,
-          keep_alive: 300
-        })
-      });
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-      }
-    } catch (e: any) {
+      await apiLoadModelOnSelection(modelName, settings, parameters, numPredictEnabled);
+    } catch (e) {
       console.error("Failed to pre-load model into VRAM", e);
-      setModelLoadError(e.message || "Failed to load model");
+      setModelLoadError(e instanceof Error ? e.message : "Failed to load model");
       setActiveModel('');
     } finally {
       setIsModelLoading(false);
     }
   };
 
-  // ponytail: Active session background keep-alive refresh
+  // Active session background keep-alive refresh
   useEffect(() => {
     if (!activeModel || activeModel === "") return;
     const interval = setInterval(async () => {
       if (isGeneratingRef.current) return;
       try {
-        const headers: HeadersInit = { 'Content-Type': 'application/json' };
-        if (settings.accessToken) {
-          headers['X-DDO-Token'] = settings.accessToken;
-        }
-        await fetch(`${settings.connectionUrl}/api/chat`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            model: activeModel,
-            messages: [],
-            keep_alive: 300
-          })
-        });
+        await keepAliveModel(activeModel, settings.connectionUrl, settings.accessToken);
       } catch (e) {
         console.error("Keep alive refresh failed", e);
       }
     }, 240000); // 4 minutes
     return () => clearInterval(interval);
   }, [activeModel, settings.connectionUrl, settings.accessToken]);
+
   const [lastPolledMsgId, setLastPolledMsgId] = useState<string>('');
   const lastPolledMsgIdRef = useRef(lastPolledMsgId);
   useEffect(() => {
@@ -350,104 +232,40 @@ export default function App() {
   }, [chats, activeChatId]);
 
   // Initial tags/ps fetch and interval polling
-  useEffect(() => {
-    fetchModelsAndPs();
-    const interval = setInterval(fetchModelsAndPs, 5000);
-    return () => clearInterval(interval);
-  }, [settings.connectionUrl, settings.accessToken]);
-
-  // Polling for shared room mode
-  useEffect(() => {
-    if (!settings.isSharedMode) return;
-    const interval = setInterval(startBroadcastPolling, 1500);
-    return () => clearInterval(interval);
-  }, [settings.isSharedMode, activeChatId]);
-
-  // ponytail: Unload model from VRAM by calling API with keep_alive: 0
-  const unloadModel = async () => {
-    if (!psInfo) return;
+  const fetchModelsAndPs = useCallback(async () => {
     try {
-      const headers: HeadersInit = { 'Content-Type': 'application/json' };
-      if (settings.accessToken) {
-        headers['X-DDO-Token'] = settings.accessToken;
-      }
-      
-      await fetch(`${settings.connectionUrl}/api/chat`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          model: psInfo.name,
-          messages: [],
-          keep_alive: 0
-        })
+      const fetchedModels = await fetchModels(settings.connectionUrl, settings.accessToken);
+      setModels(prev => {
+        if (JSON.stringify(prev) === JSON.stringify(fetchedModels)) return prev;
+        return fetchedModels;
       });
-      
-      setPsInfo(null);
-      fetchModelsAndPs();
-    } catch (e) {
-      console.error("Failed to unload model", e);
-    }
-  };
 
-  // Create default tab if none exists
-  useEffect(() => {
-    if (chats.length === 0) {
-      addNewTab();
-    }
-  }, [chats]);
-
-  const fetchModelsAndPs = async () => {
-    try {
-      const headers: HeadersInit = { 'Content-Type': 'application/json' };
-      if (settings.accessToken) {
-        headers['X-DDO-Token'] = settings.accessToken;
-      }
-
-      // Fetch Local Models
-      const tagsRes = await fetch(`${settings.connectionUrl}/api/tags`, { headers });
-      if (tagsRes.ok) {
-        const data = await tagsRes.json();
-        const modelObjects = data.models?.map((m: any) => ({
-          name: m.name,
-          size: m.size
-        })) || [];
-        
-        // Prevent state update if the model list hasn't changed
-        setModels(prev => {
-          if (JSON.stringify(prev) === JSON.stringify(modelObjects)) return prev;
-          return modelObjects;
-        });
-
-        // ponytail: Fallback logic is handled by a dedicated useEffect above
-      }
-
-      // Fetch Running Models status
-      const psRes = await fetch(`${settings.connectionUrl}/api/ps`, { headers });
-      if (psRes.ok) {
-        const data = await psRes.json();
-        if (data.models && data.models.length > 0) {
-          const m = data.models[0];
-          setPsInfo({
-            name: m.name,
-            size: m.size,
-            processor: m.size_vram > 0 ? 'GPU' : 'CPU',
-            until: m.expires_at || ''
-          });
-        } else {
-          setPsInfo(null);
-        }
-      }
+      const fetchedPs = await fetchPs(settings.connectionUrl, settings.accessToken);
+      setPsInfo(fetchedPs);
     } catch (e) {
       console.error("Failed to connect to Ollama Server status endpoints.", e);
     }
-  };
+  }, [settings.connectionUrl, settings.accessToken]);
 
-  const startBroadcastPolling = async () => {
+  useEffect(() => {
+    setTimeout(() => {
+      void fetchModelsAndPs();
+    }, 0);
+    const interval = setInterval(() => {
+      void fetchModelsAndPs();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [fetchModelsAndPs]);
+
+  // Polling for shared room mode
+  const startBroadcastPolling = useCallback(async () => {
     try {
-      const res = await fetch(`${settings.connectionUrl}/api/poll`);
-      if (!res.ok) return;
-      const data = await res.json();
-      
+      const data = (await pollMessage(settings.connectionUrl, settings.accessToken)) as {
+        id?: string;
+        sender?: string;
+        role?: 'user' | 'assistant' | 'system';
+        content?: string;
+      };
       if (data.id && data.id !== lastPolledMsgIdRef.current && data.sender !== settings.username) {
         setLastPolledMsgId(data.id);
         
@@ -458,8 +276,8 @@ export default function App() {
               return {
                 ...c,
                 messages: [...c.messages, {
-                  role: data.role,
-                  content: data.content,
+                  role: data.role || 'user',
+                  content: data.content || '',
                   sender: data.sender
                 }]
               };
@@ -471,9 +289,27 @@ export default function App() {
     } catch (e) {
       console.error("Broadcasting poll failed", e);
     }
+  }, [settings.connectionUrl, settings.accessToken, settings.username, activeChatId]);
+
+  useEffect(() => {
+    if (!settings.isSharedMode) return;
+    const interval = setInterval(startBroadcastPolling, 1500);
+    return () => clearInterval(interval);
+  }, [settings.isSharedMode, startBroadcastPolling]);
+
+  // Unload model from VRAM by calling API with keep_alive: 0
+  const handleUnloadModel = async () => {
+    if (!psInfo) return;
+    try {
+      await apiUnloadModel(psInfo.name, settings.connectionUrl, settings.accessToken);
+      setPsInfo(null);
+      fetchModelsAndPs();
+    } catch (e) {
+      console.error("Failed to unload model", e);
+    }
   };
 
-  const addNewTab = () => {
+  const addNewTab = useCallback(() => {
     const newId = Date.now().toString();
     const newChat: ChatSession = {
       id: newId,
@@ -482,7 +318,16 @@ export default function App() {
     };
     setChats(prev => [...prev, newChat]);
     setActiveChatId(newId);
-  };
+  }, [t.newChat, chats.length]);
+
+  // Create default tab if none exists
+  useEffect(() => {
+    if (chats.length === 0) {
+      setTimeout(() => {
+        addNewTab();
+      }, 0);
+    }
+  }, [chats.length, addNewTab]);
 
   const deleteTab = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -506,7 +351,7 @@ export default function App() {
       sender: settings.username
     };
 
-    let targetChat = chats.find(c => c.id === activeChatId);
+    const targetChat = chats.find(c => c.id === activeChatId);
     if (!targetChat) return;
 
     // Append user message locally
@@ -518,28 +363,25 @@ export default function App() {
       return c;
     }));
 
-    // Broadcast user message if Shared Room mode is active
+    // Broadcast user message if Shared Room mode is active (includes access token)
     if (settings.isSharedMode) {
       try {
-        await fetch(`${settings.connectionUrl}/api/broadcast`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sender: settings.username,
-            role: 'user',
-            content: userMessageContent
-          })
-        });
+        await broadcastMessage(
+          settings.connectionUrl,
+          settings.accessToken,
+          settings.username,
+          'user',
+          userMessageContent
+        );
       } catch (e) {
         console.error("Failed to broadcast user message", e);
       }
     }
 
     // Prepare inference API request payload
-    // Map system prompt and options settings
     const requestMessages = [];
     if (systemPrompt) {
-      requestMessages.push({ role: 'system', content: systemPrompt });
+      requestMessages.push({ role: 'system' as const, content: systemPrompt });
     }
     updatedMessages.forEach(m => {
       requestMessages.push({ role: m.role, content: m.content });
@@ -553,7 +395,7 @@ export default function App() {
     abortControllerRef.current = new AbortController();
 
     try {
-      const optionsPayload: Record<string, any> = { ...parameters };
+      const optionsPayload: Record<string, unknown> = { ...parameters };
       if (!numPredictEnabled) {
         delete optionsPayload.num_predict;
       }
@@ -581,7 +423,6 @@ export default function App() {
         if (c.id === activeChatId) {
           return {
             ...c,
-            // ponytail: Use the selected activeModel name as the sender signature
             messages: [...c.messages, { id: assistantMsgId, role: 'assistant', content: '', sender: activeModel }]
           };
         }
@@ -609,7 +450,6 @@ export default function App() {
             try {
               const parsed = JSON.parse(line);
               
-              // ponytail: Record timestamps for CoT (think) duration
               if (!thinkStartTime) {
                 thinkStartTime = performance.now();
               }
@@ -630,7 +470,6 @@ export default function App() {
               }
 
               if (accumulatedContent) {
-                // Update assistant message state incrementally (streaming UI typewriter effect)
                 setChats(prev => prev.map(c => {
                   if (c.id === activeChatId) {
                     return {
@@ -647,7 +486,6 @@ export default function App() {
                 }));
               }
 
-              // ponytail: Capture inference metrics at the end of the stream
               if (parsed.done) {
                 if (isThinkingState && !hasThoughtEndedState) {
                   accumulatedContent += '\n</think>\n';
@@ -667,7 +505,6 @@ export default function App() {
                   thinkDurationSec: parseFloat(thinkDurationSec.toFixed(2))
                 };
 
-                // Update total context token usage stats
                 setContextUsed((parsed.prompt_eval_count || 0) + (parsed.eval_count || 0));
 
                 setChats(prev => prev.map(c => {
@@ -685,41 +522,39 @@ export default function App() {
                   return c;
                 }));
               }
-            } catch (err) {
-              // Ignore partial JSON line parse errors during chunk cuts
+            } catch {
+              // Ignore partial JSON line parse errors
             }
           }
         }
       }
 
-      // After streaming is complete, broadcast assistant message if Shared Room mode is active
+      // After streaming is complete, broadcast assistant message (includes access token)
       if (settings.isSharedMode && accumulatedContent) {
         try {
-          await fetch(`${settings.connectionUrl}/api/broadcast`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              sender: activeModel,
-              role: 'assistant',
-              content: accumulatedContent
-            })
-          });
+          await broadcastMessage(
+            settings.connectionUrl,
+            settings.accessToken,
+            activeModel,
+            'assistant',
+            accumulatedContent
+          );
         } catch (e) {
           console.error("Failed to broadcast assistant message", e);
         }
       }
 
-    } catch (e: any) {
-      if (e.name === 'AbortError') {
+    } catch (e) {
+      const err = e as Error;
+      if (err.name === 'AbortError') {
         console.log("Inference stream aborted.");
       } else {
         console.error("Inference request failed.", e);
-        // Display error message inside chat log
         setChats(prev => prev.map(c => {
           if (c.id === activeChatId) {
             return {
               ...c,
-              messages: [...c.messages, { role: 'system', content: `Error: ${e.message}` }]
+              messages: [...c.messages, { role: 'system', content: `Error: ${err.message}` }]
             };
           }
           return c;
@@ -782,14 +617,14 @@ export default function App() {
           if (data.options) setParameters(prev => ({ ...prev, ...data.options }));
           if (data.think !== undefined) setThinkMode(data.think);
         }
-      } catch (err) {
+      } catch {
         alert("Failed to parse cassette JSON file. Make sure it conforms to DDO Saba specifications.");
       }
     };
     reader.readAsText(file);
   };
 
-  function exportPreset() {
+  const exportPreset = () => {
     const presetData = {
       version: "1.0-preset",
       presetName,
@@ -811,9 +646,9 @@ export default function App() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }
+  };
 
-  function importPreset(e: React.ChangeEvent<HTMLInputElement>) {
+  const importPreset = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -836,85 +671,11 @@ export default function App() {
         } else {
           alert("Invalid preset file format. Make sure version matches.");
         }
-      } catch (err) {
+      } catch {
         alert("Failed to parse preset JSON file.");
       }
     };
     reader.readAsText(file);
-  };
-
-  // Helper parser to extract <think> blocks and render Markdown / LaTeX with Syntax Highlighting
-  const parseMessageContent = (content: string, msgKey: string) => {
-    const thinkStart = content.indexOf('<think>');
-    const thinkEnd = content.indexOf('</think>');
-
-    const renderMarkdownContent = (txt: string) => {
-      return (
-        <ReactMarkdown
-          remarkPlugins={[remarkMath]}
-          rehypePlugins={[rehypeKatex]}
-          components={{
-            code({ node, inline, className, children, ...props }: any) {
-              const match = /language-(\w+)/.exec(className || '');
-              return !inline && match ? (
-                <SyntaxHighlighter
-                  {...props}
-                  children={String(children).replace(/\n$/, '')}
-                  style={oneDark}
-                  language={match[1]}
-                  PreTag="div"
-                />
-              ) : (
-                <code {...props} className={className}>
-                  {children}
-                </code>
-              );
-            }
-          }}
-        >
-          {txt}
-        </ReactMarkdown>
-      );
-    };
-
-    if (thinkStart !== -1) {
-      const isThinkingExpanded = expandedThinking[msgKey] ?? !collapseThinking;
-      if (thinkEnd !== -1) {
-        const thinking = content.slice(thinkStart + 7, thinkEnd).trim();
-        const answer = content.slice(thinkEnd + 8).trim();
-        return (
-          <div className="message-cot-container">
-            <details 
-              className="cot-details" 
-              open={isThinkingExpanded}
-              onToggle={(e) => handleThinkingToggle(msgKey, e.currentTarget.open)}
-            >
-              <summary className="cot-summary">{t.thinking}</summary>
-              {isThinkingExpanded && <div className="cot-content">{renderMarkdownContent(thinking)}</div>}
-            </details>
-            <div className="cot-answer">{renderMarkdownContent(answer)}</div>
-          </div>
-        );
-      } else {
-        const thinking = content.slice(thinkStart + 7).trim();
-        return (
-          <div className="message-cot-container">
-            <details 
-              className="cot-details" 
-              open={isThinkingExpanded}
-              onToggle={(e) => handleThinkingToggle(msgKey, e.currentTarget.open)}
-            >
-              <summary className="cot-summary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Loader2 className="animate-spin" size={14} />
-                <span>{t.thinking}...</span>
-              </summary>
-              {isThinkingExpanded && <div className="cot-content">{renderMarkdownContent(thinking)}</div>}
-            </details>
-          </div>
-        );
-      }
-    }
-    return <div className="raw-content">{renderMarkdownContent(content)}</div>;
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -943,13 +704,15 @@ export default function App() {
             if (data.options) setParameters(prev => ({ ...prev, ...data.options }));
             if (data.think !== undefined) setThinkMode(data.think);
           }
-        } catch (err) {
+        } catch {
           alert("Malformed cassette JSON.");
         }
       };
       reader.readAsText(file);
     }
   };
+
+  const activeChat = chats.find(c => c.id === activeChatId);
 
   return (
     <div className="app-container" onDragOver={handleDragOver} onDrop={handleDrop}>
@@ -970,7 +733,7 @@ export default function App() {
               className={`tab-item ${activeChatId === c.id ? 'active' : ''}`}
               onClick={() => setActiveChatId(c.id)}
             >
-              <MessageSquare size={16} className="tab-icon" />
+              <Trash2 size={16} className="tab-icon" />
               <span className="tab-title">{c.title}</span>
               <button className="tab-close-btn" onClick={(e) => deleteTab(c.id, e)}>
                 <Trash2 size={14} />
@@ -1003,16 +766,16 @@ export default function App() {
               className="model-select"
               style={{ flex: 1 }}
             >
-              <option value="">{isModelLoading ? (lang === 'ja' ? 'モデルをロード中...' : 'Loading Model...') : (models.length === 0 ? "No models detected" : (t.selectModel || "Select a model..."))}</option>
+              <option value="">{isModelLoading ? (lang === 'ja' ? 'モデルをロード中...' : 'Loading Model...') : (models.length === 0 ? "No models detected" : t.selectModel)}</option>
               {models.map(m => (
                 <option key={m.name} value={m.name}>
-                  {m.name} {m.size ? `(${formatBytes(m.size)})` : ''}
+                  {m.name}
                 </option>
               ))}
             </select>
             {psInfo && (
               <button 
-                onClick={unloadModel} 
+                onClick={handleUnloadModel} 
                 className="unload-btn" 
                 title={lang === 'ja' ? 'VRAMからアンロード' : 'Unload from VRAM'}
               >
@@ -1037,52 +800,14 @@ export default function App() {
           </div>
         </header>
 
-        <div className="chat-messages-scroll">
-          {activeChatId && chats.find(c => c.id === activeChatId)?.messages.length === 0 && (
-            <div className="empty-state">
-              <FolderOpen size={48} className="empty-icon" />
-              <p>{t.noChats}</p>
-              <div className="import-box">
-                <label className="btn-secondary clickable">
-                  <Upload size={16} />
-                  <span>{t.import}</span>
-                  <input type="file" accept=".json" onChange={importCassette} style={{ display: 'none' }} />
-                </label>
-              </div>
-            </div>
-          )}
-
-          {activeChatId && chats.find(c => c.id === activeChatId)?.messages.map((m, idx) => (
-            <div key={idx} className={`message-row ${m.role}`}>
-              <div className="message-avatar">
-                {m.role === 'user' 
-                  ? (m.sender?.slice(0, 2).toUpperCase() || 'US') 
-                  : (m.sender?.slice(0, 2).toUpperCase() || 'AI')}
-              </div>
-              <div className="message-bubble">
-                {m.sender && <div className="message-sender">{m.sender}</div>}
-                <div className="message-text">
-                  {m.content ? parseMessageContent(m.content, m.id || `msg_${idx}`) : (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'hsl(var(--text-muted))' }}>
-                      <Loader2 size={16} className="animate-spin" />
-                      <span>Thinking...</span>
-                    </div>
-                  )}
-                </div>
-                {/* ponytail: Display assistant performance metrics below the bubble */}
-                {m.role === 'assistant' && m.metrics && (
-                  <div className="message-metrics">
-                    {m.metrics.thinkDurationSec && m.metrics.thinkDurationSec > 0 ? `Think: ${m.metrics.thinkDurationSec}s | ` : ''}
-                    {`Time: ${m.metrics.totalDurationSec}s | Speed: ${m.metrics.tokensPerSec} tok/s | Tokens: ${m.metrics.evalTokens} (gen) / ${m.metrics.promptTokens} (prompt)`}
-                  </div>
-                )}
-              </div>
-              {/* ponytail: Hover Copy button (copies Raw Markdown source) */}
-              {m.content && <CopyButton text={m.content} />}
-            </div>
-          ))}
-          <div ref={messagesEndRef} />
-        </div>
+        <ChatMessages 
+          messages={activeChat?.messages || []}
+          onImportCassette={importCassette}
+          expandedThinking={expandedThinking}
+          onToggleThinking={handleThinkingToggle}
+          collapseThinking={collapseThinking}
+          t={t}
+        />
 
         <footer className="chat-input-bar">
           <div className="input-wrap">
@@ -1091,7 +816,6 @@ export default function App() {
               disabled={isGenerating || isModelLoading}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={(e) => {
-                // ponytail: dynamically evaluate keyboard send shortcuts based on configuration toggle
                 if (e.key === 'Enter') {
                   if (sendOnEnter && !e.shiftKey) {
                     e.preventDefault();
@@ -1123,317 +847,42 @@ export default function App() {
         </footer>
       </main>
 
-      {/* 3. Right Column: Parameters and System Config */}
-      <aside className="parameters-column">
-        <div className="column-section">
-          <h3><Sliders size={16} /> {t.modelParameters}</h3>
-          
-          <div className="input-group">
-            <label>{lang === 'ja' ? 'プリセット名' : 'Preset Name'}</label>
-            <input
-              type="text"
-              className="preset-name-input"
-              value={presetName}
-              onChange={(e) => setPresetName(e.target.value)}
-              placeholder={lang === 'ja' ? 'プリセット名を入力...' : 'Enter preset name...'}
-            />
-          </div>
-
-          <div className="input-group">
-            <label>{t.reasoningMode}</label>
-            <div className="toggle-switch">
-              <input 
-                type="checkbox" 
-                id="think-toggle" 
-                checked={thinkMode} 
-                onChange={(e) => setThinkMode(e.target.checked)} 
-              />
-              <label htmlFor="think-toggle"></label>
-            </div>
-          </div>
-
-          <div className="input-group">
-            <label>{t.collapseThinking}</label>
-            <div className="toggle-switch">
-              <input 
-                type="checkbox" 
-                id="collapse-think-toggle" 
-                checked={collapseThinking} 
-                onChange={(e) => setCollapseThinking(e.target.checked)} 
-              />
-              <label htmlFor="collapse-think-toggle"></label>
-            </div>
-          </div>
-
-          <div className="input-group font-japanese">
-            <label>{t.systemPrompt}</label>
-            <textarea 
-              value={systemPrompt} 
-              onChange={(e) => setSystemPrompt(e.target.value)}
-              className="system-prompt-textarea"
-              rows={4}
-            />
-          </div>
-
-          {/* Temperature Slider */}
-          <div className="slider-group">
-            <div className="slider-header">
-              <label>{t.temperature}</label>
-              <span>{parameters.temperature}</span>
-            </div>
-            <input 
-              type="range" min="0.0" max="2.0" step="0.1" 
-              value={parameters.temperature} 
-              onChange={(e) => setParameters(prev => ({ ...prev, temperature: parseFloat(e.target.value) }))}
-            />
-          </div>
-
-          {/* Min P Slider */}
-          <div className="slider-group">
-            <div className="slider-header">
-              <label>{t.minP}</label>
-              <span>{parameters.min_p}</span>
-            </div>
-            <input 
-              type="range" min="0.0" max="1.0" step="0.01" 
-              value={parameters.min_p} 
-              onChange={(e) => setParameters(prev => ({ ...prev, min_p: parseFloat(e.target.value) }))}
-            />
-          </div>
-
-          {/* Top P Slider */}
-          <div className="slider-group">
-            <div className="slider-header">
-              <label>{t.topP}</label>
-              <span>{parameters.top_p}</span>
-            </div>
-            <input 
-              type="range" min="0.0" max="1.0" step="0.01" 
-              value={parameters.top_p} 
-              onChange={(e) => setParameters(prev => ({ ...prev, top_p: parseFloat(e.target.value) }))}
-            />
-          </div>
-
-          {/* Top K Slider */}
-          <div className="slider-group">
-            <div className="slider-header">
-              <label>{t.topK}</label>
-              <span>{parameters.top_k}</span>
-            </div>
-            <input 
-              type="range" min="0" max="100" step="1" 
-              value={parameters.top_k} 
-              onChange={(e) => setParameters(prev => ({ ...prev, top_k: parseInt(e.target.value) }))}
-            />
-          </div>
-
-          {/* Max Output Tokens Slider with Toggle */}
-          <div className="slider-group">
-            <div className="slider-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
-                <input 
-                  type="checkbox" 
-                  checked={numPredictEnabled} 
-                  onChange={(e) => setNumPredictEnabled(e.target.checked)} 
-                />
-                {t.maxTokens}
-              </label>
-              <span>{numPredictEnabled ? parameters.num_predict : (lang === 'ja' ? '無制限' : 'Unlimited')}</span>
-            </div>
-            <input 
-              type="range" min="128" max="16384" step="128" 
-              value={parameters.num_predict} 
-              disabled={!numPredictEnabled}
-              onChange={(e) => setParameters(prev => ({ ...prev, num_predict: parseInt(e.target.value) }))}
-            />
-          </div>
-
-          {/* ponytail: Context Limit Slider */}
-          <div className="slider-group">
-            <div className="slider-header">
-              <label>{t.contextLimit || "Context Limit (num_ctx)"}</label>
-              <span>{parameters.num_ctx}</span>
-            </div>
-            <input 
-              type="range" min="1024" max="32768" step="1024" 
-              value={parameters.num_ctx} 
-              onChange={(e) => setParameters(prev => ({ ...prev, num_ctx: parseInt(e.target.value) }))}
-            />
-          </div>
-
-          {/* Repeat Penalty Slider */}
-          <div className="slider-group">
-            <div className="slider-header">
-              <label>{t.repeatPenalty}</label>
-              <span>{parameters.repeat_penalty}</span>
-            </div>
-            <input 
-              type="range" min="0.5" max="2.0" step="0.05" 
-              value={parameters.repeat_penalty} 
-              onChange={(e) => setParameters(prev => ({ ...prev, repeat_penalty: parseFloat(e.target.value) }))}
-            />
-          </div>
-
-          {/* Preset Export / Import Actions */}
-          <div className="preset-actions-group">
-            <button className="btn-secondary" onClick={exportPreset}>
-              Export
-            </button>
-            <label className="btn-secondary clickable">
-              Import
-              <input type="file" accept=".json" onChange={importPreset} style={{ display: 'none' }} />
-            </label>
-          </div>
-        </div>
-
-        {/* Dynamic VRAM state status (Ollama ps) */}
-        <div className="column-section status-section">
-          <h3><Cpu size={16} /> {t.loadedModel}</h3>
-          {psInfo ? (
-            <div className="status-card">
-              <div className="status-row">
-                <span className="label">Model:</span>
-                <span className="val font-semibold flex items-center gap-2">
-                  {psInfo.name}
-                </span>
-              </div>
-              <div className="status-row">
-                <span className="label">{t.vram}:</span>
-                <span className="val">{(psInfo.size / (1024*1024*1024)).toFixed(2)} GB</span>
-              </div>
-              <div className="status-row">
-                <span className="label">{t.device}:</span>
-                <span className="val badge">{psInfo.processor}</span>
-              </div>
-              <div className="status-row">
-                <span className="label">{t.until}:</span>
-                <span className="val text-amber-400">{psInfo.until}</span>
-              </div>
-            </div>
-          ) : (
-            <p className="no-status-text">{t.noLoadedModel}</p>
-          )}
-        </div>
-
-        {/* ponytail: Context usage progress and details */}
-        <div className="column-section status-section">
-          <h3><Sliders size={16} /> Context Memory</h3>
-          <div className="status-card">
-            <div className="status-row">
-              <span className="label">Used / Limit:</span>
-              <span className="val">{contextUsed} / {parameters.num_ctx} Tokens</span>
-            </div>
-            <div style={{
-              width: '100%',
-              height: '6px',
-              backgroundColor: 'hsl(var(--border))',
-              borderRadius: '3px',
-              marginTop: '8px',
-              overflow: 'hidden'
-            }}>
-              <div style={{
-                width: `${parameters.num_ctx > 0 ? Math.min(100, (contextUsed / parameters.num_ctx) * 100) : 0}%`,
-                height: '100%',
-                backgroundColor: (contextUsed / parameters.num_ctx) > 0.8 ? 'hsl(var(--danger))' : 'hsl(var(--accent))',
-                transition: 'width 0.3s ease'
-              }} />
-            </div>
-            <div className="status-row" style={{ marginTop: '4px', fontSize: '0.75rem', justifyContent: 'flex-end' }}>
-              <span className="val text-muted">
-                {parameters.num_ctx > 0 ? `${Math.min(100, Math.round((contextUsed / parameters.num_ctx) * 100))}%` : '0%'}
-              </span>
-            </div>
-          </div>
-        </div>
-      </aside>
+      {/* 3. Right Column: Parameters Panel */}
+      <ParameterPanel 
+        parameters={parameters}
+        onChangeParameters={setParameters}
+        presetName={presetName}
+        onChangePresetName={setPresetName}
+        systemPrompt={systemPrompt}
+        onChangeSystemPrompt={setSystemPrompt}
+        thinkMode={thinkMode}
+        onChangeThinkMode={setThinkMode}
+        collapseThinking={collapseThinking}
+        onChangeCollapseThinking={setCollapseThinking}
+        numPredictEnabled={numPredictEnabled}
+        onChangeNumPredictEnabled={setNumPredictEnabled}
+        psInfo={psInfo}
+        contextUsed={contextUsed}
+        onExportPreset={exportPreset}
+        onImportPreset={importPreset}
+        t={t}
+        lang={lang}
+      />
 
       {/* 4. Settings Popup / Modal */}
-      {showSettingsModal && (
-        <div className="modal-backdrop">
-          <div className="settings-modal">
-            <div className="modal-header">
-              <h3>{t.settings}</h3>
-              <button className="close-btn" onClick={() => setShowSettingsModal(false)}>✕</button>
-            </div>
-            <div className="modal-body">
-              <div className="form-group">
-                <label>{t.connectionUrl}</label>
-                <input 
-                  type="text" 
-                  value={settings.connectionUrl} 
-                  onChange={(e) => setSettings(prev => ({ ...prev, connectionUrl: e.target.value }))}
-                />
-              </div>
+      <SettingsModal 
+        show={showSettingsModal}
+        settings={settings}
+        onChangeSettings={setSettings}
+        sendOnEnter={sendOnEnter}
+        onChangeSendOnEnter={setSendOnEnter}
+        onClose={() => setShowSettingsModal(false)}
+        onExportCassette={exportCassette}
+        onImportCassette={importCassette}
+        t={t}
+      />
 
-              <div className="form-group">
-                <label>{t.accessToken}</label>
-                <input 
-                  type="password" 
-                  value={settings.accessToken} 
-                  onChange={(e) => setSettings(prev => ({ ...prev, accessToken: e.target.value }))}
-                  placeholder="Enter X-DDO-Token"
-                />
-              </div>
-
-              <div className="form-group">
-                <label>{t.username}</label>
-                <input 
-                  type="text" 
-                  value={settings.username} 
-                  onChange={(e) => setSettings(prev => ({ ...prev, username: e.target.value }))}
-                />
-              </div>
-
-              <div className="form-group inline-group">
-                <label>{t.sharedRoomMode}</label>
-                <div className="toggle-switch">
-                  <input 
-                    type="checkbox" 
-                    id="shared-toggle" 
-                    checked={settings.isSharedMode} 
-                    onChange={(e) => setSettings(prev => ({ ...prev, isSharedMode: e.target.checked }))} 
-                  />
-                  <label htmlFor="shared-toggle"></label>
-                </div>
-              </div>
-
-              <div className="form-group inline-group">
-                <label>{t.sendOnEnter}</label>
-                <div className="toggle-switch">
-                  <input 
-                    type="checkbox" 
-                    id="send-toggle" 
-                    checked={sendOnEnter} 
-                    onChange={(e) => setSendOnEnter(e.target.checked)} 
-                  />
-                  <label htmlFor="send-toggle"></label>
-                </div>
-              </div>
-
-              <div className="modal-divider"></div>
-
-              <div className="form-actions-cassette">
-                <h4>Cassette (JSON Data)</h4>
-                <div className="action-row">
-                  <button className="btn-secondary" onClick={exportCassette}>
-                    <Download size={16} />
-                    <span>{t.export}</span>
-                  </button>
-                  <label className="btn-secondary clickable">
-                    <Upload size={16} />
-                    <span>{t.import}</span>
-                    <input type="file" accept=".json" onChange={importCassette} style={{ display: 'none' }} />
-                  </label>
-                </div>
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn-accent" onClick={() => setShowSettingsModal(false)}>{t.close}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
+      <div ref={messagesEndRef} />
     </div>
   );
 }

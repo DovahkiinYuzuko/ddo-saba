@@ -42,20 +42,20 @@ if !ERRORLEVEL! neq 0 (
 
 :: Start Nginx Server
 echo Starting Nginx server...
-if not exist "nginx\modules\ngx_http_js_module.dll" goto FALLBACK_NGINX
+if not exist "nginx\modules\ngx_http_js_module.dll" (
+    echo.
+    echo [CRITICAL ERROR] Nginx JS module (ngx_http_js_module.dll) is missing!
+    echo For security reasons, DDO Saba cannot start without Nginx JS module,
+    echo as it is required to authenticate requests and secure your Ollama API from external access.
+    echo Please make sure the module is correctly installed in 'nginx\modules\' folder.
+    echo.
+    pause
+    exit /b 1
+)
 
 :FULL_NGINX
-echo [INFO] Found njs module. Starting Nginx with full features...
+echo [INFO] Found njs module. Starting Nginx...
 start /B nginx\nginx.exe -p nginx
-goto NGINX_STARTED
-
-:FALLBACK_NGINX
-echo [WARNING] njs module (ngx_http_js_module.dll) not found.
-echo Starting Nginx in fallback mode (No Shared Room / Access Token)...
-
-start /B nginx\nginx.exe -p nginx -c conf/nginx_no_njs.conf
-
-:NGINX_STARTED
 
 if !ERRORLEVEL! neq 0 (
     echo.
