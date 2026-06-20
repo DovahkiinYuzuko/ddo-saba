@@ -100,6 +100,10 @@ All states defined below use React's `useState` or `useRef`.
 - **Type:** `boolean`
 - **Description:** Tracks mobile right panel status.
 
+### `messagesContainerRef`
+- **Type:** `React.MutableRefObject<HTMLDivElement | null>`
+- **Description:** Tracks the HTMLDivElement scroll container of the chat message list to directly manipulate `scrollTop` for scroll synchronization.
+
 ---
 
 ## 2. Functions
