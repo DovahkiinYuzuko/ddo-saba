@@ -15,7 +15,7 @@ This document specifies the environment variables, external processes, and contr
 ## 2. Process Control Flow
 
 ### Windows (`start_server.bat`)
-*   **Step 1:** Verifies if `DDO_SABA_TOKEN` is set; if empty, runs a PowerShell command to generate a cryptographically secure 16-byte random hex string (32 characters).
+*   **Step 1:** Verifies if `DDO_SABA_TOKEN` is set; if empty, runs a PowerShell command to generate a cryptographically secure 16-byte random hex string (32 characters) using `[BitConverter]` for PowerShell 5.1 compatibility.
 *   **Step 2:** Checks if Ollama is running on port `11434` (using `netstat`). If not, runs `ollama serve` in the background.
 *   **Step 3:** Generates the active configuration `nginx\conf\nginx_active.conf` from the template `nginx\conf\nginx_win.conf.template` by replacing `__DDO_SABA_TOKEN__` with the generated `DDO_SABA_TOKEN`.
 *   **Step 4:** Starts the background PowerShell broadcast server (`bin\broadcast_server.ps1`) and saves its process ID to `bin\broadcast.pid`.

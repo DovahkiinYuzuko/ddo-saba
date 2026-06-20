@@ -23,6 +23,14 @@ if exist "bin\broadcast.pid" set /p BC_PID=<bin\broadcast.pid
 if exist "bin\broadcast.pid" if not "!BC_PID!"=="" echo Killing PowerShell Broadcast Server (PID: !BC_PID!)...
 if exist "bin\broadcast.pid" if not "!BC_PID!"=="" taskkill /f /pid !BC_PID! >nul 2>&1
 
+:: Force terminate any lingering processes on port 8088 (Nginx)
+echo Scanning and terminating residual processes on port 8088...
+powershell -NoProfile -Command "netstat -ano | Select-String 'LISTENING' | Select-String ':8088' | ForEach-Object { if ($_ -match '(\d+)$') { Stop-Process -Id $Matches[1] -Force -ErrorAction SilentlyContinue } }"
+
+:: Force terminate any lingering broadcast server processes
+echo Scanning and terminating residual broadcast server processes...
+powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name = 'powershell.exe'\" | ForEach-Object { if ($_.CommandLine -like '*broadcast_server.ps1*') { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue } }"
+
 :: Clean up files
 echo Cleaning up temporary files...
 if exist "nginx\conf\nginx_active.conf" del "nginx\conf\nginx_active.conf"

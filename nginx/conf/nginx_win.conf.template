@@ -10,6 +10,7 @@ http {
     limit_conn_zone $binary_remote_addr zone=ollama_limit:10m;
 
     # Dynamic map-based token verification
+    map_hash_bucket_size 64;
     map $http_x_ddo_token $auth_status {
         "__DDO_SABA_TOKEN__" "ok";
         default "fail";

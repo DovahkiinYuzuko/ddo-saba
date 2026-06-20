@@ -5,8 +5,8 @@ setlocal enabledelayedexpansion
 if "%DDO_SABA_TOKEN%"=="" (
     set /p DDO_SABA_TOKEN="Enter access token (Press Enter to auto-generate a secure random 32-character token): "
     if "!DDO_SABA_TOKEN!"=="" (
-        :: Generate secure 32-character hex token via PowerShell RNG
-        for /f "usebackq delims=" %%i in (`powershell -NoProfile -Command "[Convert]::ToHexString((System.Security.Cryptography.RandomNumberGenerator::GetBytes(16))).ToLower()"` ) do (
+        :: Generate secure 32-character hex token via PowerShell RNG (PowerShell 5.1/7.x compatible)
+        for /f "usebackq delims=" %%i in (`powershell -NoProfile -Command "$b=New-Object byte[] 16; (New-Object System.Security.Cryptography.RNGCryptoServiceProvider).GetBytes($b); [BitConverter]::ToString($b).Replace('-','').ToLower()"` ) do (
             set DDO_SABA_TOKEN=%%i
         )
     )
@@ -58,7 +58,7 @@ if !ERRORLEVEL! neq 0 (
 
 :: Start Cloudflare Tunnel
 echo Starting Cloudflare Tunnel...
-powershell -ExecutionPolicy Bypass -File bin\start_tunnel.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File bin\start_tunnel.ps1
 
 :: Keep batch open so users can read output
 pause

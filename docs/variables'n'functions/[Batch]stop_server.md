@@ -17,6 +17,7 @@ The shutdown operation targets specific background processes initiated by the st
 *   **Step 3:** Discovers the PowerShell Broadcast Server PID from `bin\broadcast.pid` and terminates it using single-line redirection check.
     *   *Command:* `taskkill /f /pid [broadcast_pid]`
 *   **Step 4:** Deletes the generated PID files and the active configuration file `nginx\conf\nginx_active.conf`.
+*   **Step 5 (Port Cleanup):** Scans for any lingering processes listening on ports `8088` (Nginx) and `8089` (PowerShell Broadcast Server) using `netstat -ano` and terminates them via `taskkill /f /pid [PID]` to guarantee port release.
 
 ### Linux/macOS (`stop_server.sh`)
 *   **Step 1:** Terminates Nginx using the saved PID in `/tmp/ddo_saba_nginx.pid`.
@@ -34,9 +35,11 @@ graph TD
     stop_server.bat --> ReadNginxPID["Read nginx/logs/nginx.pid"]
     stop_server.bat --> ReadCFPID["Read bin/cloudflared.pid"]
     stop_server.bat --> ReadBCPID["Read bin/broadcast.pid"]
+    stop_server.bat --> ScanPorts["netstat -ano for 8088 & 8089"]
     ReadNginxPID --> StopNginx["nginx.exe -s stop / taskkill Nginx"]
     ReadCFPID --> KillCloudflared["taskkill /f /pid cloudflared_pid"]
     ReadBCPID --> KillBroadcast["taskkill /f /pid broadcast_pid"]
+    ScanPorts --> PortCleanup["taskkill /f /pid remaining_pid"]
     
     stop_server.sh --> ReadUnixNginxPID["Read /tmp/ddo_saba_nginx.pid"]
     stop_server.sh --> ReadUnixCFPID["Read /tmp/ddo_saba_cloudflared.pid"]
