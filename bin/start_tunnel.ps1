@@ -47,6 +47,8 @@ for ($i = 0; $i -lt 5; $i++) {
         $output = Get-Content $logFile -Raw
         if ($output -match $regex) {
             $tunnelUrl = $Matches[0]
+            Write-Host "Establishing network connection (handshaking)..." -ForegroundColor Gray
+            Start-Sleep -Seconds 3
             Write-Host "Tunnel established! URL: $tunnelUrl" -ForegroundColor Green
             if ($env:DDO_SABA_TOKEN) {
                 Write-Host "Auto-Auth client URL: $tunnelUrl?token=$env:DDO_SABA_TOKEN" -ForegroundColor Cyan
