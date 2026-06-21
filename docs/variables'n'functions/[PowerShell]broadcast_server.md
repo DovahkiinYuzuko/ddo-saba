@@ -48,7 +48,7 @@ This script runs a lightweight in-memory broadcast relay server for Windows envi
   - `GET /api/poll`: Returns the cached message if it has a newer ID than the client's query parameter, and if it has not expired (within 5 seconds).
   - `POST /api/broadcast`: Reads the incoming JSON message body, updates `$cachedMessage`, `$cachedId`, and `$cachedTime`, appends the message to `$messageHistory`, then returns `200 OK`.
   - `GET /api/history`: Returns the entire array in `$messageHistory` as a JSON payload to allow newly connected peers to sync full chat session logs.
-  - `POST /api/model`: Receives model change event `{ model, sender }` and updates `$cachedModelName`, `$cachedModelSender`, and `$cachedModelTime`.
+  - `POST /api/model`: Receives model change event `{ model, sender, timestamp }` and updates `$cachedModelName`, `$cachedModelSender`, and `$cachedModelTime` (using the provided timestamp or auto-generated epoch if missing).
   - `GET /api/model`: Returns the active model cache JSON `{ model: $cachedModelName, sender: $cachedModelSender, timestamp: $cachedModelTime }`.
   - `OPTIONS /api/poll` & `OPTIONS /api/broadcast` & `OPTIONS /api/history` & `OPTIONS /api/model`: Handles CORS preflight by returning CORS headers with `200 OK` or `204 No Content`.
 

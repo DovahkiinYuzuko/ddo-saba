@@ -11,7 +11,7 @@ This document specifies the variables and functions used in `nginx/conf/broadcas
 - **Description:** The global Nginx object provided by the njs runtime. Accesses the shared dictionary zone `shared.broadcast_zone` which is allocated in memory to temporarily cache the latest broadcasted chat message. Key-value pairs in this zone automatically expire after 5 seconds.
 - **Scope:** Global.
 
-### `process` (L28)
+### `process` (L83-83)
 - **Type:** `Object` (Global Process Object)
 - **Description:** The process object provided by njs to access environmental variables. Accesses `env.DDO_SABA_TOKEN` to retrieve the access credential set by the server host.
 - **Scope:** Global.
@@ -20,8 +20,8 @@ This document specifies the variables and functions used in `nginx/conf/broadcas
 
 ## 2. Functions
 
-### `post_message` (L1-18)
-- **Description:** Receives a HTTP `POST` request containing a chat message from a client, generates an ID and timestamp, and stores it in the `ngx.shared.broadcast_zone`.
+### `post_message` (L1-35)
+- **Description:** Receives a HTTP `POST` request containing a chat message from a client, generates an ID and timestamp, stores it in the `ngx.shared.broadcast_zone` as `"latest"`, and appends it to the in-memory array under the key `"history"` (capped at 100 items).
 - **Arguments:**
   - `r` (`Object`): The Nginx HTTP request object.
 - **Return Value:** None (Sends HTTP response code `200` with confirmation JSON, or `400` on error).
@@ -30,9 +30,10 @@ This document specifies the variables and functions used in `nginx/conf/broadcas
   2. Extracts `sender`, `role`, and `content`.
   3. Formulates a JSON string containing an `id` (using `Date.now()`), the input message, and `timestamp`.
   4. Stores the string into `ngx.shared.broadcast_zone` under the key `"latest"`.
-  5. Returns HTTP `200` with the generated message ID.
+  5. Retrieves `"history"` JSON from `ngx.shared.broadcast_zone`, parses it (defaults to `[]`), pushes the new message, caps the array to the last 100 items, and serializes it back to the `"history"` key.
+  6. Returns HTTP `200` with the generated message ID.
 
-### `get_message` (L20-25)
+### `get_message` (L37-42)
 - **Description:** Receives a HTTP `GET` request and returns the latest message stored in the memory zone.
 - **Arguments:**
   - `r` (`Object`): The Nginx HTTP request object.
@@ -42,7 +43,29 @@ This document specifies the variables and functions used in `nginx/conf/broadcas
   2. Sets response `Content-Type` header to `application/json`.
   3. Returns the payload with HTTP status `200`.
 
-### `auth_check` (L27-42)
+### `get_history` (L44-49)
+- **Description:** Receives a HTTP `GET` request and returns the entire active session history array.
+- **Arguments:**
+  - `r` (`Object`): The Nginx HTTP request object.
+- **Return Value:** None (Sends HTTP response code `200` with history array JSON, or `[]` if none).
+- **Behavior:**
+  1. Retrieves the string under `"history"` from `ngx.shared.broadcast_zone`.
+  2. Sets response `Content-Type` header to `application/json`.
+  3. Returns the payload or `[]` with status `200`.
+
+### `post_model` (L51-65)
+- **Description:** Receives a HTTP `POST` request containing `{ model, sender, timestamp }` and stores it under `"model"` key.
+- **Arguments:**
+  - `r` (`Object`): The Nginx HTTP request object.
+- **Return Value:** None (Sends HTTP `200` or `400`).
+
+### `get_model` (L67-72)
+- **Description:** Receives a HTTP `GET` request and returns the stored active model info `{ model, sender, timestamp }`.
+- **Arguments:**
+  - `r` (`Object`): The Nginx HTTP request object.
+- **Return Value:** None (Sends HTTP `200`).
+
+### `auth_check` (L82-97)
 - **Description:** Authenticates request headers targeting `/api/` endpoints by comparing the incoming token with the host-configured token.
 - **Arguments:**
   - `r` (`Object`): The Nginx HTTP request object.
@@ -61,6 +84,9 @@ This document specifies the variables and functions used in `nginx/conf/broadcas
 graph TD
     post_message --> ngx
     get_message --> ngx
+    get_history --> ngx
+    post_model --> ngx
+    get_model --> ngx
     auth_check --> process
 ```
 

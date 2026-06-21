@@ -127,7 +127,11 @@ while ($listener.IsListening) {
                     $data = ConvertFrom-Json $body
                     $cachedModelName = $data.model
                     $cachedModelSender = $data.sender
-                    $cachedModelTime = [double]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
+                    if ($data.timestamp) {
+                        $cachedModelTime = [double]$data.timestamp
+                    } else {
+                        $cachedModelTime = [double]([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())
+                    }
                     $response.StatusCode = 200
                 } catch {
                     $response.StatusCode = 400

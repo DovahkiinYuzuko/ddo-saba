@@ -27,6 +27,8 @@ The shutdown operation targets specific background processes initiated by the st
     *   *Command:* `kill -TERM $(cat /tmp/ddo_saba_nginx.pid)`
 *   **Step 2:** Terminates Cloudflare Tunnel using the saved PID in `/tmp/ddo_saba_cloudflared.pid`.
     *   *Command:* `kill -TERM $(cat /tmp/ddo_saba_cloudflared.pid)`
+    *   *Lingering Process Cleanup:* To prevent zombie tunnel processes, forcefully kills any remaining cloudflared processes.
+        *   *Command:* `pkill -f cloudflared`
 *   **Step 3:** Cleans up active configurations and deletes temporary PID files.
 
 ---
@@ -48,6 +50,8 @@ graph TD
     stop_server.sh --> ReadUnixCFPID["Read /tmp/ddo_saba_cloudflared.pid"]
     ReadUnixNginxPID --> StopUnixNginx["kill Nginx"]
     ReadUnixCFPID --> KillUnixCloudflared["kill cloudflared"]
+    stop_server.sh --> KillLingeringCF["pkill -f cloudflared"]
+```
 ```
 
 ---

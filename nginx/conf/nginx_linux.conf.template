@@ -60,6 +60,34 @@ http {
             js_content broadcast.post_message;
         }
 
+        # Nginx JS (njs) History endpoint
+        location /api/history {
+            add_header Access-Control-Allow-Origin * always;
+            add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
+            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token" always;
+
+            if ($request_method = OPTIONS) {
+                return 204;
+            }
+
+            auth_request /auth_check;
+            js_content broadcast.get_history;
+        }
+
+        # Nginx JS (njs) Model Sync endpoint
+        location /api/model {
+            add_header Access-Control-Allow-Origin * always;
+            add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
+            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token" always;
+
+            if ($request_method = OPTIONS) {
+                return 204;
+            }
+
+            auth_request /auth_check;
+            js_content broadcast.handle_model;
+        }
+
         # Auth subrequest checker
         location = /auth_check {
             internal;

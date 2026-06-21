@@ -104,6 +104,10 @@ All states defined below use React's `useState` or `useRef`.
 - **Type:** `React.MutableRefObject<HTMLDivElement | null>`
 - **Description:** Tracks the HTMLDivElement scroll container of the chat message list to directly manipulate `scrollTop` for scroll synchronization.
 
+### `lastModelChangeTime`
+- **Type:** `number`
+- **Description:** Holds the millisecond timestamp of the last local model change (selection or unload) to prevent poll echoes.
+
 ---
 
 ## 2. Functions
@@ -119,18 +123,18 @@ All states defined below use React's `useState` or `useRef`.
 - **Return Value:** `void`
 
 ### `addNewTab`
-- **Description:** Spawns a new chat tab with a default blank history.
+- **Description:** Spawns a new chat tab with a default blank history. If in Shared Room Mode, broadcasts a `tab_create:ID:Title` system message.
 - **Arguments:** None.
 - **Return Value:** `void`
 
 ### `deleteTab`
-- **Description:** Closes and deletes a specific chat session.
+- **Description:** Closes and deletes a specific chat session. If in Shared Room Mode, broadcasts a `tab_delete:ID` system message.
 - **Arguments:**
   - `id` (`string`): Target chat session ID.
 - **Return Value:** `void`
 
 ### `handleUnloadModel`
-- **Description:** Unloads the currently active model from Ollama VRAM by hitting the API, then updates state `psInfo` to null, triggers `fetchModelsAndPs`, clears state `activeModel` to resetting the UI select element back to "Select a model...", and broadcasts model clear command if Shared Room Mode is enabled.
+- **Description:** Unloads the currently active model from Ollama VRAM by hitting the API, then updates state `psInfo` to null, triggers `fetchModelsAndPs`, clears state `activeModel` to resetting the UI select element back to "Select a model...", updates `lastModelChangeTime`, and broadcasts model clear command if Shared Room Mode is enabled.
 - **Arguments:** None.
 - **Return Value:** `Promise<void>`
 
@@ -151,6 +155,7 @@ graph TD
 
     App --> isSidebarOpen
     App --> isParamsOpen
+    App --> lastModelChangeTime
 
     App --> broadcastModel[broadcastModel API]
     App --> pollModel[pollModel API]
@@ -162,4 +167,7 @@ graph TD
     sendMessage --> chats
     sendMessage --> settings
     sendMessage --> abortControllerRef
+
+    addNewTab --> settings
+    deleteTab --> settings
 ```

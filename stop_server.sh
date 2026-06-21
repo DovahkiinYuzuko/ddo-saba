@@ -27,6 +27,7 @@ if [ -f "/tmp/ddo_saba_cloudflared.pid" ]; then
     kill -TERM $(cat /tmp/ddo_saba_cloudflared.pid) 2>/dev/null
     rm -f "/tmp/ddo_saba_cloudflared.pid"
 fi
+pkill -f cloudflared 2>/dev/null
 
 # Clean up active config
 rm -f "$ACTIVE_CONF"

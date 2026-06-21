@@ -52,13 +52,14 @@ export const broadcastModel = async (
   connectionUrl: string,
   accessToken: string,
   sender: string,
-  model: string
+  model: string,
+  timestamp: number
 ): Promise<void> => {
   const headers = getHeaders(accessToken);
   const res = await fetch(`${connectionUrl}/api/model`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ sender, model })
+    body: JSON.stringify({ sender, model, timestamp })
   });
   if (!res.ok) {
     throw new Error(`HTTP ${res.status}`);
@@ -68,7 +69,7 @@ export const broadcastModel = async (
 export const pollModel = async (
   connectionUrl: string,
   accessToken: string
-): Promise<unknown> => {
+): Promise<{ model?: string; sender?: string; timestamp?: number }> => {
   const headers = getHeaders(accessToken);
   const res = await fetch(`${connectionUrl}/api/model`, { headers });
   if (!res.ok) {
