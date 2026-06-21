@@ -250,7 +250,7 @@
 }
 
 .cot-answer {
-  white-space: pre-wrap;
+  white-space: normal;
 }
 
 /* Input area */
@@ -334,34 +334,38 @@
   color: hsl(var(--success));
 }
 
-/* Copy button position outside the bubble, appears on hover */
+.message-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.message-metrics-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
 .copy-btn {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  opacity: 0;
+  margin-left: auto;
+  opacity: 0.5;
   transition: opacity 0.15s ease, background-color 0.15s ease;
-  background-color: hsl(var(--bg-panel));
+  background-color: hsl(var(--bg-input));
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius-sm);
   color: hsl(var(--text-muted));
-  padding: 6px;
+  padding: 4px 8px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 10;
+  font-size: 0.75rem;
 }
-.message-row.user .copy-btn {
-  left: -40px;
-}
-.message-row.assistant .copy-btn {
-  right: -40px;
-}
-.message-row:hover .copy-btn {
-  opacity: 1;
-}
+
 .copy-btn:hover {
+  opacity: 1;
   background-color: hsl(var(--bg-panel-hover));
   color: hsl(var(--text-primary));
   border-color: hsl(var(--border-focus));
@@ -373,6 +377,9 @@
 }
 .message-text p:last-child {
   margin-bottom: 0;
+}
+.message-text p:empty {
+  display: none;
 }
 .message-text ul, .message-text ol {
   margin-left: 20px;
@@ -500,26 +507,7 @@
     gap: 8px;
   }
 
-  /* Copy button adjustments for mobile touch */
-  .copy-btn {
-    position: relative;
-    top: auto;
-    transform: none;
-    opacity: 1;
-    display: inline-flex;
-    margin-top: 6px;
-    align-self: flex-start;
-  }
 
-  .message-row.user .copy-btn {
-    left: auto;
-    align-self: flex-end;
-  }
-
-  .message-row.assistant .copy-btn {
-    right: auto;
-    align-self: flex-start;
-  }
 
   .message-bubble {
     width: 100%;

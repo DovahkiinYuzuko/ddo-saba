@@ -32,7 +32,10 @@ import {
 } from './api/ollama';
 import { 
   pollMessage, 
-  broadcastMessage 
+  broadcastMessage,
+  fetchHistory,
+  broadcastModel,
+  pollModel
 } from './api/broadcast';
 import SettingsModal from './components/SettingsModal';
 import ParameterPanel from './components/ParameterPanel';
@@ -179,15 +182,17 @@ export default function App() {
   const abortControllerRef = useRef<AbortController | null>(null);
   const [sendOnEnter, setSendOnEnter] = useState<boolean>(true);
   const [contextUsed, setContextUsed] = useState<number>(0);
+  const [lastModelChangeTime, setLastModelChangeTime] = useState<number>(0);
 
   // Separate model fallback logic
   useEffect(() => {
-    if (activeModel) {
+    if (activeModel && models.length > 0) {
       const modelNames = models.map(m => m.name);
-      if (models.length > 0 && !modelNames.includes(activeModel)) {
-        setTimeout(() => setActiveModel(models[0].name), 0);
-      } else if (models.length === 0) {
-        setTimeout(() => setActiveModel(''), 0);
+      if (!modelNames.includes(activeModel)) {
+        setTimeout(() => {
+          setActiveModel(models[0].name);
+          setLastModelChangeTime(Date.now());
+        }, 0);
       }
     }
   }, [models, activeModel]);
@@ -242,6 +247,72 @@ export default function App() {
     }
   }, [chats, activeChatId]);
 
+  const addNewTab = useCallback((isRemote = false, remoteId?: string, remoteTitle?: string) => {
+    const newId = remoteId || Date.now().toString();
+    const title = remoteTitle || `${t.newChat} ${chats.length + 1}`;
+    const newChat: ChatSession = {
+      id: newId,
+      title: title,
+      messages: []
+    };
+    setChats(prev => {
+      if (prev.some(c => c.id === newId)) return prev;
+      return [...prev, newChat];
+    });
+    setActiveChatId(newId);
+
+    if (settings.isSharedMode && !isRemote) {
+      void broadcastMessage(
+        settings.connectionUrl,
+        settings.accessToken,
+        settings.username,
+        'system',
+        `tab_create:${newId}:${title}`
+      );
+    }
+  }, [t.newChat, chats.length, settings.isSharedMode, settings.connectionUrl, settings.accessToken, settings.username]);
+
+  // Create default tab if none exists
+  useEffect(() => {
+    if (chats.length === 0) {
+      setTimeout(() => {
+        addNewTab(false);
+      }, 0);
+    }
+  }, [chats.length, addNewTab]);
+
+  const deleteTab = useCallback((id: string, e?: React.MouseEvent, isRemote = false) => {
+    if (e) e.stopPropagation();
+    setChats(prev => prev.filter(c => c.id !== id));
+    setActiveChatId(prevActiveId => {
+      if (prevActiveId === id) {
+        const remaining = chats.filter(c => c.id !== id);
+        const nextActiveId = remaining.length > 0 ? remaining[remaining.length - 1].id : null;
+        if (settings.isSharedMode && !isRemote && nextActiveId) {
+          void broadcastMessage(
+            settings.connectionUrl,
+            settings.accessToken,
+            settings.username,
+            'system',
+            `tab_switch:${nextActiveId}`
+          );
+        }
+        return nextActiveId;
+      }
+      return prevActiveId;
+    });
+
+    if (settings.isSharedMode && !isRemote) {
+      void broadcastMessage(
+        settings.connectionUrl,
+        settings.accessToken,
+        settings.username,
+        'system',
+        `tab_delete:${id}`
+      );
+    }
+  }, [chats, settings.isSharedMode, settings.connectionUrl, settings.accessToken, settings.username]);
+
   // Initial tags/ps fetch and interval polling
   const fetchModelsAndPs = useCallback(async () => {
     try {
@@ -280,6 +351,31 @@ export default function App() {
       if (data.id && data.id !== lastPolledMsgIdRef.current && data.sender !== settings.username) {
         setLastPolledMsgId(data.id);
         
+        // Handle system sync events
+        if (data.role === 'system' && data.content) {
+          if (data.content.startsWith('tab_create:')) {
+            const parts = data.content.split(':');
+            const tabId = parts[1];
+            const tabTitle = parts.slice(2).join(':');
+            if (tabId) {
+              addNewTab(true, tabId, tabTitle);
+            }
+            return;
+          } else if (data.content.startsWith('tab_delete:')) {
+            const tabId = data.content.substring('tab_delete:'.length);
+            if (tabId) {
+              deleteTab(tabId, undefined, true);
+            }
+            return;
+          } else if (data.content.startsWith('tab_switch:')) {
+            const tabId = data.content.substring('tab_switch:'.length);
+            if (tabId) {
+              setActiveChatId(tabId);
+            }
+            return;
+          }
+        }
+
         // Append shared message to currently active chat session
         if (activeChatId) {
           setChats(prev => prev.map(c => {
@@ -300,7 +396,7 @@ export default function App() {
     } catch (e) {
       console.error("Broadcasting poll failed", e);
     }
-  }, [settings.connectionUrl, settings.accessToken, settings.username, activeChatId]);
+  }, [settings.connectionUrl, settings.accessToken, settings.username, activeChatId, addNewTab, deleteTab]);
 
   useEffect(() => {
     if (!settings.isSharedMode) return;
@@ -308,46 +404,149 @@ export default function App() {
     return () => clearInterval(interval);
   }, [settings.isSharedMode, startBroadcastPolling]);
 
+  // Fetch initial history when Shared Room mode is enabled
+  useEffect(() => {
+    if (!settings.isSharedMode) return;
+    
+    const syncHistory = async () => {
+      try {
+        const historyData = await fetchHistory(settings.connectionUrl, settings.accessToken) as {
+          id?: string;
+          sender?: string;
+          role?: 'user' | 'assistant' | 'system';
+          content?: string;
+        }[];
+        
+        if (historyData && historyData.length > 0) {
+          let currentChats: ChatSession[] = [];
+          let currentActiveChatId: string | null = null;
+
+          historyData.forEach(h => {
+            if (h.role === 'system' && h.content) {
+              if (h.content.startsWith('tab_create:')) {
+                const parts = h.content.split(':');
+                const tabId = parts[1];
+                const tabTitle = parts.slice(2).join(':');
+                if (tabId && !currentChats.some(c => c.id === tabId)) {
+                  currentChats.push({
+                    id: tabId,
+                    title: tabTitle || `Chat`,
+                    messages: []
+                  });
+                }
+                currentActiveChatId = tabId;
+              } else if (h.content.startsWith('tab_delete:')) {
+                const tabId = h.content.substring('tab_delete:'.length);
+                currentChats = currentChats.filter(c => c.id !== tabId);
+                if (currentActiveChatId === tabId) {
+                  currentActiveChatId = currentChats.length > 0 ? currentChats[currentChats.length - 1].id : null;
+                }
+              } else if (h.content.startsWith('tab_switch:')) {
+                const tabId = h.content.substring('tab_switch:'.length);
+                if (tabId && currentChats.some(c => c.id === tabId)) {
+                  currentActiveChatId = tabId;
+                }
+              } else {
+                if (currentActiveChatId) {
+                  currentChats = currentChats.map(c => {
+                    if (c.id === currentActiveChatId) {
+                      return {
+                        ...c,
+                        messages: [...c.messages, {
+                          role: 'system',
+                          content: h.content || '',
+                          sender: h.sender
+                        }]
+                      };
+                    }
+                    return c;
+                  });
+                }
+              }
+            } else {
+              if (currentActiveChatId) {
+                currentChats = currentChats.map(c => {
+                  if (c.id === currentActiveChatId) {
+                    return {
+                      ...c,
+                      messages: [...c.messages, {
+                        role: h.role || 'user',
+                        content: h.content || '',
+                        sender: h.sender
+                      }]
+                    };
+                  }
+                  return c;
+                });
+              }
+            }
+          });
+
+          if (currentChats.length > 0) {
+            setChats(currentChats);
+            if (currentActiveChatId) {
+              setActiveChatId(currentActiveChatId);
+            }
+          }
+
+          // Update last polled message ID to the last one in history to avoid duplicate polling
+          const lastMsg = historyData[historyData.length - 1];
+          if (lastMsg.id) {
+            setLastPolledMsgId(lastMsg.id);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to sync shared room history", e);
+      }
+    };
+    
+    void syncHistory();
+  }, [settings.isSharedMode, settings.connectionUrl, settings.accessToken]);
+
+  // Polling for shared model selection
+  useEffect(() => {
+    if (!settings.isSharedMode) return;
+    
+    const startModelPolling = async () => {
+      try {
+        const data = await pollModel(settings.connectionUrl, settings.accessToken);
+        if (data.sender && data.sender !== settings.username && data.model !== undefined) {
+          const remoteTime = data.timestamp || 0;
+          if (remoteTime > lastModelChangeTime && data.model !== activeModel) {
+            setActiveModel(data.model);
+            if (data.model) {
+              void loadModelOnSelection(data.model);
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Model poll failed", e);
+      }
+    };
+    
+    const interval = setInterval(startModelPolling, 3000);
+    return () => clearInterval(interval);
+  }, [settings.isSharedMode, settings.connectionUrl, settings.accessToken, settings.username, activeModel, lastModelChangeTime]);
+
   // Unload model from VRAM by calling API with keep_alive: 0
   const handleUnloadModel = async () => {
     if (!psInfo) return;
     try {
       await apiUnloadModel(psInfo.name, settings.connectionUrl, settings.accessToken);
       setPsInfo(null);
+      setActiveModel('');
+      const now = Date.now();
+      setLastModelChangeTime(now);
+      if (settings.isSharedMode) {
+        void broadcastModel(settings.connectionUrl, settings.accessToken, settings.username, '', now);
+      }
       fetchModelsAndPs();
     } catch (e) {
       console.error("Failed to unload model", e);
     }
   };
 
-  const addNewTab = useCallback(() => {
-    const newId = Date.now().toString();
-    const newChat: ChatSession = {
-      id: newId,
-      title: `${t.newChat} ${chats.length + 1}`,
-      messages: []
-    };
-    setChats(prev => [...prev, newChat]);
-    setActiveChatId(newId);
-  }, [t.newChat, chats.length]);
-
-  // Create default tab if none exists
-  useEffect(() => {
-    if (chats.length === 0) {
-      setTimeout(() => {
-        addNewTab();
-      }, 0);
-    }
-  }, [chats.length, addNewTab]);
-
-  const deleteTab = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    const filtered = chats.filter(c => c.id !== id);
-    setChats(filtered);
-    if (activeChatId === id) {
-      setActiveChatId(filtered.length > 0 ? filtered[filtered.length - 1].id : null);
-    }
-  };
+  // (definitions moved above startBroadcastPolling)
 
   const sendMessage = async () => {
     if (!inputText.trim() || !activeChatId || !activeModel || isGenerating) return;
@@ -743,7 +942,7 @@ export default function App() {
       <aside className="sidebar-column">
         <div className="sidebar-header">
           <h2>{t.chats}</h2>
-          <button className="icon-btn-accent" onClick={addNewTab} title={t.newChat}>
+          <button className="icon-btn-accent" onClick={() => addNewTab(false)} title={t.newChat}>
             <Plus size={18} />
           </button>
         </div>
@@ -756,11 +955,20 @@ export default function App() {
               onClick={() => {
                 setActiveChatId(c.id);
                 setIsSidebarOpen(false);
+                if (settings.isSharedMode) {
+                  void broadcastMessage(
+                    settings.connectionUrl,
+                    settings.accessToken,
+                    settings.username,
+                    'system',
+                    `tab_switch:${c.id}`
+                  );
+                }
               }}
             >
               <Trash2 size={16} className="tab-icon" />
               <span className="tab-title">{c.title}</span>
-              <button className="tab-close-btn" onClick={(e) => deleteTab(c.id, e)}>
+              <button className="tab-close-btn" onClick={(e) => deleteTab(c.id, e, false)}>
                 <Trash2 size={14} />
               </button>
             </div>
@@ -793,7 +1001,12 @@ export default function App() {
               onChange={(e) => {
                 const selected = e.target.value;
                 setActiveModel(selected);
+                const now = Date.now();
+                setLastModelChangeTime(now);
                 loadModelOnSelection(selected);
+                if (settings.isSharedMode) {
+                  void broadcastModel(settings.connectionUrl, settings.accessToken, settings.username, selected, now);
+                }
               }}
               disabled={isModelLoading}
               className="model-select"

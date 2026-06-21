@@ -6,6 +6,10 @@ $pidFile = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "broadcas
 $cachedMessage = ""
 $cachedId = ""
 $cachedTime = 0
+$messageHistory = @()
+$cachedModelName = ""
+$cachedModelSender = ""
+$cachedModelTime = 0
 
 $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add("http://127.0.0.1:$port/")
@@ -72,17 +76,78 @@ while ($listener.IsListening) {
                 # Update cache
                 try {
                     $data = ConvertFrom-Json $body
-                    if ($data.id) {
-                        $cachedMessage = $body
-                        $cachedId = $data.id
-                        $cachedTime = [double]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
-                        $response.StatusCode = 200
-                    } else {
-                        $response.StatusCode = 400
+                    
+                    # Ensure the message has an ID and timestamp (auto-generate if missing)
+                    if (-not $data.id) {
+                        $autoId = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds().ToString() + "_" + [Guid]::NewGuid().ToString().Substring(0,8)
+                        $data = $data | Add-Member -NotePropertyName "id" -NotePropertyValue $autoId -PassThru
+                        $autoTime = [DateTime]::UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")
+                        $data = $data | Add-Member -NotePropertyName "timestamp" -NotePropertyValue $autoTime -PassThru
+                        $body = ConvertTo-Json $data -Compress
                     }
+                    
+                    $cachedMessage = $body
+                    $cachedId = $data.id
+                    $cachedTime = [double]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
+                    
+                    # Append message to session history (limit to last 100 to save memory)
+                    $messageHistory += $data
+                    if ($messageHistory.Count -gt 100) {
+                        $messageHistory = @($messageHistory | Select-Object -Last 100)
+                    }
+                    
+                    $response.StatusCode = 200
                 } catch {
                     $response.StatusCode = 400
                 }
+            } else {
+                $response.StatusCode = 405
+            }
+        }
+        elseif ($url -eq "/api/history") {
+            if ($request.HttpMethod -eq "GET") {
+                $historyJson = ConvertTo-Json $messageHistory -Compress
+                if (-not $historyJson) {
+                    $historyJson = "[]"
+                }
+                $buffer = [System.Text.Encoding]::UTF8.GetBytes($historyJson)
+                $response.ContentType = "application/json"
+                $response.ContentLength64 = $buffer.Length
+                $response.OutputStream.Write($buffer, 0, $buffer.Length)
+                $response.StatusCode = 200
+            } else {
+                $response.StatusCode = 405
+            }
+        }
+        elseif ($url -eq "/api/model") {
+            if ($request.HttpMethod -eq "POST") {
+                $reader = New-Object System.IO.StreamReader($request.InputStream, [System.Text.Encoding]::UTF8)
+                $body = $reader.ReadToEnd()
+                try {
+                    $data = ConvertFrom-Json $body
+                    $cachedModelName = $data.model
+                    $cachedModelSender = $data.sender
+                    if ($data.timestamp) {
+                        $cachedModelTime = [double]$data.timestamp
+                    } else {
+                        $cachedModelTime = [double]([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())
+                    }
+                    $response.StatusCode = 200
+                } catch {
+                    $response.StatusCode = 400
+                }
+            } elseif ($request.HttpMethod -eq "GET") {
+                $modelData = @{
+                    model = $cachedModelName
+                    sender = $cachedModelSender
+                    timestamp = $cachedModelTime
+                }
+                $modelJson = ConvertTo-Json $modelData -Compress
+                $buffer = [System.Text.Encoding]::UTF8.GetBytes($modelJson)
+                $response.ContentType = "application/json"
+                $response.ContentLength64 = $buffer.Length
+                $response.OutputStream.Write($buffer, 0, $buffer.Length)
+                $response.StatusCode = 200
             } else {
                 $response.StatusCode = 405
             }

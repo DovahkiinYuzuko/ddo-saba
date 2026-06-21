@@ -14,16 +14,21 @@ The shutdown operation targets specific background processes initiated by the st
     *   *Fallback command:* If Nginx process persists, reads PID via single-line `if exist` (avoiding nested parentheses syntax error) and runs `taskkill /f /pid [nginx_pid]`.
 *   **Step 2:** Discovers the Cloudflare Tunnel process PID from `bin\cloudflared.pid` and terminates it using single-line redirection check.
     *   *Command:* `taskkill /f /pid [cloudflared_pid]`
+    *   *Lingering Process Cleanup:* Since the PID file might be missing or contain an stale PID, a fallback command terminates any remaining instances of `cloudflared.exe` by image name.
+        *   *Command:* `taskkill /f /im cloudflared.exe`
 *   **Step 3:** Discovers the PowerShell Broadcast Server PID from `bin\broadcast.pid` and terminates it using single-line redirection check.
     *   *Command:* `taskkill /f /pid [broadcast_pid]`
 *   **Step 4:** Deletes the generated PID files and the active configuration file `nginx\conf\nginx_active.conf`.
 *   **Step 5 (Port Cleanup):** Scans for any lingering processes listening on ports `8088` (Nginx) and `8089` (PowerShell Broadcast Server) using `netstat -ano` and terminates them via `taskkill /f /pid [PID]` to guarantee port release.
+
 
 ### Linux/macOS (`stop_server.sh`)
 *   **Step 1:** Terminates Nginx using the saved PID in `/tmp/ddo_saba_nginx.pid`.
     *   *Command:* `kill -TERM $(cat /tmp/ddo_saba_nginx.pid)`
 *   **Step 2:** Terminates Cloudflare Tunnel using the saved PID in `/tmp/ddo_saba_cloudflared.pid`.
     *   *Command:* `kill -TERM $(cat /tmp/ddo_saba_cloudflared.pid)`
+    *   *Lingering Process Cleanup:* To prevent zombie tunnel processes, forcefully kills any remaining cloudflared processes.
+        *   *Command:* `pkill -f cloudflared`
 *   **Step 3:** Cleans up active configurations and deletes temporary PID files.
 
 ---
@@ -45,6 +50,8 @@ graph TD
     stop_server.sh --> ReadUnixCFPID["Read /tmp/ddo_saba_cloudflared.pid"]
     ReadUnixNginxPID --> StopUnixNginx["kill Nginx"]
     ReadUnixCFPID --> KillUnixCloudflared["kill cloudflared"]
+    stop_server.sh --> KillLingeringCF["pkill -f cloudflared"]
+```
 ```
 
 ---

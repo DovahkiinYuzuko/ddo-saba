@@ -35,3 +35,45 @@ export const broadcastMessage = async (
     throw new Error(`HTTP ${res.status}`);
   }
 };
+
+export const fetchHistory = async (
+  connectionUrl: string,
+  accessToken: string
+): Promise<unknown> => {
+  const headers = getHeaders(accessToken);
+  const res = await fetch(`${connectionUrl}/api/history`, { headers });
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+  return res.json();
+};
+
+export const broadcastModel = async (
+  connectionUrl: string,
+  accessToken: string,
+  sender: string,
+  model: string,
+  timestamp: number
+): Promise<void> => {
+  const headers = getHeaders(accessToken);
+  const res = await fetch(`${connectionUrl}/api/model`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ sender, model, timestamp })
+  });
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+};
+
+export const pollModel = async (
+  connectionUrl: string,
+  accessToken: string
+): Promise<{ model?: string; sender?: string; timestamp?: number }> => {
+  const headers = getHeaders(accessToken);
+  const res = await fetch(`${connectionUrl}/api/model`, { headers });
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+  return res.json();
+};

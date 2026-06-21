@@ -17,6 +17,9 @@ if exist "nginx\logs\nginx.pid" if not "!NGINX_PID!"=="" taskkill /f /pid !NGINX
 if exist "bin\cloudflared.pid" set /p CF_PID=<bin\cloudflared.pid
 if exist "bin\cloudflared.pid" if not "!CF_PID!"=="" echo Killing Cloudflare Tunnel (PID: !CF_PID!)...
 if exist "bin\cloudflared.pid" if not "!CF_PID!"=="" taskkill /f /pid !CF_PID! >nul 2>&1
+echo Terminating residual Cloudflare Tunnel processes...
+taskkill /f /im cloudflared.exe >nul 2>&1
+
 
 :: Kill PowerShell Broadcast Server by PID
 if exist "bin\broadcast.pid" set /p BC_PID=<bin\broadcast.pid

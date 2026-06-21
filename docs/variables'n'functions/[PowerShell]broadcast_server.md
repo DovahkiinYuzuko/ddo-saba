@@ -24,14 +24,33 @@ This script runs a lightweight in-memory broadcast relay server for Windows envi
 - **Type:** `Double` (Unix timestamp)
 - **Description:** The epoch timestamp when the message was cached. Used to expire messages after 5 seconds.
 
+### `$messageHistory`
+- **Type:** `Array`
+- **Description:** An in-memory list storing the chronological sequence of all messages broadcasted within the active session. Used to sync client history.
+
+### `$cachedModelName`
+- **Type:** `String`
+- **Description:** The name of the currently active model selected by any peer.
+
+### `$cachedModelSender`
+- **Type:** `String`
+- **Description:** The username of the peer who made the last model selection.
+
+### `$cachedModelTime`
+- **Type:** `Double`
+- **Description:** The epoch timestamp when the active model was updated.
+
 ## Functions
 
 ### `Start-BroadcastServer`
 - **Description:** Initializes and starts the HttpListener loop, routing requests based on URLs.
 - **Routes:**
   - `GET /api/poll`: Returns the cached message if it has a newer ID than the client's query parameter, and if it has not expired (within 5 seconds).
-  - `POST /api/broadcast`: Reads the incoming JSON message body, updates `$cachedMessage`, `$cachedId`, and `$cachedTime`, then returns `200 OK`.
-  - `OPTIONS /api/poll` & `OPTIONS /api/broadcast`: Handles CORS preflight by returning CORS headers with `200 OK` or `204 No Content`.
+  - `POST /api/broadcast`: Reads the incoming JSON message body, updates `$cachedMessage`, `$cachedId`, and `$cachedTime`, appends the message to `$messageHistory`, then returns `200 OK`.
+  - `GET /api/history`: Returns the entire array in `$messageHistory` as a JSON payload to allow newly connected peers to sync full chat session logs.
+  - `POST /api/model`: Receives model change event `{ model, sender, timestamp }` and updates `$cachedModelName`, `$cachedModelSender`, and `$cachedModelTime` (using the provided timestamp or auto-generated epoch if missing).
+  - `GET /api/model`: Returns the active model cache JSON `{ model: $cachedModelName, sender: $cachedModelSender, timestamp: $cachedModelTime }`.
+  - `OPTIONS /api/poll` & `OPTIONS /api/broadcast` & `OPTIONS /api/history` & `OPTIONS /api/model`: Handles CORS preflight by returning CORS headers with `200 OK` or `204 No Content`.
 
 ## Dependency Map
 
@@ -42,10 +61,17 @@ graph TD
     start --> loop[Request Loop]
     loop --> poll[GET /api/poll]
     loop --> broadcast[POST /api/broadcast]
+    loop --> history[GET /api/history]
+    loop --> model[GET/POST /api/model]
     poll --> cacheMsg[$cachedMessage]
     poll --> cacheId[$cachedId]
     poll --> cacheTime[$cachedTime]
     broadcast --> cacheMsg
     broadcast --> cacheId
     broadcast --> cacheTime
+    broadcast --> cacheHist[$messageHistory]
+    history --> cacheHist
+    model --> cacheModelName[$cachedModelName]
+    model --> cacheModelSender[$cachedModelSender]
+    model --> cacheModelTime[$cachedModelTime]
 ```

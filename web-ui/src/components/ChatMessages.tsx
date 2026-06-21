@@ -160,14 +160,20 @@ export default React.forwardRef<HTMLDivElement, ChatMessagesProps>(function Chat
                 </div>
               )}
             </div>
-            {m.role === 'assistant' && m.metrics && (
-              <div className="message-metrics">
-                {m.metrics.thinkDurationSec && m.metrics.thinkDurationSec > 0 ? `Think: ${m.metrics.thinkDurationSec}s | ` : ''}
-                {`Time: ${m.metrics.totalDurationSec}s | Speed: ${m.metrics.tokensPerSec} tok/s | Tokens: ${m.metrics.evalTokens} (gen) / ${m.metrics.promptTokens} (prompt)`}
+            {m.role !== 'system' && m.content && (
+              <div className="message-footer">
+                <div className="message-metrics-wrap">
+                  {m.role === 'assistant' && m.metrics && (
+                    <div className="message-metrics">
+                      {m.metrics.thinkDurationSec && m.metrics.thinkDurationSec > 0 ? `Think: ${m.metrics.thinkDurationSec}s | ` : ''}
+                      {`Time: ${m.metrics.totalDurationSec}s | Speed: ${m.metrics.tokensPerSec} tok/s | Tokens: ${m.metrics.evalTokens} (gen) / ${m.metrics.promptTokens} (prompt)`}
+                    </div>
+                  )}
+                </div>
+                <CopyButton text={m.content} />
               </div>
             )}
           </div>
-          {m.content && <CopyButton text={m.content} />}
         </div>
       ))}
     </div>
