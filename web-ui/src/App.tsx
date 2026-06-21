@@ -33,7 +33,9 @@ import {
 import { 
   pollMessage, 
   broadcastMessage,
-  fetchHistory
+  fetchHistory,
+  broadcastModel,
+  pollModel
 } from './api/broadcast';
 import SettingsModal from './components/SettingsModal';
 import ParameterPanel from './components/ParameterPanel';
@@ -355,6 +357,31 @@ export default function App() {
     void syncHistory();
   }, [settings.isSharedMode, activeChatId, settings.connectionUrl, settings.accessToken]);
 
+  // Polling for shared model selection
+  useEffect(() => {
+    if (!settings.isSharedMode) return;
+    
+    const startModelPolling = async () => {
+      try {
+        const data = await pollModel(settings.connectionUrl, settings.accessToken) as {
+          model?: string;
+          sender?: string;
+        };
+        
+        if (data.sender && data.sender !== settings.username && data.model !== undefined && data.model !== activeModel) {
+          setActiveModel(data.model);
+          if (data.model) {
+            void loadModelOnSelection(data.model);
+          }
+        }
+      } catch (e) {
+        console.error("Model poll failed", e);
+      }
+    };
+    
+    const interval = setInterval(startModelPolling, 3000);
+    return () => clearInterval(interval);
+  }, [settings.isSharedMode, settings.connectionUrl, settings.accessToken, settings.username, activeModel]);
 
   // Unload model from VRAM by calling API with keep_alive: 0
   const handleUnloadModel = async () => {
@@ -363,6 +390,9 @@ export default function App() {
       await apiUnloadModel(psInfo.name, settings.connectionUrl, settings.accessToken);
       setPsInfo(null);
       setActiveModel('');
+      if (settings.isSharedMode) {
+        void broadcastModel(settings.connectionUrl, settings.accessToken, settings.username, '');
+      }
       fetchModelsAndPs();
     } catch (e) {
       console.error("Failed to unload model", e);
@@ -843,6 +873,9 @@ export default function App() {
                 const selected = e.target.value;
                 setActiveModel(selected);
                 loadModelOnSelection(selected);
+                if (settings.isSharedMode) {
+                  void broadcastModel(settings.connectionUrl, settings.accessToken, settings.username, selected);
+                }
               }}
               disabled={isModelLoading}
               className="model-select"

@@ -130,10 +130,9 @@ All states defined below use React's `useState` or `useRef`.
 - **Return Value:** `void`
 
 ### `handleUnloadModel`
-- **Description:** Unloads the currently active model from Ollama VRAM by hitting the API, then updates state `psInfo` to null, triggers `fetchModelsAndPs`, and clears state `activeModel` to resetting the UI select element back to "Select a model...".
+- **Description:** Unloads the currently active model from Ollama VRAM by hitting the API, then updates state `psInfo` to null, triggers `fetchModelsAndPs`, clears state `activeModel` to resetting the UI select element back to "Select a model...", and broadcasts model clear command if Shared Room Mode is enabled.
 - **Arguments:** None.
 - **Return Value:** `Promise<void>`
-
 
 ---
 
@@ -145,12 +144,16 @@ graph TD
     App --> stopGeneration
     App --> addNewTab
     App --> deleteTab
+    App --> handleUnloadModel
     App --> SettingsModal
     App --> ParameterPanel
     App --> ChatMessages
 
     App --> isSidebarOpen
     App --> isParamsOpen
+
+    App --> broadcastModel[broadcastModel API]
+    App --> pollModel[pollModel API]
 
     sendMessage --> activeModel
     sendMessage --> systemPrompt

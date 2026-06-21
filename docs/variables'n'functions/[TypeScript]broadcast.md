@@ -29,3 +29,19 @@ This document specifies the helper functions for room broadcasting (sharing mess
   - `connectionUrl` (`string`): Host URL.
   - `accessToken` (`string`): Access token (added for auth verification).
 - **Return Value:** `Promise<any>`
+
+### `broadcastModel` (L51-66)
+- **Description:** Notifies other peers of a model selection change by posting `{ model, sender }` to `/api/model`.
+- **Arguments:**
+  - `connectionUrl` (`string`): Host URL.
+  - `accessToken` (`string`): Access token (added for auth verification).
+  - `sender` (`string`): Username signature.
+  - `model` (`string`): Selected model name.
+- **Return Value:** `Promise<void>`
+
+### `pollModel` (L68-78)
+- **Description:** Pulls the current active model and selection meta from `/api/model`.
+- **Arguments:**
+  - `connectionUrl` (`string`): Host URL.
+  - `accessToken` (`string`): Access token (added for auth verification).
+- **Return Value:** `Promise<any>`

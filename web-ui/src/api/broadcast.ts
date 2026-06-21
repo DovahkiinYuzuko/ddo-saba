@@ -47,3 +47,32 @@ export const fetchHistory = async (
   }
   return res.json();
 };
+
+export const broadcastModel = async (
+  connectionUrl: string,
+  accessToken: string,
+  sender: string,
+  model: string
+): Promise<void> => {
+  const headers = getHeaders(accessToken);
+  const res = await fetch(`${connectionUrl}/api/model`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ sender, model })
+  });
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+};
+
+export const pollModel = async (
+  connectionUrl: string,
+  accessToken: string
+): Promise<unknown> => {
+  const headers = getHeaders(accessToken);
+  const res = await fetch(`${connectionUrl}/api/model`, { headers });
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status}`);
+  }
+  return res.json();
+};

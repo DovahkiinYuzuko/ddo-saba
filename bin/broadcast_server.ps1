@@ -7,6 +7,9 @@ $cachedMessage = ""
 $cachedId = ""
 $cachedTime = 0
 $messageHistory = @()
+$cachedModelName = ""
+$cachedModelSender = ""
+$cachedModelTime = 0
 
 $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add("http://127.0.0.1:$port/")
@@ -108,6 +111,35 @@ while ($listener.IsListening) {
                     $historyJson = "[]"
                 }
                 $buffer = [System.Text.Encoding]::UTF8.GetBytes($historyJson)
+                $response.ContentType = "application/json"
+                $response.ContentLength64 = $buffer.Length
+                $response.OutputStream.Write($buffer, 0, $buffer.Length)
+                $response.StatusCode = 200
+            } else {
+                $response.StatusCode = 405
+            }
+        }
+        elseif ($url -eq "/api/model") {
+            if ($request.HttpMethod -eq "POST") {
+                $reader = New-Object System.IO.StreamReader($request.InputStream, [System.Text.Encoding]::UTF8)
+                $body = $reader.ReadToEnd()
+                try {
+                    $data = ConvertFrom-Json $body
+                    $cachedModelName = $data.model
+                    $cachedModelSender = $data.sender
+                    $cachedModelTime = [double]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
+                    $response.StatusCode = 200
+                } catch {
+                    $response.StatusCode = 400
+                }
+            } elseif ($request.HttpMethod -eq "GET") {
+                $modelData = @{
+                    model = $cachedModelName
+                    sender = $cachedModelSender
+                    timestamp = $cachedModelTime
+                }
+                $modelJson = ConvertTo-Json $modelData -Compress
+                $buffer = [System.Text.Encoding]::UTF8.GetBytes($modelJson)
                 $response.ContentType = "application/json"
                 $response.ContentLength64 = $buffer.Length
                 $response.OutputStream.Write($buffer, 0, $buffer.Length)
