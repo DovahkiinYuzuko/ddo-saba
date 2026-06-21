@@ -122,6 +122,17 @@ const locales: Record<'en' | 'ja', LocaleStrings> = {
   }
 };
 
+const formatTimestamp = (isoString?: string): string => {
+  if (!isoString) return '';
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '';
+  }
+};
+
 export default function App() {
   const [lang, setLang] = useState<'en' | 'ja'>(
     navigator.language.startsWith('ja') ? 'ja' : 'en'
@@ -223,6 +234,9 @@ export default function App() {
     if (!activeModel || activeModel === "") return;
     const interval = setInterval(async () => {
       if (isGeneratingRef.current) return;
+      // Only keep alive if the activeModel matches the model currently running in VRAM (psInfo).
+      // This prevents unselected/cleared models from being automatically reloaded on other clients.
+      if (!psInfo || psInfo.name !== activeModel) return;
       try {
         await keepAliveModel(activeModel, settings.connectionUrl, settings.accessToken);
       } catch (e) {
@@ -230,7 +244,7 @@ export default function App() {
       }
     }, 240000); // 4 minutes
     return () => clearInterval(interval);
-  }, [activeModel, settings.connectionUrl, settings.accessToken]);
+  }, [activeModel, settings.connectionUrl, settings.accessToken, psInfo]);
 
   const [lastPolledMsgId, setLastPolledMsgId] = useState<string>('');
   const lastPolledMsgIdRef = useRef(lastPolledMsgId);
@@ -347,6 +361,7 @@ export default function App() {
         sender?: string;
         role?: 'user' | 'assistant' | 'system';
         content?: string;
+        timestamp?: string;
       };
       if (data.id && data.id !== lastPolledMsgIdRef.current && data.sender !== settings.username) {
         setLastPolledMsgId(data.id);
@@ -385,7 +400,8 @@ export default function App() {
                 messages: [...c.messages, {
                   role: data.role || 'user',
                   content: data.content || '',
-                  sender: data.sender
+                  sender: data.sender,
+                  timestamp: data.timestamp ? formatTimestamp(data.timestamp) : undefined
                 }]
               };
             }
@@ -415,6 +431,7 @@ export default function App() {
           sender?: string;
           role?: 'user' | 'assistant' | 'system';
           content?: string;
+          timestamp?: string;
         }[];
         
         if (historyData && historyData.length > 0) {
@@ -455,7 +472,8 @@ export default function App() {
                         messages: [...c.messages, {
                           role: 'system',
                           content: h.content || '',
-                          sender: h.sender
+                          sender: h.sender,
+                          timestamp: h.timestamp ? formatTimestamp(h.timestamp) : undefined
                         }]
                       };
                     }
@@ -472,7 +490,8 @@ export default function App() {
                       messages: [...c.messages, {
                         role: h.role || 'user',
                         content: h.content || '',
-                        sender: h.sender
+                        sender: h.sender,
+                        timestamp: h.timestamp ? formatTimestamp(h.timestamp) : undefined
                       }]
                     };
                   }
@@ -514,9 +533,8 @@ export default function App() {
           const remoteTime = data.timestamp || 0;
           if (remoteTime > lastModelChangeTime && data.model !== activeModel) {
             setActiveModel(data.model);
-            if (data.model) {
-              void loadModelOnSelection(data.model);
-            }
+            // loadModelOnSelection(data.model) is intentionally bypassed to avoid 503 connection errors.
+            // Other clients' models are synchronized in UI view only.
           }
         }
       } catch (e) {
@@ -555,10 +573,13 @@ export default function App() {
     setInputText('');
     setIsGenerating(true);
 
+    const nowStr = new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+
     const userMsg: Message = {
       role: 'user',
       content: userMessageContent,
-      sender: settings.username
+      sender: settings.username,
+      timestamp: nowStr
     };
 
     const targetChat = chats.find(c => c.id === activeChatId);
@@ -633,7 +654,13 @@ export default function App() {
         if (c.id === activeChatId) {
           return {
             ...c,
-            messages: [...c.messages, { id: assistantMsgId, role: 'assistant', content: '', sender: activeModel }]
+            messages: [...c.messages, { 
+              id: assistantMsgId, 
+              role: 'assistant', 
+              content: '', 
+              sender: activeModel,
+              timestamp: new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+            }]
           };
         }
         return c;
@@ -764,7 +791,11 @@ export default function App() {
           if (c.id === activeChatId) {
             return {
               ...c,
-              messages: [...c.messages, { role: 'system', content: `Error: ${err.message}` }]
+              messages: [...c.messages, { 
+                role: 'system', 
+                content: `Error: ${err.message}`,
+                timestamp: new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+              }]
             };
           }
           return c;

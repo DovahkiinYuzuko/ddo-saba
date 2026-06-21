@@ -169,6 +169,7 @@ export default React.forwardRef<HTMLDivElement, ChatMessagesProps>(function Chat
                       {`Time: ${m.metrics.totalDurationSec}s | Speed: ${m.metrics.tokensPerSec} tok/s | Tokens: ${m.metrics.evalTokens} (gen) / ${m.metrics.promptTokens} (prompt)`}
                     </div>
                   )}
+                  {m.timestamp && <span className="message-timestamp">{m.timestamp}</span>}
                 </div>
                 <CopyButton text={m.content} />
               </div>

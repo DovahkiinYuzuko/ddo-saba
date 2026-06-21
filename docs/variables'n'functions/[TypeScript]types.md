@@ -15,7 +15,7 @@ This document defines the common TypeScript interfaces and types shared across t
   - `tokensPerSec?: number`
   - `thinkDurationSec?: number`
 
-### `Message` (L9-15)
+### `Message` (L9-16)
 - **Description:** Represents a single chat message in a session.
 - **Fields:**
   - `id?: string`
@@ -23,15 +23,16 @@ This document defines the common TypeScript interfaces and types shared across t
   - `content`: `string`
   - `sender?: string`
   - `metrics?: MessageMetrics`
+  - `timestamp?: string`
 
-### `ChatSession` (L17-21)
+### `ChatSession` (L18-22)
 - **Description:** A group of messages representing a chat tab.
 - **Fields:**
   - `id`: `string`
   - `title`: `string`
   - `messages`: `Message[]`
 
-### `PsModelInfo` (L23-28)
+### `PsModelInfo` (L24-29)
 - **Description:** Ollama VRAM/process status information.
 - **Fields:**
   - `name`: `string`
@@ -39,13 +40,13 @@ This document defines the common TypeScript interfaces and types shared across t
   - `processor`: `string`
   - `until`: `string`
 
-### `OllamaModelInfo` (L30-33)
+### `OllamaModelInfo` (L31-34)
 - **Description:** Local model installed tag information.
 - **Fields:**
   - `name`: `string`
   - `size?: number`
 
-### `DdoSettings` (L35-40)
+### `DdoSettings` (L36-41)
 - **Description:** Configurations inside the settings modal.
 - **Fields:**
   - `connectionUrl`: `string`
@@ -53,7 +54,7 @@ This document defines the common TypeScript interfaces and types shared across t
   - `isSharedMode`: `boolean`
   - `username`: `string`
 
-### `DdoParameters` (L42-50)
+### `DdoParameters` (L43-51)
 - **Description:** Hyperparameters passed to Ollama options.
 - **Fields:**
   - `temperature`: `number`

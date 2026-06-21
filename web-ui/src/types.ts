@@ -12,6 +12,7 @@ export interface Message {
   content: string;
   sender?: string;
   metrics?: MessageMetrics;
+  timestamp?: string;
 }
 
 export interface ChatSession {

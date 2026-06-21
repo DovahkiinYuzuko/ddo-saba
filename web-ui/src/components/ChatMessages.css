@@ -513,3 +513,25 @@
     width: 100%;
   }
 }
+
+/* Message timestamp styling */
+.message-metrics-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.user .message-metrics-wrap {
+  justify-content: flex-end;
+}
+
+.assistant .message-metrics-wrap {
+  justify-content: flex-start;
+}
+
+.message-timestamp {
+  font-size: 0.725rem;
+  color: hsl(var(--text-muted) / 0.8);
+  font-family: monospace;
+}

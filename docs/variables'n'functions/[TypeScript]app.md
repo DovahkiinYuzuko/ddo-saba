@@ -112,7 +112,7 @@ All states defined below use React's `useState` or `useRef`.
 ## 2. Functions
 
 ### `sendMessage`
-- **Description:** Initiates a chat request, sends user prompt, handles responses stream, and triggers Nginx broadcast.
+- **Description:** Initiates a chat request, sends user prompt (with local millisecond-precision localized timestamp `HH:mm`), handles responses stream, and triggers Nginx broadcast.
 - **Arguments:** None.
 - **Return Value:** `Promise<void>`
 
@@ -136,6 +136,9 @@ All states defined below use React's `useState` or `useRef`.
 - **Description:** Unloads the currently active model from Ollama VRAM by hitting the API, then updates state `psInfo` to null, triggers `fetchModelsAndPs`, clears state `activeModel` to resetting the UI select element back to "Select a model...", updates `lastModelChangeTime`, and broadcasts model clear command if Shared Room Mode is enabled.
 - **Arguments:** None.
 - **Return Value:** `Promise<void>`
+
+### `Model Synchronization & 503 Bypass`
+- **Description:** When the model selection is synchronized automatically via polling (`pollModel`), only `activeModel` is updated. Unlike manual selection, `loadModelOnSelection` (calling `/api/generate`) is bypassed to prevent redundant network pre-loads that trigger Nginx's concurrent connection limit (`503 Service Unavailable`).
 
 ---
 
