@@ -123,12 +123,23 @@ All states defined below use React's `useState` or `useRef`.
 - **Description:** Stores the real-time generated content streamed from another client.
 - **Default:** `""`
 
+### `isHistorySynced`
+- **Type:** `boolean`
+- **Description:** Tracks whether the shared room history synchronization (`syncHistory`) has completed.
+- **Default:** `false`
+
 ---
 
 ## 2. Functions
 
+### `formatTimestamp`
+- **Description:** Formats a date object or an ISO timestamp string into `yyyy/MM/dd-HH:mm`.
+- **Arguments:**
+  - `dateInput` (`string | Date`): Input date.
+- **Return Value:** `string`
+
 ### `sendMessage`
-- **Description:** Initiates a chat request, sends user prompt (with local millisecond-precision localized timestamp `HH:mm`), handles responses stream, triggers Nginx broadcast, and throttles real-time stream status broadcast to `/api/model`.
+- **Description:** Initiates a chat request, sends user prompt (with local millisecond-precision localized timestamp `yyyy/MM/dd-HH:mm`), handles responses stream, triggers Nginx broadcast, and throttles real-time stream status broadcast to `/api/model`.
 - **Arguments:** None.
 - **Return Value:** `Promise<void>`
 

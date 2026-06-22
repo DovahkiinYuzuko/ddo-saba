@@ -13,7 +13,7 @@ This document specifies the helper functions for room broadcasting (sharing mess
   - `accessToken` (`string`): Access token (added for auth verification).
 - **Return Value:** `Promise<any>`
 
-### `broadcastMessage` (L21-37)
+### `broadcastMessage` (L21-38)
 - **Description:** Sends local user or assistant message to `/api/broadcast` for other peers to capture.
 - **Arguments:**
   - `connectionUrl` (`string`): Host URL.
@@ -21,16 +21,16 @@ This document specifies the helper functions for room broadcasting (sharing mess
   - `sender` (`string`): Username signature.
   - `role` (`string`): Message owner ('user' or 'assistant').
   - `content` (`string`): Message body.
-- **Return Value:** `Promise<void>`
+- **Return Value:** `Promise<{ status: string; id: string }>`
 
-### `fetchHistory` (L39-49)
+### `fetchHistory` (L40-50)
 - **Description:** Requests the full chronological list of messages broadcasted in the shared room from `/api/history`.
 - **Arguments:**
   - `connectionUrl` (`string`): Host URL.
   - `accessToken` (`string`): Access token (added for auth verification).
 - **Return Value:** `Promise<any>`
 
-### `broadcastModel` (L51-69)
+### `broadcastModel` (L52-70)
 - **Description:** Notifies other peers of a model selection change by posting `{ model, sender, timestamp }` to `/api/model`.
 - **Arguments:**
   - `connectionUrl` (`string`): Host URL.
@@ -40,7 +40,7 @@ This document specifies the helper functions for room broadcasting (sharing mess
   - `timestamp` (`number`): Millisecond timestamp of the model change.
 - **Return Value:** `Promise<void>`
 
-### `pollModel` (L71-81)
+### `pollModel` (L72-82)
 - **Description:** Pulls the current active model and selection meta (including the millisecond timestamp) from `/api/model`.
 - **Arguments:**
   - `connectionUrl` (`string`): Host URL.

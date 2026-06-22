@@ -122,12 +122,17 @@ const locales: Record<'en' | 'ja', LocaleStrings> = {
   }
 };
 
-const formatTimestamp = (isoString?: string): string => {
-  if (!isoString) return '';
+const formatTimestamp = (dateInput?: string | Date): string => {
+  if (!dateInput) return '';
   try {
-    const d = new Date(isoString);
+    const d = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
     if (isNaN(d.getTime())) return '';
-    return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    const yyyy = d.getFullYear();
+    const MM = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const HH = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    return `${yyyy}/${MM}/${dd}-${HH}:${mm}`;
   } catch {
     return '';
   }
@@ -204,6 +209,7 @@ export default function App() {
   const [sendOnEnter, setSendOnEnter] = useState<boolean>(true);
   const [contextUsed, setContextUsed] = useState<number>(0);
   const [lastModelChangeTime, setLastModelChangeTime] = useState<number>(0);
+  const [isHistorySynced, setIsHistorySynced] = useState<boolean>(false);
 
   // Separate model fallback logic
   useEffect(() => {
@@ -336,12 +342,12 @@ export default function App() {
 
   // Create default tab if none exists
   useEffect(() => {
-    if (chats.length === 0) {
+    if (chats.length === 0 && (!settings.isSharedMode || isHistorySynced)) {
       setTimeout(() => {
         addNewTab(false);
       }, 0);
     }
-  }, [chats.length, addNewTab]);
+  }, [chats.length, addNewTab, settings.isSharedMode, isHistorySynced]);
 
   const deleteTab = useCallback((id: string, e?: React.MouseEvent, isRemote = false) => {
     if (e) e.stopPropagation();
@@ -587,6 +593,8 @@ export default function App() {
         }
       } catch (e) {
         console.error("Failed to sync shared room history", e);
+      } finally {
+        setIsHistorySynced(true);
       }
     };
     
@@ -607,11 +615,8 @@ export default function App() {
           generatingText?: string;
         };
         if (data.sender && data.sender !== settings.username) {
-          if (data.model !== undefined) {
-            const remoteTime = data.timestamp || 0;
-            if (remoteTime > lastModelChangeTime && data.model !== activeModel) {
-              setActiveModel(data.model);
-            }
+          if (data.model !== undefined && data.model !== activeModel) {
+            setActiveModel(data.model);
           }
           if (data.isGenerating !== undefined) {
             setIsRemoteGenerating(data.isGenerating);
@@ -661,7 +666,7 @@ export default function App() {
       void broadcastModel(settings.connectionUrl, settings.accessToken, settings.username, activeModel, Date.now(), true, '');
     }
 
-    const nowStr = new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    const nowStr = formatTimestamp(new Date());
 
     const userMsg: Message = {
       role: 'user',
@@ -747,7 +752,7 @@ export default function App() {
               role: 'assistant', 
               content: '', 
               sender: activeModel,
-              timestamp: new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+              timestamp: formatTimestamp(new Date())
             }]
           };
         }
@@ -874,13 +879,16 @@ export default function App() {
       // After streaming is complete, broadcast assistant message (includes access token)
       if (settings.isSharedMode && accumulatedContent) {
         try {
-          await broadcastMessage(
+          const result = await broadcastMessage(
             settings.connectionUrl,
             settings.accessToken,
             activeModel,
             'assistant',
             accumulatedContent
           );
+          if (result && result.id) {
+            setLastPolledMsgId(result.id);
+          }
         } catch (e) {
           console.error("Failed to broadcast assistant message", e);
         }
@@ -899,7 +907,7 @@ export default function App() {
               messages: [...c.messages, { 
                 role: 'system', 
                 content: `Error: ${err.message}`,
-                timestamp: new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+                timestamp: formatTimestamp(new Date())
               }]
             };
           }
