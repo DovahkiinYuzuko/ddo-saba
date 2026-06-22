@@ -11,7 +11,7 @@ This document specifies the variables and functions used in `nginx/conf/broadcas
 - **Description:** The global Nginx object provided by the njs runtime. Accesses the shared dictionary zone `shared.broadcast_zone` which is allocated in memory to temporarily cache the latest broadcasted chat message. Key-value pairs in this zone automatically expire after 5 seconds.
 - **Scope:** Global.
 
-### `process` (L83-83)
+### `process` (L81-81)
 - **Type:** `Object` (Global Process Object)
 - **Description:** The process object provided by njs to access environmental variables. Accesses `env.DDO_SABA_TOKEN` to retrieve the access credential set by the server host.
 - **Scope:** Global.
@@ -53,19 +53,19 @@ This document specifies the variables and functions used in `nginx/conf/broadcas
   2. Sets response `Content-Type` header to `application/json`.
   3. Returns the payload or `[]` with status `200`.
 
-### `post_model` (L51-65)
-- **Description:** Receives a HTTP `POST` request containing `{ model, sender, timestamp }` and stores it under `"model"` key.
+### `post_model` (L51-63)
+- **Description:** Receives a HTTP `POST` request containing model details and real-time generation/sync status, and stores the raw JSON object string under the `"model"` key.
 - **Arguments:**
   - `r` (`Object`): The Nginx HTTP request object.
 - **Return Value:** None (Sends HTTP `200` or `400`).
 
-### `get_model` (L67-72)
-- **Description:** Receives a HTTP `GET` request and returns the stored active model info `{ model, sender, timestamp }`.
+### `get_model` (L65-70)
+- **Description:** Receives a HTTP `GET` request and returns the stored raw JSON object representing the active model and real-time status details.
 - **Arguments:**
   - `r` (`Object`): The Nginx HTTP request object.
 - **Return Value:** None (Sends HTTP `200`).
 
-### `auth_check` (L82-97)
+### `auth_check` (L80-95)
 - **Description:** Authenticates request headers targeting `/api/` endpoints by comparing the incoming token with the host-configured token.
 - **Arguments:**
   - `r` (`Object`): The Nginx HTTP request object.

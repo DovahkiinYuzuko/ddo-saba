@@ -7,9 +7,8 @@ $cachedMessage = ""
 $cachedId = ""
 $cachedTime = 0
 $messageHistory = @()
-$cachedModelName = ""
-$cachedModelSender = ""
-$cachedModelTime = 0
+$cachedModelData = $null
+
 
 $listener = New-Object System.Net.HttpListener
 $listener.Prefixes.Add("http://127.0.0.1:$port/")
@@ -125,24 +124,20 @@ while ($listener.IsListening) {
                 $body = $reader.ReadToEnd()
                 try {
                     $data = ConvertFrom-Json $body
-                    $cachedModelName = $data.model
-                    $cachedModelSender = $data.sender
-                    if ($data.timestamp) {
-                        $cachedModelTime = [double]$data.timestamp
-                    } else {
-                        $cachedModelTime = [double]([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())
+                    if (-not $data.timestamp) {
+                        # Add member dynamically (PowerShell 5.1/7.x safe approach)
+                        $data = $data | Add-Member -NotePropertyName "timestamp" -NotePropertyValue [double]([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) -PassThru
                     }
+                    $cachedModelData = $data
                     $response.StatusCode = 200
                 } catch {
                     $response.StatusCode = 400
                 }
             } elseif ($request.HttpMethod -eq "GET") {
-                $modelData = @{
-                    model = $cachedModelName
-                    sender = $cachedModelSender
-                    timestamp = $cachedModelTime
+                $modelJson = "{}"
+                if ($cachedModelData) {
+                    $modelJson = ConvertTo-Json $cachedModelData -Compress
                 }
-                $modelJson = ConvertTo-Json $modelData -Compress
                 $buffer = [System.Text.Encoding]::UTF8.GetBytes($modelJson)
                 $response.ContentType = "application/json"
                 $response.ContentLength64 = $buffer.Length

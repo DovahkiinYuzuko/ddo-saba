@@ -53,13 +53,15 @@ export const broadcastModel = async (
   accessToken: string,
   sender: string,
   model: string,
-  timestamp: number
+  timestamp: number,
+  isGenerating?: boolean,
+  generatingText?: string
 ): Promise<void> => {
   const headers = getHeaders(accessToken);
   const res = await fetch(`${connectionUrl}/api/model`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ sender, model, timestamp })
+    body: JSON.stringify({ sender, model, timestamp, isGenerating, generatingText })
   });
   if (!res.ok) {
     throw new Error(`HTTP ${res.status}`);

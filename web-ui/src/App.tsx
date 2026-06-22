@@ -185,6 +185,15 @@ export default function App() {
     repeat_penalty: 1.1
   });
   const [thinkMode, setThinkMode] = useState<boolean>(true);
+  const [syncRequestPending, setSyncRequestPending] = useState<{
+    activeModel?: string;
+    systemPrompt?: string;
+    parameters?: DdoParameters;
+    thinkMode?: boolean;
+    sender: string;
+  } | null>(null);
+  const [isRemoteGenerating, setIsRemoteGenerating] = useState<boolean>(false);
+  const [remoteGeneratingText, setRemoteGeneratingText] = useState<string>('');
   const [psInfo, setPsInfo] = useState<PsModelInfo | null>(null);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const isGeneratingRef = useRef(isGenerating);
@@ -211,6 +220,44 @@ export default function App() {
 
   const [inputText, setInputText] = useState<string>('');
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
+
+  const broadcastSettings = async () => {
+    if (!settings.isSharedMode) return;
+    try {
+      const syncPayload = {
+        activeModel,
+        systemPrompt,
+        parameters,
+        thinkMode
+      };
+      await broadcastMessage(
+        settings.connectionUrl,
+        settings.accessToken,
+        settings.username,
+        'system',
+        `sync_request:${settings.username}:${JSON.stringify(syncPayload)}`
+      );
+    } catch (e) {
+      console.error("Failed to broadcast settings sync request", e);
+    }
+  };
+
+  const handleAcceptSyncRequest = () => {
+    if (!syncRequestPending) return;
+    const { activeModel: remoteModel, systemPrompt: remotePrompt, parameters: remoteParams, thinkMode: remoteThink } = syncRequestPending;
+    
+    if (remoteModel !== undefined) {
+      setActiveModel(remoteModel);
+      if (remoteModel && remoteModel !== activeModel) {
+        void loadModelOnSelection(remoteModel);
+      }
+    }
+    if (remotePrompt !== undefined) setSystemPrompt(remotePrompt);
+    if (remoteParams !== undefined) setParameters(prev => ({ ...prev, ...remoteParams }));
+    if (remoteThink !== undefined) setThinkMode(remoteThink);
+    
+    setSyncRequestPending(null);
+  };
 
   const loadModelOnSelection = async (modelName: string) => {
     if (!modelName) {
@@ -339,10 +386,17 @@ export default function App() {
 
       const fetchedPs = await fetchPs(settings.connectionUrl, settings.accessToken);
       setPsInfo(fetchedPs);
+
+      // Automatically clear active model selection if it was unloaded from VRAM (psInfo is null)
+      // and we are not currently loading a model.
+      if (!fetchedPs && activeModel && !isModelLoading) {
+        setActiveModel('');
+        setLastModelChangeTime(Date.now());
+      }
     } catch (e) {
       console.error("Failed to connect to Ollama Server status endpoints.", e);
     }
-  }, [settings.connectionUrl, settings.accessToken]);
+  }, [settings.connectionUrl, settings.accessToken, activeModel, isModelLoading]);
 
   useEffect(() => {
     setTimeout(() => {
@@ -369,7 +423,23 @@ export default function App() {
         
         // Handle system sync events
         if (data.role === 'system' && data.content) {
-          if (data.content.startsWith('tab_create:')) {
+          if (data.content.startsWith('sync_request:')) {
+            const parts = data.content.split(':');
+            const sender = parts[1];
+            const payloadStr = parts.slice(2).join(':');
+            if (sender !== settings.username && payloadStr) {
+              try {
+                const payload = JSON.parse(payloadStr);
+                setSyncRequestPending({
+                  ...payload,
+                  sender
+                });
+              } catch (e) {
+                console.error("Failed to parse settings sync payload", e);
+              }
+            }
+            return;
+          } else if (data.content.startsWith('tab_create:')) {
             const parts = data.content.split(':');
             const tabId = parts[1];
             const tabTitle = parts.slice(2).join(':');
@@ -523,27 +593,40 @@ export default function App() {
     void syncHistory();
   }, [settings.isSharedMode, settings.connectionUrl, settings.accessToken]);
 
-  // Polling for shared model selection
+  // Polling for shared model selection and generation status
   useEffect(() => {
     if (!settings.isSharedMode) return;
     
     const startModelPolling = async () => {
       try {
-        const data = await pollModel(settings.connectionUrl, settings.accessToken);
-        if (data.sender && data.sender !== settings.username && data.model !== undefined) {
-          const remoteTime = data.timestamp || 0;
-          if (remoteTime > lastModelChangeTime && data.model !== activeModel) {
-            setActiveModel(data.model);
-            // loadModelOnSelection(data.model) is intentionally bypassed to avoid 503 connection errors.
-            // Other clients' models are synchronized in UI view only.
+        const data = await pollModel(settings.connectionUrl, settings.accessToken) as {
+          model?: string;
+          sender?: string;
+          timestamp?: number;
+          isGenerating?: boolean;
+          generatingText?: string;
+        };
+        if (data.sender && data.sender !== settings.username) {
+          if (data.model !== undefined) {
+            const remoteTime = data.timestamp || 0;
+            if (remoteTime > lastModelChangeTime && data.model !== activeModel) {
+              setActiveModel(data.model);
+            }
           }
+          if (data.isGenerating !== undefined) {
+            setIsRemoteGenerating(data.isGenerating);
+            setRemoteGeneratingText(data.generatingText || '');
+          }
+        } else if (!data.sender) {
+          setIsRemoteGenerating(false);
+          setRemoteGeneratingText('');
         }
       } catch (e) {
         console.error("Model poll failed", e);
       }
     };
     
-    const interval = setInterval(startModelPolling, 3000);
+    const interval = setInterval(startModelPolling, 1500);
     return () => clearInterval(interval);
   }, [settings.isSharedMode, settings.connectionUrl, settings.accessToken, settings.username, activeModel, lastModelChangeTime]);
 
@@ -573,6 +656,10 @@ export default function App() {
     const userMessageContent = inputText;
     setInputText('');
     setIsGenerating(true);
+
+    if (settings.isSharedMode) {
+      void broadcastModel(settings.connectionUrl, settings.accessToken, settings.username, activeModel, Date.now(), true, '');
+    }
 
     const nowStr = new Date().toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
 
@@ -675,6 +762,8 @@ export default function App() {
       let isThinkingState = false;
       let hasThoughtEndedState = false;
 
+      let lastBroadcastTime = Date.now();
+
       if (reader) {
         while (true) {
           const { done, value } = await reader.read();
@@ -722,6 +811,21 @@ export default function App() {
                   }
                   return c;
                 }));
+              }
+
+              // Throttled real-time streaming text broadcast (every 600ms)
+              const nowMillis = Date.now();
+              if (settings.isSharedMode && accumulatedContent && nowMillis - lastBroadcastTime > 600) {
+                lastBroadcastTime = nowMillis;
+                void broadcastModel(
+                  settings.connectionUrl,
+                  settings.accessToken,
+                  settings.username,
+                  activeModel,
+                  nowMillis,
+                  true,
+                  accumulatedContent
+                );
               }
 
               if (parsed.done) {
@@ -805,6 +909,9 @@ export default function App() {
     } finally {
       setIsGenerating(false);
       abortControllerRef.current = null;
+      if (settings.isSharedMode) {
+        void broadcastModel(settings.connectionUrl, settings.accessToken, settings.username, activeModel, Date.now(), false, '');
+      }
     }
   };
 
@@ -956,6 +1063,17 @@ export default function App() {
 
   const activeChat = chats.find(c => c.id === activeChatId);
 
+  const displayMessages = activeChat ? [...activeChat.messages] : [];
+  if (isRemoteGenerating && remoteGeneratingText && activeChat) {
+    displayMessages.push({
+      id: 'remote_generating_temp',
+      role: 'assistant',
+      content: remoteGeneratingText,
+      sender: activeModel || 'AI',
+      timestamp: lang === 'ja' ? '同期中...' : 'Streaming...'
+    });
+  }
+
   return (
     <div className={`app-container ${isSidebarOpen ? 'sidebar-open' : ''} ${isParamsOpen ? 'params-open' : ''}`} onDragOver={handleDragOver} onDrop={handleDrop}>
       
@@ -1087,7 +1205,7 @@ export default function App() {
 
         <ChatMessages 
           ref={messagesContainerRef}
-          messages={activeChat?.messages || []}
+          messages={displayMessages}
           onImportCassette={importCassette}
           expandedThinking={expandedThinking}
           onToggleThinking={handleThinkingToggle}
@@ -1099,7 +1217,7 @@ export default function App() {
           <div className="input-wrap">
             <textarea 
               value={inputText}
-              disabled={isGenerating || isModelLoading}
+              disabled={isGenerating || isModelLoading || isRemoteGenerating}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
@@ -1112,7 +1230,7 @@ export default function App() {
                   }
                 }
               }}
-              placeholder={t.placeholder}
+              placeholder={isRemoteGenerating ? (lang === 'ja' ? '他のユーザーが推論中です...' : 'Another user is thinking...') : t.placeholder}
               rows={2}
               className="input-textarea"
             />
@@ -1121,7 +1239,7 @@ export default function App() {
                 <Square size={16} />
               </button>
             ) : (
-              <button className="action-btn send-btn" onClick={sendMessage} disabled={!inputText.trim() || isModelLoading}>
+              <button className="action-btn send-btn" onClick={sendMessage} disabled={!inputText.trim() || isModelLoading || isRemoteGenerating}>
                 <Send size={16} />
               </button>
             )}
@@ -1153,6 +1271,8 @@ export default function App() {
         onImportPreset={importPreset}
         t={t}
         lang={lang}
+        isSharedMode={settings.isSharedMode}
+        onBroadcastSettings={broadcastSettings}
       />
 
       {/* 4. Settings Popup / Modal */}
@@ -1167,6 +1287,38 @@ export default function App() {
         onImportCassette={importCassette}
         t={t}
       />
+
+      {/* 5. Synchronize Request Modal */}
+      {syncRequestPending && (
+        <div className="modal-backdrop" style={{ zIndex: 200 }}>
+          <div className="settings-modal" style={{ maxWidth: '400px' }}>
+            <div className="modal-header">
+              <h3>{lang === 'ja' ? '設定同期のリクエスト' : 'Settings Sync Request'}</h3>
+            </div>
+            <div className="modal-body">
+              <p style={{ marginBottom: '16px', fontSize: '0.9rem', lineHeight: '1.5' }}>
+                {lang === 'ja'
+                  ? `ユーザー「${syncRequestPending.sender}」から設定の同期がリクエストされました。モデルとパラメータを同期しますか？`
+                  : `User "${syncRequestPending.sender}" has requested to sync settings. Do you want to sync your model and parameters?`}
+              </p>
+              <div style={{ backgroundColor: 'hsl(var(--bg-input))', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid hsl(var(--border))', fontSize: '0.8rem', fontFamily: 'monospace', marginBottom: '20px' }}>
+                <div>Model: {syncRequestPending.activeModel || 'None'}</div>
+                <div>Temp: {syncRequestPending.parameters?.temperature ?? 'N/A'}</div>
+                <div>Context: {syncRequestPending.parameters?.num_ctx ?? 'N/A'}</div>
+                <div>Reasoning: {syncRequestPending.thinkMode ? 'ON' : 'OFF'}</div>
+              </div>
+            </div>
+            <div className="modal-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+              <button className="btn-secondary" onClick={() => setSyncRequestPending(null)}>
+                {lang === 'ja' ? '拒否' : 'Deny'}
+              </button>
+              <button className="btn-accent" onClick={handleAcceptSyncRequest}>
+                {lang === 'ja' ? '承認' : 'Accept'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

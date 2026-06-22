@@ -22,6 +22,8 @@ interface ParameterPanelProps {
   onImportPreset: (e: React.ChangeEvent<HTMLInputElement>) => void;
   t: LocaleStrings;
   lang: 'en' | 'ja';
+  isSharedMode: boolean;
+  onBroadcastSettings: () => Promise<void>;
 }
 
 export default function ParameterPanel({
@@ -42,7 +44,9 @@ export default function ParameterPanel({
   onExportPreset,
   onImportPreset,
   t,
-  lang
+  lang,
+  isSharedMode,
+  onBroadcastSettings
 }: ParameterPanelProps) {
 
   const handleSliderChange = (key: keyof DdoParameters, value: number) => {
@@ -213,6 +217,20 @@ export default function ParameterPanel({
             <input type="file" accept=".json" onChange={onImportPreset} style={{ display: 'none' }} />
           </label>
         </div>
+
+        {/* Sync Settings to All Clients Button */}
+        {isSharedMode && (
+          <div style={{ marginTop: '12px', width: '100%' }}>
+            <button 
+              className="btn-accent" 
+              onClick={onBroadcastSettings}
+              style={{ width: '100%', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
+            >
+              <Cpu size={16} />
+              <span>{lang === 'ja' ? '現在の設定を全員に同期' : 'Sync Settings to Room'}</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Dynamic VRAM state status (Ollama ps) */}

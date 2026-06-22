@@ -52,12 +52,10 @@ function post_model(r) {
     var dict = ngx.shared.broadcast_zone;
     try {
         var body = JSON.parse(r.requestBody);
-        var modelData = {
-            model: body.model || '',
-            sender: body.sender || 'unknown',
-            timestamp: body.timestamp || Date.now()
-        };
-        dict.set("model", JSON.stringify(modelData));
+        if (!body.timestamp) {
+            body.timestamp = Date.now();
+        }
+        dict.set("model", JSON.stringify(body));
         r.return(200, JSON.stringify({ status: "success" }));
     } catch (e) {
         r.return(400, "Invalid JSON body");
