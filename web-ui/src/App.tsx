@@ -209,7 +209,7 @@ export default function App() {
   const [sendOnEnter, setSendOnEnter] = useState<boolean>(true);
   const [contextUsed, setContextUsed] = useState<number>(0);
   const [lastModelChangeTime, setLastModelChangeTime] = useState<number>(0);
-  const [isHistorySynced, setIsHistorySynced] = useState<boolean>(false);
+  const [lastModelSender, setLastModelSender] = useState<string>(settings.username);
 
   // Separate model fallback logic
   useEffect(() => {
@@ -342,14 +342,14 @@ export default function App() {
     }
   }, [t.newChat, chats.length, settings.isSharedMode, settings.connectionUrl, settings.accessToken, settings.username]);
 
-  // Create default tab if none exists
+  // Create default tab if none exists (Private Mode only)
   useEffect(() => {
-    if (chats.length === 0 && (!settings.isSharedMode || isHistorySynced)) {
+    if (!settings.isSharedMode && chats.length === 0) {
       setTimeout(() => {
         addNewTab(false);
       }, 0);
     }
-  }, [chats.length, addNewTab, settings.isSharedMode, isHistorySynced]);
+  }, [chats.length, addNewTab, settings.isSharedMode]);
 
   const deleteTab = useCallback((id: string, e?: React.MouseEvent, isRemote = false) => {
     if (e) e.stopPropagation();
@@ -398,15 +398,22 @@ export default function App() {
       setPsInfo(fetchedPs);
 
       // Automatically clear active model selection if it was unloaded from VRAM (psInfo is null)
-      // and we are not currently loading a model.
-      if (!fetchedPs && activeModel && !isModelLoading) {
+      // and we are not currently loading a model, and we are the owner of the last model choice.
+      const isModelOwner = lastModelSender === settings.username;
+      if (isModelOwner && !fetchedPs && activeModel && !isModelLoading) {
         setActiveModel('');
-        setLastModelChangeTime(Date.now());
+        setLastModelSender(settings.username);
+        const now = Date.now();
+        setLastModelChangeTime(now);
+        if (settings.isSharedMode) {
+          void broadcastModel(settings.connectionUrl, settings.accessToken, settings.username, '', now);
+        }
+        fetchModelsAndPs();
       }
     } catch (e) {
       console.error("Failed to connect to Ollama Server status endpoints.", e);
     }
-  }, [settings.connectionUrl, settings.accessToken, activeModel, isModelLoading]);
+  }, [settings.connectionUrl, settings.accessToken, activeModel, isModelLoading, lastModelSender, settings.username]);
 
   useEffect(() => {
     setTimeout(() => {
@@ -603,8 +610,6 @@ export default function App() {
         }
       } catch (e) {
         console.error("Failed to sync shared room history", e);
-      } finally {
-        setIsHistorySynced(true);
       }
     };
     
@@ -627,6 +632,8 @@ export default function App() {
         if (data.sender && data.sender !== settings.username) {
           if (data.model !== undefined && data.model !== activeModel) {
             setActiveModel(data.model);
+            setLastModelSender(data.sender);
+            setLastModelChangeTime(Date.now());
           }
           if (data.isGenerating !== undefined) {
             setIsRemoteGenerating(data.isGenerating);
@@ -652,6 +659,7 @@ export default function App() {
       await apiUnloadModel(psInfo.name, settings.connectionUrl, settings.accessToken);
       setPsInfo(null);
       setActiveModel('');
+      setLastModelSender(settings.username);
       const now = Date.now();
       setLastModelChangeTime(now);
       if (settings.isSharedMode) {
@@ -1172,6 +1180,7 @@ export default function App() {
               onChange={(e) => {
                 const selected = e.target.value;
                 setActiveModel(selected);
+                setLastModelSender(settings.username);
                 const now = Date.now();
                 setLastModelChangeTime(now);
                 loadModelOnSelection(selected);

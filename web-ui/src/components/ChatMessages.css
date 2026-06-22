@@ -184,6 +184,8 @@
   border-radius: var(--radius-lg);
   font-size: 0.925rem;
   line-height: 1.6;
+  width: fit-content;
+  max-width: 100%;
 }
 
 .user .message-text {
@@ -191,6 +193,7 @@
   color: hsl(var(--text-primary));
   border: 1px solid hsl(var(--accent) / 0.3);
   border-top-right-radius: 2px;
+  align-self: flex-end;
 }
 
 .assistant .message-text {
@@ -198,6 +201,7 @@
   color: hsl(var(--text-primary));
   border: 1px solid hsl(var(--border));
   border-top-left-radius: 2px;
+  align-self: flex-start;
 }
 
 .system .message-text {
@@ -510,7 +514,7 @@
 
 
   .message-bubble {
-    width: 100%;
+    max-width: 100%;
   }
 }
 

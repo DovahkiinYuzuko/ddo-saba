@@ -123,10 +123,9 @@ All states defined below use React's `useState` or `useRef`.
 - **Description:** Stores the real-time generated content streamed from another client.
 - **Default:** `""`
 
-### `isHistorySynced`
-- **Type:** `boolean`
-- **Description:** Tracks whether the shared room history synchronization (`syncHistory`) has completed.
-- **Default:** `false`
+### `lastModelSender`
+- **Type:** `string`
+- **Description:** Tracks the username of the peer who last changed or loaded the active model. Used to determine ownership for handling VRAM unloading cleanups.
 
 ---
 
