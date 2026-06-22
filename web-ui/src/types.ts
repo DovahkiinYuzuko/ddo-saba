@@ -11,6 +11,7 @@ export interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
   sender?: string;
+  broadcaster?: string;
   metrics?: MessageMetrics;
   timestamp?: string;
 }

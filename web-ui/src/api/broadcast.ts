@@ -22,6 +22,7 @@ export const broadcastMessage = async (
   connectionUrl: string,
   accessToken: string,
   sender: string,
+  broadcaster: string,
   role: string,
   content: string
 ): Promise<{ status: string; id: string }> => {
@@ -29,7 +30,7 @@ export const broadcastMessage = async (
   const res = await fetch(`${connectionUrl}/api/broadcast`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ sender, role, content })
+    body: JSON.stringify({ sender, broadcaster, role, content })
   });
   if (!res.ok) {
     throw new Error(`HTTP ${res.status}`);

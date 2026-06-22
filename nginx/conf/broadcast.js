@@ -6,6 +6,7 @@ function post_message(r) {
         var msgData = {
             id: msgId,
             sender: body.sender || 'unknown',
+            broadcaster: body.broadcaster || '',
             role: body.role || 'user',
             content: body.content || '',
             timestamp: new Date().toISOString()

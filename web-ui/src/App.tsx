@@ -240,6 +240,7 @@ export default function App() {
         settings.connectionUrl,
         settings.accessToken,
         settings.username,
+        settings.username,
         'system',
         `sync_request:${settings.username}:${JSON.stringify(syncPayload)}`
       );
@@ -334,6 +335,7 @@ export default function App() {
         settings.connectionUrl,
         settings.accessToken,
         settings.username,
+        settings.username,
         'system',
         `tab_create:${newId}:${title}`
       );
@@ -361,6 +363,7 @@ export default function App() {
             settings.connectionUrl,
             settings.accessToken,
             settings.username,
+            settings.username,
             'system',
             `tab_switch:${nextActiveId}`
           );
@@ -374,6 +377,7 @@ export default function App() {
       void broadcastMessage(
         settings.connectionUrl,
         settings.accessToken,
+        settings.username,
         settings.username,
         'system',
         `tab_delete:${id}`
@@ -420,11 +424,13 @@ export default function App() {
       const data = (await pollMessage(settings.connectionUrl, settings.accessToken)) as {
         id?: string;
         sender?: string;
+        broadcaster?: string;
         role?: 'user' | 'assistant' | 'system';
         content?: string;
         timestamp?: string;
       };
-      if (data.id && data.id !== lastPolledMsgIdRef.current && data.sender !== settings.username) {
+      const isMyMessage = data.sender === settings.username || data.broadcaster === settings.username;
+      if (data.id && data.id !== lastPolledMsgIdRef.current && !isMyMessage) {
         setLastPolledMsgId(data.id);
         
         // Handle system sync events
@@ -478,6 +484,7 @@ export default function App() {
                   role: data.role || 'user',
                   content: data.content || '',
                   sender: data.sender,
+                  broadcaster: data.broadcaster,
                   timestamp: data.timestamp ? formatTimestamp(data.timestamp) : undefined
                 }]
               };
@@ -506,6 +513,7 @@ export default function App() {
         const historyData = await fetchHistory(settings.connectionUrl, settings.accessToken) as {
           id?: string;
           sender?: string;
+          broadcaster?: string;
           role?: 'user' | 'assistant' | 'system';
           content?: string;
           timestamp?: string;
@@ -550,6 +558,7 @@ export default function App() {
                           role: 'system',
                           content: h.content || '',
                           sender: h.sender,
+                          broadcaster: h.broadcaster,
                           timestamp: h.timestamp ? formatTimestamp(h.timestamp) : undefined
                         }]
                       };
@@ -568,6 +577,7 @@ export default function App() {
                         role: h.role || 'user',
                         content: h.content || '',
                         sender: h.sender,
+                        broadcaster: h.broadcaster,
                         timestamp: h.timestamp ? formatTimestamp(h.timestamp) : undefined
                       }]
                     };
@@ -693,6 +703,7 @@ export default function App() {
         await broadcastMessage(
           settings.connectionUrl,
           settings.accessToken,
+          settings.username,
           settings.username,
           'user',
           userMessageContent
@@ -883,6 +894,7 @@ export default function App() {
             settings.connectionUrl,
             settings.accessToken,
             activeModel,
+            settings.username,
             'assistant',
             accumulatedContent
           );
@@ -1117,6 +1129,7 @@ export default function App() {
                   void broadcastMessage(
                     settings.connectionUrl,
                     settings.accessToken,
+                    settings.username,
                     settings.username,
                     'system',
                     `tab_switch:${c.id}`
