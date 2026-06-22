@@ -105,7 +105,7 @@ export default function SettingsModal({
                 !settings.connectionUrl.includes('127.0.0.1');
 
               if (isPublicOrIp) {
-                const shareUrl = `${settings.connectionUrl}?token=${settings.accessToken}`;
+                const shareUrl = `${settings.connectionUrl}?token=${settings.accessToken}&sharedMode=${settings.isSharedMode}`;
                 const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(shareUrl)}`;
                 return (
                   <div className="qr-code-section">

@@ -24,7 +24,7 @@ This document specifies the popover modal logic for editing connection URLs, aut
 ---
 
 ## 2. Shared QR Code Feature
-- Generates a QR Code image using an external API (`api.qrserver.com`) representing `${settings.connectionUrl}?token=${settings.accessToken}` for quick mobile client connection when `settings.connectionUrl` is a public URL (e.g., contains `.trycloudflare.com`).
+- Generates a QR Code image using an external API (`api.qrserver.com`) representing `${settings.connectionUrl}?token=${settings.accessToken}&sharedMode=${settings.isSharedMode}` for quick mobile client connection when `settings.connectionUrl` is a public URL (e.g., contains `.trycloudflare.com`).
 
 ---
 

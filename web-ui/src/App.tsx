@@ -148,12 +148,13 @@ export default function App() {
   const [settings, setSettings] = useState<DdoSettings>(() => {
     const params = new URLSearchParams(window.location.search);
     const tokenFromUrl = params.get('token') || params.get('accessToken') || '';
+    const isSharedModeFromUrl = params.get('sharedMode') === 'true' || params.get('isSharedMode') === 'true';
     return {
       connectionUrl: window.location.origin.includes('localhost:3000')
         ? 'http://localhost:8088'
         : window.location.origin,
       accessToken: tokenFromUrl,
-      isSharedMode: false,
+      isSharedMode: isSharedModeFromUrl,
       username: 'Guest_' + Math.floor(Math.random() * 1000)
     };
   });
