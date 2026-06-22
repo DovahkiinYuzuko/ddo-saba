@@ -127,6 +127,21 @@ All states defined below use React's `useState` or `useRef`.
 - **Type:** `string`
 - **Description:** Tracks the username of the peer who last changed or loaded the active model. Used to determine ownership for handling VRAM unloading cleanups.
 
+### `jobQueue`
+- **Type:** `Array` of `QueueJob` objects
+- **Description:** Holds the list of active jobs in the inference queue.
+- **Default:** `[]`
+
+### `myJobId`
+- **Type:** `string | null`
+- **Description:** Tracks the unique ID of the user's active job in the queue.
+- **Default:** `null`
+
+### `pendingMessage`
+- **Type:** `string`
+- **Description:** Stores the prompt text temporarily in client memory while waiting in the queue.
+- **Default:** `""`
+
 ---
 
 ## 2. Functions
@@ -138,7 +153,7 @@ All states defined below use React's `useState` or `useRef`.
 - **Return Value:** `string`
 
 ### `sendMessage`
-- **Description:** Initiates a chat request, sends user prompt (with local millisecond-precision localized timestamp `yyyy/MM/dd-HH:mm`), handles responses stream, triggers Nginx broadcast, and throttles real-time stream status broadcast to `/api/model`.
+- **Description:** Sends a user prompt. If in Shared Room Mode, it first issues a `joinQueue` request to register in the queue. Only after successful queue confirmation does it clear the input field (`setInputText('')`), append the user message bubble to `chats`, and broadcast the user message via `/api/broadcast`. If queue registration fails, it keeps the input text intact without appending a bubble to the UI. If not in Shared Room Mode, it immediately clears the input field, appends the bubble, and calls `runInferenceStream`.
 - **Arguments:** None.
 - **Return Value:** `Promise<void>`
 

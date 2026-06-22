@@ -90,3 +90,10 @@ export interface LocaleStrings {
   selectModel: string;
   collapseThinking: string;
 }
+
+export interface QueueJob {
+  id: string;
+  username: string;
+  timestamp: number;
+  status: 'waiting' | 'running';
+}

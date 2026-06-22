@@ -8,6 +8,7 @@ $cachedId = ""
 $cachedTime = 0
 $messageHistory = @()
 $cachedModelData = $null
+$jobQueue = @()
 
 
 $listener = New-Object System.Net.HttpListener
@@ -144,6 +145,120 @@ while ($listener.IsListening) {
                 $response.OutputStream.Write($buffer, 0, $buffer.Length)
                 $response.StatusCode = 200
             } else {
+                $response.StatusCode = 405
+            }
+        }
+        elseif ($url -eq "/api/queue") {
+            # Check for expired running jobs
+            $nowEpoch = [double]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
+            $newQueue = @()
+            $hasChanges = $false
+            
+            # Find the running job and see if it timed out (120 seconds limit)
+            foreach ($job in $jobQueue) {
+                if ($job.status -eq "running") {
+                    $jobStart = $job.timestamp
+                    if ($nowEpoch - $jobStart -gt 120) {
+                        # Eject due to timeout
+                        $hasChanges = $true
+                        Write-Host "Job $($job.id) of $($job.username) timed out (120s) and was ejected." -ForegroundColor Yellow
+                        continue
+                    }
+                }
+                $newQueue += $job
+            }
+            
+            if ($hasChanges) {
+                $jobQueue = $newQueue
+                # If the first job is now waiting, promote it to running and update its timestamp
+                if ($jobQueue.Count -gt 0 -and $jobQueue[0].status -eq "waiting") {
+                    $jobQueue[0].status = "running"
+                    $jobQueue[0].timestamp = $nowEpoch
+                }
+            }
+
+            if ($request.HttpMethod -eq "GET") {
+                $queueJson = "[]"
+                if ($jobQueue.Count -gt 0) {
+                    $queueJson = ConvertTo-Json $jobQueue -Compress
+                    if (-not $queueJson.StartsWith("[")) {
+                        $queueJson = "[" + $queueJson + "]"
+                    }
+                }
+                $buffer = [System.Text.Encoding]::UTF8.GetBytes($queueJson)
+                $response.ContentType = "application/json"
+                $response.ContentLength64 = $buffer.Length
+                $response.OutputStream.Write($buffer, 0, $buffer.Length)
+                $response.StatusCode = 200
+            }
+            elseif ($request.HttpMethod -eq "POST") {
+                $reader = New-Object System.IO.StreamReader($request.InputStream, [System.Text.Encoding]::UTF8)
+                $body = $reader.ReadToEnd()
+                try {
+                    $data = ConvertFrom-Json $body
+                    $action = $data.action
+                    $id = $data.id
+                    $username = $data.username
+                    $nowEpoch = [double]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
+
+                    if ($action -eq "join") {
+                        # Avoid duplicates
+                        $exists = $false
+                        foreach ($job in $jobQueue) {
+                            if ($job.id -eq $id) { $exists = $true }
+                        }
+                        if (-not $exists) {
+                            $newJob = [PSCustomObject]@{
+                                id = $id
+                                username = $username
+                                timestamp = $nowEpoch
+                                status = "waiting"
+                            }
+                            if ($jobQueue.Count -eq 0) {
+                                $newJob.status = "running"
+                            }
+                            $jobQueue += $newJob
+                        }
+                        $response.StatusCode = 200
+                    }
+                    elseif ($action -eq "cancel") {
+                        $newQueue = @()
+                        $wasRunning = $false
+                        foreach ($job in $jobQueue) {
+                            if ($job.id -eq $id) {
+                                if ($job.status -eq "running") { $wasRunning = $true }
+                                continue
+                            }
+                            $newQueue += $job
+                        }
+                        $jobQueue = $newQueue
+                        if ($wasRunning -and $jobQueue.Count -gt 0) {
+                            $jobQueue[0].status = "running"
+                            $jobQueue[0].timestamp = $nowEpoch
+                        }
+                        $response.StatusCode = 200
+                    }
+                    elseif ($action -eq "complete") {
+                        $newQueue = @()
+                        foreach ($job in $jobQueue) {
+                            if ($job.id -eq $id) { continue }
+                            $newQueue += $job
+                        }
+                        $jobQueue = $newQueue
+                        if ($jobQueue.Count -gt 0) {
+                            $jobQueue[0].status = "running"
+                            $jobQueue[0].timestamp = $nowEpoch
+                        }
+                        $response.StatusCode = 200
+                    }
+                    else {
+                        $response.StatusCode = 400
+                    }
+                } catch {
+                    $response.StatusCode = 400
+                }
+            }
+            else {
                 $response.StatusCode = 405
             }
         }

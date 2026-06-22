@@ -93,5 +93,5 @@ graph TD
 ---
 
 ## 4. Impact Scope
-- **`nginx.conf`:** Relies on this file to be imported via `js_import conf/broadcast.js` and maps locations `/api/poll` and `/api/broadcast` to the exported functions `get_message` and `post_message`. Relies on `auth_check` mapped to location `/auth_check` under the `auth_request` module.
-- **`app.tsx`:** Client-side React app executes HTTP requests targeting `/api/poll` and `/api/broadcast`, directly relying on the response structure established here. Must include `X-DDO-Token` in headers for all `/api/` fetch operations.
+- **`nginx.conf`:** Relies on this file to be imported via `js_import conf/broadcast.js` and maps locations `/api/poll`, `/api/broadcast`, `/api/history`, and `/api/model` to the exported functions. Additionally, `/api/queue` must be proxied directly to the PowerShell Broadcast Server (port 8089) bypassing njs.
+- **`app.tsx`:** Client-side React app executes HTTP requests targeting `/api/poll`, `/api/broadcast`, `/api/history`, `/api/model`, and `/api/queue`.

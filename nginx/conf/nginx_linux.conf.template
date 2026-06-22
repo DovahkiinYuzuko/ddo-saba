@@ -88,6 +88,22 @@ http {
             js_content broadcast.handle_model;
         }
 
+        # Local PowerShell Broadcast Proxy: Queue Sync
+        location /api/queue {
+            add_header Access-Control-Allow-Origin * always;
+            add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
+            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token" always;
+
+            if ($request_method = OPTIONS) {
+                return 204;
+            }
+
+            auth_request /auth_check;
+            proxy_pass http://127.0.0.1:8089/api/queue;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+        }
+
         # Auth subrequest checker
         location = /auth_check {
             internal;

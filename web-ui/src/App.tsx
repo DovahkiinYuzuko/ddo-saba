@@ -37,6 +37,13 @@ import {
   broadcastModel,
   pollModel
 } from './api/broadcast';
+import { 
+  fetchQueue, 
+  joinQueue, 
+  cancelQueue, 
+  completeQueue 
+} from './api/queue';
+import type { QueueJob } from './types';
 import SettingsModal from './components/SettingsModal';
 import ParameterPanel from './components/ParameterPanel';
 import ChatMessages from './components/ChatMessages';
@@ -212,6 +219,9 @@ export default function App() {
   const [lastModelChangeTime, setLastModelChangeTime] = useState<number>(0);
   const [lastModelSender, setLastModelSender] = useState<string>(settings.username);
   const prevIsSharedModeRef = useRef<boolean>(settings.isSharedMode);
+  const [jobQueue, setJobQueue] = useState<QueueJob[]>([]);
+  const [myJobId, setMyJobId] = useState<string | null>(null);
+  const [pendingMessage, setPendingMessage] = useState<string>('');
 
   // Upload all local chats when entering Shared Room Mode
   useEffect(() => {
@@ -251,6 +261,17 @@ export default function App() {
       void uploadLocalChats();
     }
   }, [settings.isSharedMode, chats, settings.connectionUrl, settings.accessToken, settings.username]);
+
+  // Trigger inference when it is our turn in the queue
+  useEffect(() => {
+    if (!settings.isSharedMode || !myJobId || jobQueue.length === 0) return;
+    
+    const firstJob = jobQueue[0];
+    if (firstJob.id === myJobId && firstJob.status === 'running' && !isGenerating) {
+      // It is our turn! Run the inference.
+      void runInferenceStream(myJobId);
+    }
+  }, [jobQueue, myJobId, pendingMessage, isGenerating, settings.isSharedMode]);
 
   // Separate model fallback logic
   useEffect(() => {
@@ -560,6 +581,22 @@ export default function App() {
     return () => clearInterval(interval);
   }, [settings.isSharedMode, startBroadcastPolling]);
 
+  // Polling for queue status in shared room mode
+  useEffect(() => {
+    if (!settings.isSharedMode) return;
+    const pollQueue = async () => {
+      try {
+        const q = await fetchQueue(settings.connectionUrl, settings.accessToken);
+        setJobQueue(q);
+      } catch (e) {
+        console.error("Queue poll failed", e);
+      }
+    };
+    pollQueue(); // initial run
+    const interval = setInterval(pollQueue, 1500);
+    return () => clearInterval(interval);
+  }, [settings.isSharedMode, settings.connectionUrl, settings.accessToken]);
+
   // Fetch initial history when Shared Room mode is enabled
   useEffect(() => {
     if (!settings.isSharedMode) return;
@@ -722,60 +759,25 @@ export default function App() {
 
   // (definitions moved above startBroadcastPolling)
 
-  const sendMessage = async () => {
-    if (!inputText.trim() || !activeChatId || !activeModel || isGenerating) return;
-
-    const userMessageContent = inputText;
-    setInputText('');
+  const runInferenceStream = async (jobIdToComplete?: string) => {
     setIsGenerating(true);
+    setModelLoadError('');
 
     if (settings.isSharedMode) {
       void broadcastModel(settings.connectionUrl, settings.accessToken, settings.username, activeModel, Date.now(), true, '');
     }
 
-    const nowStr = formatTimestamp(new Date());
-
-    const userMsg: Message = {
-      role: 'user',
-      content: userMessageContent,
-      sender: settings.username,
-      timestamp: nowStr
-    };
-
     const targetChat = chats.find(c => c.id === activeChatId);
-    if (!targetChat) return;
-
-    // Append user message locally
-    const updatedMessages = [...targetChat.messages, userMsg];
-    setChats(prev => prev.map(c => {
-      if (c.id === activeChatId) {
-        return { ...c, messages: updatedMessages };
-      }
-      return c;
-    }));
-
-    // Broadcast user message if Shared Room mode is active (includes access token)
-    if (settings.isSharedMode) {
-      try {
-        await broadcastMessage(
-          settings.connectionUrl,
-          settings.accessToken,
-          settings.username,
-          settings.username,
-          'user',
-          userMessageContent
-        );
-      } catch (e) {
-        console.error("Failed to broadcast user message", e);
-      }
+    if (!targetChat) {
+      setIsGenerating(false);
+      return;
     }
 
-    // Prepare inference API request payload
     const requestMessages = [];
     if (systemPrompt) {
       requestMessages.push({ role: 'system' as const, content: systemPrompt });
     }
-    updatedMessages.forEach(m => {
+    targetChat.messages.forEach(m => {
       requestMessages.push({ role: m.role, content: m.content });
     });
 
@@ -809,7 +811,6 @@ export default function App() {
         throw new Error(`Server returned status: ${res.status}`);
       }
 
-      // Initialize assistant answer slot
       const assistantMsgId = Date.now().toString() + "_ai";
       setChats(prev => prev.map(c => {
         if (c.id === activeChatId) {
@@ -886,7 +887,6 @@ export default function App() {
                 }));
               }
 
-              // Throttled real-time streaming text broadcast (every 600ms)
               const nowMillis = Date.now();
               if (settings.isSharedMode && accumulatedContent && nowMillis - lastBroadcastTime > 600) {
                 lastBroadcastTime = nowMillis;
@@ -944,7 +944,6 @@ export default function App() {
         }
       }
 
-      // After streaming is complete, broadcast assistant message (includes access token)
       if (settings.isSharedMode && accumulatedContent) {
         try {
           const result = await broadcastMessage(
@@ -988,13 +987,144 @@ export default function App() {
       abortControllerRef.current = null;
       if (settings.isSharedMode) {
         void broadcastModel(settings.connectionUrl, settings.accessToken, settings.username, activeModel, Date.now(), false, '');
+        if (jobIdToComplete) {
+          try {
+            await completeQueue(settings.connectionUrl, settings.accessToken, jobIdToComplete);
+            setMyJobId(null);
+            setPendingMessage('');
+            const q = await fetchQueue(settings.connectionUrl, settings.accessToken);
+            setJobQueue(q);
+          } catch (err) {
+            console.error("Failed to complete queue job", err);
+          }
+        }
       }
     }
   };
 
-  const stopGeneration = () => {
+  const sendMessage = async () => {
+    if (!inputText.trim() || !activeChatId || !activeModel || isGenerating || myJobId) return;
+
+    const userMessageContent = inputText;
+
+    if (settings.isSharedMode) {
+      const jobId = "job_" + Date.now().toString() + "_" + Math.floor(Math.random() * 1000);
+
+      try {
+        // Try to join the queue first
+        await joinQueue(settings.connectionUrl, settings.accessToken, jobId, settings.username);
+
+        // Queue join succeeded -> confirm transmission
+        setInputText('');
+        setPendingMessage(userMessageContent);
+        setMyJobId(jobId);
+
+        const nowStr = formatTimestamp(new Date());
+        const userMsgId = Date.now().toString() + "_user";
+
+        const userMsg: Message = {
+          id: userMsgId,
+          role: 'user',
+          content: userMessageContent,
+          sender: settings.username,
+          timestamp: nowStr
+        };
+
+        setChats(prev => prev.map(c => {
+          if (c.id === activeChatId) {
+            return { ...c, messages: [...c.messages, userMsg] };
+          }
+          return c;
+        }));
+
+        const q = await fetchQueue(settings.connectionUrl, settings.accessToken);
+        setJobQueue(q);
+
+        try {
+          await broadcastMessage(
+            settings.connectionUrl,
+            settings.accessToken,
+            settings.username,
+            settings.username,
+            'user',
+            userMessageContent
+          );
+        } catch (e) {
+          console.error("Failed to broadcast user message", e);
+        }
+
+      } catch (err) {
+        console.error("Failed to join queue", err);
+        // Do not clear input, do not append bubble, leave state intact for retry
+      }
+    } else {
+      setInputText('');
+
+      const nowStr = formatTimestamp(new Date());
+      const userMsgId = Date.now().toString() + "_user";
+
+      const userMsg: Message = {
+        id: userMsgId,
+        role: 'user',
+        content: userMessageContent,
+        sender: settings.username,
+        timestamp: nowStr
+      };
+
+      setChats(prev => prev.map(c => {
+        if (c.id === activeChatId) {
+          return { ...c, messages: [...c.messages, userMsg] };
+        }
+        return c;
+      }));
+
+      void runInferenceStream();
+    }
+  };
+
+  const handleCancelQueue = async () => {
+    if (!myJobId || !settings.isSharedMode) return;
+    const targetJobId = myJobId;
+    setMyJobId(null);
+    setPendingMessage('');
+    
+    setChats(prev => prev.map(c => {
+      if (c.id === activeChatId) {
+        const lastMsg = c.messages[c.messages.length - 1];
+        if (lastMsg && lastMsg.role === 'user' && lastMsg.sender === settings.username) {
+          return {
+            ...c,
+            messages: c.messages.slice(0, -1)
+          };
+        }
+      }
+      return c;
+    }));
+
+    try {
+      await cancelQueue(settings.connectionUrl, settings.accessToken, targetJobId);
+      const q = await fetchQueue(settings.connectionUrl, settings.accessToken);
+      setJobQueue(q);
+    } catch (err) {
+      console.error("Failed to cancel queue job", err);
+    }
+  };
+
+  const stopGeneration = async () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
+    }
+    if (myJobId && settings.isSharedMode) {
+      const targetJobId = myJobId;
+      setMyJobId(null);
+      setPendingMessage('');
+      try {
+        await cancelQueue(settings.connectionUrl, settings.accessToken, targetJobId);
+        const q = await fetchQueue(settings.connectionUrl, settings.accessToken);
+        setJobQueue(q);
+      } catch (err) {
+        console.error("Failed to cancel running job on stop", err);
+      }
     }
   };
 
@@ -1302,7 +1432,7 @@ export default function App() {
           <div className="input-wrap">
             <textarea 
               value={inputText}
-              disabled={isGenerating || isModelLoading || isRemoteGenerating || !activeChatId}
+              disabled={isGenerating || isModelLoading || isRemoteGenerating || !activeChatId || myJobId !== null}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
@@ -1318,9 +1448,15 @@ export default function App() {
               placeholder={
                 !activeChatId
                   ? (lang === 'ja' ? '左側の「＋」から新しいチャットを作成してください' : 'Please create a new chat using the "+" button on the left.')
-                  : isRemoteGenerating
-                    ? (lang === 'ja' ? '他のユーザーが推論中です...' : 'Another user is thinking...')
-                    : t.placeholder
+                  : myJobId !== null
+                    ? (() => {
+                        const myIdx = jobQueue.findIndex(q => q.id === myJobId);
+                        const pos = myIdx !== -1 ? myIdx + 1 : '?';
+                        return lang === 'ja' ? `順番待ちしています... (キュー ${pos}番目)` : `Waiting in queue... (Position ${pos})`;
+                      })()
+                    : isRemoteGenerating
+                      ? (lang === 'ja' ? '他のユーザーが推論中です...' : 'Another user is thinking...')
+                      : t.placeholder
               }
               rows={2}
               className="input-textarea"
@@ -1328,6 +1464,15 @@ export default function App() {
             {isGenerating ? (
               <button className="action-btn stop-btn" onClick={stopGeneration}>
                 <Square size={16} />
+              </button>
+            ) : myJobId !== null ? (
+              <button 
+                className="action-btn stop-btn" 
+                onClick={handleCancelQueue}
+                title={lang === 'ja' ? 'キューから取り下げる' : 'Withdraw from queue'}
+                style={{ width: 'auto', padding: '0 12px', fontSize: '0.8rem' }}
+              >
+                {lang === 'ja' ? '取り下げる' : 'Cancel'}
               </button>
             ) : (
               <button className="action-btn send-btn" onClick={sendMessage} disabled={!inputText.trim() || isModelLoading || isRemoteGenerating || !activeChatId}>
@@ -1338,6 +1483,11 @@ export default function App() {
           <div className="input-footer-settings">
             <span>{settings.isSharedMode ? <Globe size={14} className="shared-indicator" /> : <Lock size={14} />}</span>
             <span className="mode-text">{settings.isSharedMode ? t.sharedRoomMode : t.privateMode}</span>
+            {settings.isSharedMode && jobQueue.length > 0 && (
+              <span className="queue-status-indicator" style={{ marginLeft: '12px', color: 'hsl(var(--warning))', fontSize: '0.75rem', fontWeight: 600 }}>
+                {lang === 'ja' ? `待ち行列: ${jobQueue.length}人` : `Queue: ${jobQueue.length} waiting`}
+              </span>
+            )}
           </div>
         </footer>
       </main>

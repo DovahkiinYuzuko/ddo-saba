@@ -40,6 +40,10 @@ This script runs a lightweight in-memory broadcast relay server for Windows envi
 - **Type:** `Double`
 - **Description:** The epoch timestamp when the active model was updated.
 
+### `$jobQueue`
+- **Type:** `Array`
+- **Description:** An in-memory queue containing the sequence of jobs currently waiting for execution.
+
 ## Functions
 
 ### `Start-BroadcastServer`
@@ -50,7 +54,9 @@ This script runs a lightweight in-memory broadcast relay server for Windows envi
   - `GET /api/history`: Returns the entire array in `$messageHistory` as a JSON payload to allow newly connected peers to sync full chat session logs.
   - `POST /api/model`: Receives model change event `{ model, sender, timestamp }` and updates `$cachedModelName`, `$cachedModelSender`, and `$cachedModelTime` (using the provided timestamp or auto-generated epoch if missing).
   - `GET /api/model`: Returns the active model cache JSON `{ model: $cachedModelName, sender: $cachedModelSender, timestamp: $cachedModelTime }`.
-  - `OPTIONS /api/poll` & `OPTIONS /api/broadcast` & `OPTIONS /api/history` & `OPTIONS /api/model`: Handles CORS preflight by returning CORS headers with `200 OK` or `204 No Content`.
+  - `GET /api/queue`: Returns the current `$jobQueue` array. Automatically checks if the current `running` job has exceeded 120 seconds timeout and ejects it if necessary.
+  - `POST /api/queue`: Accepts a JSON payload `{ action, id, username }` and updates `$jobQueue` accordingly (join, cancel, complete actions).
+  - `OPTIONS /api/poll` & `OPTIONS /api/broadcast` & `OPTIONS /api/history` & `OPTIONS /api/model` & `OPTIONS /api/queue`: Handles CORS preflight by returning CORS headers with `200 OK` or `204 No Content`.
 
 ## Dependency Map
 
@@ -63,6 +69,7 @@ graph TD
     loop --> broadcast[POST /api/broadcast]
     loop --> history[GET /api/history]
     loop --> model[GET/POST /api/model]
+    loop --> queue[GET/POST /api/queue]
     poll --> cacheMsg[$cachedMessage]
     poll --> cacheId[$cachedId]
     poll --> cacheTime[$cachedTime]
@@ -74,4 +81,5 @@ graph TD
     model --> cacheModelName[$cachedModelName]
     model --> cacheModelSender[$cachedModelSender]
     model --> cacheModelTime[$cachedModelTime]
+    queue --> jobQueue[$jobQueue]
 ```
