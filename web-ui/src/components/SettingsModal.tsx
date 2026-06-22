@@ -114,8 +114,8 @@ export default function SettingsModal({
                       <img src={qrCodeUrl} alt="QR Code for Mobile Access" className="qr-image" />
                       <p className="qr-help-text">
                         {isJa
-                          ? 'PC画面のこのQRコードをスマホのカメラでスキャンするだけで、トークンが自動認証された状態でアクセスできます。'
-                          : 'Scan this QR code with your mobile camera to open DDO Saba with automatic token authentication.'}
+                          ? 'このQRコードを他の端末のカメラでスキャンするだけで、トークンが自動認証された状態でアクセスできます。'
+                          : 'Scan this QR code with another device\'s camera to open DDO Saba with automatic token authentication.'}
                       </p>
                     </div>
                   </div>

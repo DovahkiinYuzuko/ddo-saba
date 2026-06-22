@@ -210,6 +210,46 @@ export default function App() {
   const [contextUsed, setContextUsed] = useState<number>(0);
   const [lastModelChangeTime, setLastModelChangeTime] = useState<number>(0);
   const [lastModelSender, setLastModelSender] = useState<string>(settings.username);
+  const prevIsSharedModeRef = useRef<boolean>(settings.isSharedMode);
+
+  // Upload all local chats when entering Shared Room Mode
+  useEffect(() => {
+    const wasShared = prevIsSharedModeRef.current;
+    prevIsSharedModeRef.current = settings.isSharedMode;
+
+    if (!wasShared && settings.isSharedMode && chats.length > 0) {
+      const uploadLocalChats = async () => {
+        for (const chat of chats) {
+          try {
+            // 1. Broadcast tab creation
+            await broadcastMessage(
+              settings.connectionUrl,
+              settings.accessToken,
+              settings.username,
+              settings.username,
+              'system',
+              `tab_create:${chat.id}:${chat.title}`
+            );
+
+            // 2. Broadcast messages within the tab sequentially
+            for (const msg of chat.messages) {
+              await broadcastMessage(
+                settings.connectionUrl,
+                settings.accessToken,
+                msg.sender || settings.username,
+                settings.username,
+                msg.role,
+                msg.content
+              );
+            }
+          } catch (e) {
+            console.error("Failed to upload local chat during share activation", e);
+          }
+        }
+      };
+      void uploadLocalChats();
+    }
+  }, [settings.isSharedMode, chats, settings.connectionUrl, settings.accessToken, settings.username]);
 
   // Separate model fallback logic
   useEffect(() => {
@@ -1091,6 +1131,8 @@ export default function App() {
 
   const activeChat = chats.find(c => c.id === activeChatId);
 
+  const isEffectivelyLoading = isModelLoading || (activeModel !== '' && (!psInfo || psInfo.name !== activeModel));
+
   const displayMessages = activeChat ? [...activeChat.messages] : [];
   if (isRemoteGenerating && remoteGeneratingText && activeChat) {
     displayMessages.push({
@@ -1174,7 +1216,7 @@ export default function App() {
           </button>
 
           <div className="model-selector-wrap">
-            {isModelLoading && <Loader2 className="animate-spin" size={16} style={{ color: 'hsl(var(--accent))', flexShrink: 0 }} />}
+            {isEffectivelyLoading && <Loader2 className="animate-spin" size={16} style={{ color: 'hsl(var(--accent))', flexShrink: 0 }} />}
             <select 
               value={activeModel} 
               onChange={(e) => {
@@ -1188,11 +1230,15 @@ export default function App() {
                   void broadcastModel(settings.connectionUrl, settings.accessToken, settings.username, selected, now);
                 }
               }}
-              disabled={isModelLoading}
+              disabled={isEffectivelyLoading}
               className="model-select"
-              style={{ flex: 1 }}
+              style={{ 
+                flex: 1,
+                opacity: isEffectivelyLoading ? 0.6 : 1,
+                color: isEffectivelyLoading ? 'hsl(var(--text-muted))' : 'inherit'
+              }}
             >
-              <option value="">{isModelLoading ? (lang === 'ja' ? 'モデルをロード中...' : 'Loading Model...') : (models.length === 0 ? "No models detected" : t.selectModel)}</option>
+              <option value="">{isEffectivelyLoading ? (lang === 'ja' ? 'モデルをロード中...' : 'Loading Model...') : (models.length === 0 ? "No models detected" : t.selectModel)}</option>
               {models.map(m => (
                 <option key={m.name} value={m.name}>
                   {m.name}
@@ -1247,7 +1293,7 @@ export default function App() {
           <div className="input-wrap">
             <textarea 
               value={inputText}
-              disabled={isGenerating || isModelLoading || isRemoteGenerating}
+              disabled={isGenerating || isModelLoading || isRemoteGenerating || !activeChatId}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
@@ -1260,7 +1306,13 @@ export default function App() {
                   }
                 }
               }}
-              placeholder={isRemoteGenerating ? (lang === 'ja' ? '他のユーザーが推論中です...' : 'Another user is thinking...') : t.placeholder}
+              placeholder={
+                !activeChatId
+                  ? (lang === 'ja' ? '左側の「＋」から新しいチャットを作成してください' : 'Please create a new chat using the "+" button on the left.')
+                  : isRemoteGenerating
+                    ? (lang === 'ja' ? '他のユーザーが推論中です...' : 'Another user is thinking...')
+                    : t.placeholder
+              }
               rows={2}
               className="input-textarea"
             />
@@ -1269,7 +1321,7 @@ export default function App() {
                 <Square size={16} />
               </button>
             ) : (
-              <button className="action-btn send-btn" onClick={sendMessage} disabled={!inputText.trim() || isModelLoading || isRemoteGenerating}>
+              <button className="action-btn send-btn" onClick={sendMessage} disabled={!inputText.trim() || isModelLoading || isRemoteGenerating || !activeChatId}>
                 <Send size={16} />
               </button>
             )}

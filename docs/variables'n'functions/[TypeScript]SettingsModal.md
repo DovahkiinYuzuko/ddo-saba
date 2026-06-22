@@ -25,6 +25,9 @@ This document specifies the popover modal logic for editing connection URLs, aut
 
 ## 2. Shared QR Code Feature
 - Generates a QR Code image using an external API (`api.qrserver.com`) representing `${settings.connectionUrl}?token=${settings.accessToken}&sharedMode=${settings.isSharedMode}` for quick mobile client connection when `settings.connectionUrl` is a public URL (e.g., contains `.trycloudflare.com`).
+- Displays descriptive instructions for connection:
+  - Japanese: "このQRコードを他の端末のカメラでスキャンするだけで、トークンが自動認証された状態でアクセスできます。"
+  - English: "Scan this QR code with another device's camera to open DDO Saba with automatic token authentication."
 
 ---
 

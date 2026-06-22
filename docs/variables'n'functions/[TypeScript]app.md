@@ -176,6 +176,9 @@ All states defined below use React's `useState` or `useRef`.
 ### `Model Synchronization & 503 Bypass`
 - **Description:** When the model selection is synchronized automatically via polling (`pollModel`), only `activeModel` is updated. Unlike manual selection, `loadModelOnSelection` (calling `/api/generate`) is bypassed to prevent redundant network pre-loads that trigger Nginx's concurrent connection limit (`503 Service Unavailable`).
 
+### `Shared Room Mode Tab Synchronization`
+- **Description:** When `settings.isSharedMode` transitions from `false` to `true`, the local client automatically serializes and broadcasts all existing chat tabs and histories (`chats`) to the broadcast server so they are fully synchronized with newly connected clients (e.g. mobile phones).
+
 ---
 
 ## 3. Dependency Mapping
