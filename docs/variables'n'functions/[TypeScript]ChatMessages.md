@@ -29,7 +29,7 @@ This document specifies the chat messages display layout, empty-state landing tr
 ## 2. Functions
 
 ### `parseMessageContent`
-- **Description:** Scans raw contents to detect `<think>` tags and splits messages into details-accordion rendering components.
+- **Description:** Scans raw contents to detect `<think>` tags and splits messages into details-accordion rendering components. To prevent the browser's default automatic scroll-into-view behavior when `<details>` toggles, `<summary>` handles clicks via `e.preventDefault()`, manually calling `onToggleThinking` to trigger the react state toggle.
 - **Arguments:**
   - `content` (`string`): Target string value.
   - `msgKey` (`string`): Unique tracking ID key.

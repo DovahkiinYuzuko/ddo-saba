@@ -97,9 +97,16 @@ export default React.forwardRef<HTMLDivElement, ChatMessagesProps>(function Chat
             <details 
               className="cot-details" 
               open={isThinkingExpanded}
-              onToggle={(e) => onToggleThinking(msgKey, e.currentTarget.open)}
             >
-              <summary className="cot-summary">{t.thinking}</summary>
+              <summary 
+                className="cot-summary"
+                onClick={(e) => {
+                  e.preventDefault();
+                  onToggleThinking(msgKey, !isThinkingExpanded);
+                }}
+              >
+                {t.thinking}
+              </summary>
               {isThinkingExpanded && <div className="cot-content">{renderMarkdownContent(thinking)}</div>}
             </details>
             <div className="cot-answer">{renderMarkdownContent(answer)}</div>
@@ -112,9 +119,15 @@ export default React.forwardRef<HTMLDivElement, ChatMessagesProps>(function Chat
             <details 
               className="cot-details" 
               open={isThinkingExpanded}
-              onToggle={(e) => onToggleThinking(msgKey, e.currentTarget.open)}
             >
-              <summary className="cot-summary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <summary 
+                className="cot-summary" 
+                style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+                onClick={(e) => {
+                  e.preventDefault();
+                  onToggleThinking(msgKey, !isThinkingExpanded);
+                }}
+              >
                 <Loader2 className="animate-spin" size={14} />
                 <span>{t.thinking}...</span>
               </summary>

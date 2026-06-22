@@ -195,6 +195,7 @@ export default function App() {
     systemPrompt?: string;
     parameters?: DdoParameters;
     thinkMode?: boolean;
+    numPredictEnabled?: boolean;
     sender: string;
   } | null>(null);
   const [isRemoteGenerating, setIsRemoteGenerating] = useState<boolean>(false);
@@ -274,7 +275,8 @@ export default function App() {
         activeModel,
         systemPrompt,
         parameters,
-        thinkMode
+        thinkMode,
+        numPredictEnabled
       };
       await broadcastMessage(
         settings.connectionUrl,
@@ -291,7 +293,13 @@ export default function App() {
 
   const handleAcceptSyncRequest = () => {
     if (!syncRequestPending) return;
-    const { activeModel: remoteModel, systemPrompt: remotePrompt, parameters: remoteParams, thinkMode: remoteThink } = syncRequestPending;
+    const { 
+      activeModel: remoteModel, 
+      systemPrompt: remotePrompt, 
+      parameters: remoteParams, 
+      thinkMode: remoteThink,
+      numPredictEnabled: remoteNumPredict
+    } = syncRequestPending;
     
     if (remoteModel !== undefined) {
       setActiveModel(remoteModel);
@@ -302,6 +310,7 @@ export default function App() {
     if (remotePrompt !== undefined) setSystemPrompt(remotePrompt);
     if (remoteParams !== undefined) setParameters(prev => ({ ...prev, ...remoteParams }));
     if (remoteThink !== undefined) setThinkMode(remoteThink);
+    if (remoteNumPredict !== undefined) setNumPredictEnabled(remoteNumPredict);
     
     setSyncRequestPending(null);
   };
