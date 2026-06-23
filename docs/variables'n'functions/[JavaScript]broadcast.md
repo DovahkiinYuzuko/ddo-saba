@@ -82,8 +82,8 @@ This document specifies the variables and functions used in `nginx/conf/broadcas
   - `r` (`Object`): The Nginx HTTP request object.
 - **Behavior:** Handles `GET` to list queue (with 120s timeout cleanup) and `POST` to `join`, `cancel`, and `complete` jobs.
 
-### `activeUserCount Tracking`
-- **Description:** On every API endpoint request, the server reads the client's `username` from headers or query parameters, updates their last active timestamp in a JSON string stored in `ngx.shared.broadcast_zone` under the `"active_users"` key, cleans up entries older than 10 seconds, and includes the active count in the response.
+### `update_active_users` (L1-37)
+- **Description:** On every API endpoint request, this function reads the client's `username` from headers or query parameters, updates their last active timestamp in a JSON string stored in `ngx.shared.broadcast_zone` under the `"active_users"` key, cleans up entries older than 10 seconds, and includes the active count in the response.
 
 ---
 
@@ -97,6 +97,7 @@ graph TD
     post_model --> ngx
     get_model --> ngx
     handle_queue --> ngx
+    update_active_users --> ngx
     auth_check --> process
 ```
 
