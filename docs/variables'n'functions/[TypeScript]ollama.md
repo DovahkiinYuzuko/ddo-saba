@@ -7,7 +7,7 @@ This document specifies the helper functions for communicating with the Ollama s
 ## 1. Functions
 
 ### `loadModelOnSelection` (L11-41)
-- **Description:** Sends background POST requests to initialize target model loading directly in host Ollama VRAM. Specifically calls `fetchAPI1` to hit the `/api/generate` endpoint, configuring `stream: false` and waiting until the response body is completely read to ensure the connection isn't aborted early.
+- **Description:** Sends background POST requests to initialize target model loading directly in host Ollama VRAM. Specifically calls `fetch` to hit the `/api/generate` endpoint, configuring `stream: false` and waiting until the response body is completely read to ensure the connection isn't aborted early.
 - **Arguments:**
   - `modelName` (`string`): Target model configuration string.
   - `settings` (`DdoSettings`): App settings.
@@ -38,7 +38,7 @@ This document specifies the helper functions for communicating with the Ollama s
 - **Return Value:** `Promise<void>`
 
 ### `unloadModel` (L98-148)
-- **Description:** Unloads a model from VRAM by calling `fetchAPI2` to hit the `/api/chat` endpoint with `keep_alive: 0` and `stream: false`, waiting until the response body is fully read. If Nginx returns a 503 Service Unavailable error, it waits for 1 second and retries up to 3 times before throwing an error.
+- **Description:** Unloads a model from VRAM by calling `fetch` to hit the `/api/chat` endpoint with `keep_alive: 0` and `stream: false`, waiting until the response body is fully read. If Nginx returns a 503 Service Unavailable error, it waits for 1 second and retries up to 3 times before throwing an error.
 - **Arguments:**
   - `modelName` (`string`): Model name.
   - `connectionUrl` (`string`): Host URL.
@@ -54,11 +54,8 @@ graph TD
     App.tsx --> loadModelOnSelection
     App.tsx --> unloadModel
     
-    loadModelOnSelection --> fetchAPI1[fetch /api/generate]
-    unloadModel --> fetchAPI2[fetch /api/chat]
-    
-    fetchAPI1 --> res1[stream: false + await res.json()]
-    fetchAPI2 --> res2[stream: false + await res.json()]
+    loadModelOnSelection --> fetch[fetch]
+    unloadModel --> fetch[fetch]
 ```
 
 ---
