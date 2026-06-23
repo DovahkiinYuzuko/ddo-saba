@@ -9,6 +9,7 @@ $cachedTime = 0
 $messageHistory = @()
 $cachedModelData = $null
 $jobQueue = @()
+$activeUsers = @{}
 
 
 $listener = New-Object System.Net.HttpListener
@@ -38,10 +39,33 @@ while ($listener.IsListening) {
         $request = $context.Request
         $response = $context.Response
 
+        # Get client username from header and update active users
+        $clientUsername = $request.Headers["X-DDO-Username"]
+        if ($clientUsername) {
+            $currentTime = [double]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
+            $activeUsers[$clientUsername] = $currentTime
+        }
+
+        # Clean up users inactive for more than 10 seconds
+        $now = [double]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
+        $keysToRemove = @()
+        foreach ($key in $activeUsers.Keys) {
+            if ($now - $activeUsers[$key] -gt 10) {
+                $keysToRemove += $key
+            }
+        }
+        foreach ($key in $keysToRemove) {
+            $activeUsers.Remove($key)
+        }
+
+        $activeCount = $activeUsers.Count
+        if ($activeCount -lt 1) { $activeCount = 1 }
+
         # CORS Headers
         $response.Headers.Add("Access-Control-Allow-Origin", "*")
         $response.Headers.Add("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
-        $response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, X-DDO-Token")
+        $response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, X-DDO-Token, X-DDO-Username")
+        $response.Headers.Add("X-DDO-Active-Count", $activeCount.ToString())
 
         if ($request.HttpMethod -eq "OPTIONS") {
             $response.StatusCode = 204

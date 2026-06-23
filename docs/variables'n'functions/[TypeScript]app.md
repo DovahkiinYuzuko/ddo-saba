@@ -92,6 +92,11 @@ All states defined below use React's `useState` or `useRef`.
 - **Type:** `React.MutableRefObject<string>`
 - **Description:** A React `useRef` holding `lastPolledMsgId` to avoid interval resets.
 
+### `activeUserCount`
+- **Type:** `number`
+- **Description:** Tracks the current number of active users connected to the shared room, received from the polling API. Used to determine if the local client is the last active user before closing the tab.
+- **Default:** `1`
+
 ### `isSidebarOpen`
 - **Type:** `boolean`
 - **Description:** Tracks mobile left sidebar status.

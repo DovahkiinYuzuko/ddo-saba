@@ -1,19 +1,28 @@
-const getHeaders = (accessToken: string): HeadersInit => {
+const getHeaders = (accessToken: string, username?: string): HeadersInit => {
   const headers: HeadersInit = { 'Content-Type': 'application/json' };
   if (accessToken) {
     headers['X-DDO-Token'] = accessToken;
+  }
+  if (username) {
+    headers['X-DDO-Username'] = username;
   }
   return headers;
 };
 
 export const pollMessage = async (
   connectionUrl: string,
-  accessToken: string
+  accessToken: string,
+  username?: string,
+  onActiveCount?: (count: number) => void
 ): Promise<unknown> => {
-  const headers = getHeaders(accessToken);
+  const headers = getHeaders(accessToken, username);
   const res = await fetch(`${connectionUrl}/api/poll`, { headers });
   if (!res.ok) {
     throw new Error(`HTTP ${res.status}`);
+  }
+  const countHeader = res.headers.get('X-DDO-Active-Count');
+  if (countHeader && onActiveCount) {
+    onActiveCount(parseInt(countHeader, 10));
   }
   return res.json();
 };
@@ -24,9 +33,11 @@ export const broadcastMessage = async (
   sender: string,
   broadcaster: string,
   role: string,
-  content: string
+  content: string,
+  username?: string,
+  onActiveCount?: (count: number) => void
 ): Promise<{ status: string; id: string }> => {
-  const headers = getHeaders(accessToken);
+  const headers = getHeaders(accessToken, username);
   const res = await fetch(`${connectionUrl}/api/broadcast`, {
     method: 'POST',
     headers,
@@ -35,17 +46,27 @@ export const broadcastMessage = async (
   if (!res.ok) {
     throw new Error(`HTTP ${res.status}`);
   }
+  const countHeader = res.headers.get('X-DDO-Active-Count');
+  if (countHeader && onActiveCount) {
+    onActiveCount(parseInt(countHeader, 10));
+  }
   return res.json();
 };
 
 export const fetchHistory = async (
   connectionUrl: string,
-  accessToken: string
+  accessToken: string,
+  username?: string,
+  onActiveCount?: (count: number) => void
 ): Promise<unknown> => {
-  const headers = getHeaders(accessToken);
+  const headers = getHeaders(accessToken, username);
   const res = await fetch(`${connectionUrl}/api/history`, { headers });
   if (!res.ok) {
     throw new Error(`HTTP ${res.status}`);
+  }
+  const countHeader = res.headers.get('X-DDO-Active-Count');
+  if (countHeader && onActiveCount) {
+    onActiveCount(parseInt(countHeader, 10));
   }
   return res.json();
 };
@@ -57,9 +78,11 @@ export const broadcastModel = async (
   model: string,
   timestamp: number,
   isGenerating?: boolean,
-  generatingText?: string
+  generatingText?: string,
+  username?: string,
+  onActiveCount?: (count: number) => void
 ): Promise<void> => {
-  const headers = getHeaders(accessToken);
+  const headers = getHeaders(accessToken, username);
   const res = await fetch(`${connectionUrl}/api/model`, {
     method: 'POST',
     headers,
@@ -68,16 +91,26 @@ export const broadcastModel = async (
   if (!res.ok) {
     throw new Error(`HTTP ${res.status}`);
   }
+  const countHeader = res.headers.get('X-DDO-Active-Count');
+  if (countHeader && onActiveCount) {
+    onActiveCount(parseInt(countHeader, 10));
+  }
 };
 
 export const pollModel = async (
   connectionUrl: string,
-  accessToken: string
+  accessToken: string,
+  username?: string,
+  onActiveCount?: (count: number) => void
 ): Promise<{ model?: string; sender?: string; timestamp?: number }> => {
-  const headers = getHeaders(accessToken);
+  const headers = getHeaders(accessToken, username);
   const res = await fetch(`${connectionUrl}/api/model`, { headers });
   if (!res.ok) {
     throw new Error(`HTTP ${res.status}`);
+  }
+  const countHeader = res.headers.get('X-DDO-Active-Count');
+  if (countHeader && onActiveCount) {
+    onActiveCount(parseInt(countHeader, 10));
   }
   return res.json();
 };

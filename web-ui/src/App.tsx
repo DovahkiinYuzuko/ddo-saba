@@ -237,6 +237,10 @@ export default function App() {
   const [jobQueue, setJobQueue] = useState<QueueJob[]>([]);
   const [myJobId, setMyJobId] = useState<string | null>(null);
   const [pendingMessage, setPendingMessage] = useState<string>('');
+  const [activeUserCount, setActiveUserCount] = useState<number>(1);
+  const handleActiveCount = useCallback((count: number) => {
+    setActiveUserCount(count);
+  }, []);
 
   // Upload all local chats when entering Shared Room Mode
   useEffect(() => {
@@ -386,14 +390,18 @@ export default function App() {
     return () => clearInterval(interval);
   }, [activeModel, settings.connectionUrl, settings.accessToken, psInfo]);
 
-  // Automatically unload model when the web UI tab is closed or reloaded (Private Mode only)
+  // Automatically unload model when the web UI tab is closed or reloaded
   useEffect(() => {
     const handleTabClose = () => {
-      if (settings.isSharedMode || !activeModel || activeModel === "") return;
+      const isLastUser = !settings.isSharedMode || activeUserCount <= 1;
+      if (!isLastUser || !activeModel || activeModel === "") return;
       
       const headers: HeadersInit = { 'Content-Type': 'application/json' };
       if (settings.accessToken) {
         headers['X-DDO-Token'] = settings.accessToken;
+      }
+      if (settings.username) {
+        headers['X-DDO-Username'] = settings.username;
       }
       
       // Use fetch with keepalive: true to ensure the request completes after tab close
@@ -413,7 +421,7 @@ export default function App() {
     return () => {
       window.removeEventListener('beforeunload', handleTabClose);
     };
-  }, [activeModel, settings.isSharedMode, settings.connectionUrl, settings.accessToken]);
+  }, [activeModel, settings.isSharedMode, settings.connectionUrl, settings.accessToken, settings.username, activeUserCount]);
 
   const [lastPolledMsgId, setLastPolledMsgId] = useState<string>('');
   const lastPolledMsgIdRef = useRef(lastPolledMsgId);
@@ -543,7 +551,12 @@ export default function App() {
   // Polling for shared room mode
   const startBroadcastPolling = useCallback(async () => {
     try {
-      const data = (await pollMessage(settings.connectionUrl, settings.accessToken)) as {
+      const data = (await pollMessage(
+        settings.connectionUrl,
+        settings.accessToken,
+        settings.username,
+        handleActiveCount
+      )) as {
         id?: string;
         sender?: string;
         broadcaster?: string;
@@ -618,7 +631,7 @@ export default function App() {
     } catch (e) {
       console.error("Broadcasting poll failed", e);
     }
-  }, [settings.connectionUrl, settings.accessToken, settings.username, activeChatId, addNewTab, deleteTab]);
+  }, [settings.connectionUrl, settings.accessToken, settings.username, activeChatId, addNewTab, deleteTab, handleActiveCount]);
 
   useEffect(() => {
     if (!settings.isSharedMode) return;
@@ -631,7 +644,12 @@ export default function App() {
     if (!settings.isSharedMode) return;
     const pollQueue = async () => {
       try {
-        const q = await fetchQueue(settings.connectionUrl, settings.accessToken);
+        const q = await fetchQueue(
+          settings.connectionUrl,
+          settings.accessToken,
+          settings.username,
+          handleActiveCount
+        );
         setJobQueue(q);
       } catch (e) {
         console.error("Queue poll failed", e);
@@ -640,7 +658,7 @@ export default function App() {
     pollQueue(); // initial run
     const interval = setInterval(pollQueue, 1500);
     return () => clearInterval(interval);
-  }, [settings.isSharedMode, settings.connectionUrl, settings.accessToken]);
+  }, [settings.isSharedMode, settings.connectionUrl, settings.accessToken, settings.username, handleActiveCount]);
 
   // Fetch initial history when Shared Room mode is enabled
   useEffect(() => {
@@ -753,7 +771,12 @@ export default function App() {
     
     const startModelPolling = async () => {
       try {
-        const data = await pollModel(settings.connectionUrl, settings.accessToken) as {
+        const data = await pollModel(
+          settings.connectionUrl,
+          settings.accessToken,
+          settings.username,
+          handleActiveCount
+        ) as {
           model?: string;
           sender?: string;
           timestamp?: number;
@@ -781,7 +804,7 @@ export default function App() {
     
     const interval = setInterval(startModelPolling, 1500);
     return () => clearInterval(interval);
-  }, [settings.isSharedMode, settings.connectionUrl, settings.accessToken, settings.username, activeModel, lastModelChangeTime]);
+  }, [settings.isSharedMode, settings.connectionUrl, settings.accessToken, settings.username, activeModel, lastModelChangeTime, handleActiveCount]);
 
   // Unload model from VRAM by calling API with keep_alive: 0
   const handleUnloadModel = async () => {

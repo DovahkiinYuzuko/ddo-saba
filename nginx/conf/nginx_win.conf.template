@@ -31,7 +31,8 @@ http {
         location /api/poll {
             add_header Access-Control-Allow-Origin * always;
             add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
-            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token" always;
+            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username" always;
+            add_header Access-Control-Expose-Headers "X-DDO-Active-Count" always;
 
             if ($request_method = OPTIONS) {
                 return 204;
@@ -50,7 +51,8 @@ http {
         location /api/broadcast {
             add_header Access-Control-Allow-Origin * always;
             add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
-            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token" always;
+            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username" always;
+            add_header Access-Control-Expose-Headers "X-DDO-Active-Count" always;
 
             if ($request_method = OPTIONS) {
                 return 204;
@@ -69,7 +71,8 @@ http {
         location /api/history {
             add_header Access-Control-Allow-Origin * always;
             add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
-            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token" always;
+            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username" always;
+            add_header Access-Control-Expose-Headers "X-DDO-Active-Count" always;
 
             if ($request_method = OPTIONS) {
                 return 204;
@@ -88,7 +91,8 @@ http {
         location /api/model {
             add_header Access-Control-Allow-Origin * always;
             add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
-            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token" always;
+            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username" always;
+            add_header Access-Control-Expose-Headers "X-DDO-Active-Count" always;
 
             if ($request_method = OPTIONS) {
                 return 204;
@@ -107,7 +111,8 @@ http {
         location /api/queue {
             add_header Access-Control-Allow-Origin * always;
             add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
-            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token" always;
+            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username" always;
+            add_header Access-Control-Expose-Headers "X-DDO-Active-Count" always;
 
             if ($request_method = OPTIONS) {
                 return 204;

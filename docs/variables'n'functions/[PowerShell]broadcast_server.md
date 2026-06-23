@@ -44,18 +44,22 @@ This script runs a lightweight in-memory broadcast relay server for Windows envi
 - **Type:** `Array`
 - **Description:** An in-memory queue containing the sequence of jobs currently waiting for execution.
 
+### `$activeUsers`
+- **Type:** `System.Collections.Hashtable`
+- **Description:** Keeps track of each client's username and their last active Unix epoch timestamp to count concurrent users.
+
 ## Functions
 
 ### `Start-BroadcastServer`
-- **Description:** Initializes and starts the HttpListener loop, routing requests based on URLs.
+- **Description:** Initializes and starts the HTTP Listener loop, routing requests based on URLs.
 - **Routes:**
-  - `GET /api/poll`: Returns the cached message if it has a newer ID than the client's query parameter, and if it has not expired (within 5 seconds).
-  - `POST /api/broadcast`: Reads the incoming JSON message body, updates `$cachedMessage`, `$cachedId`, and `$cachedTime`, appends the message to `$messageHistory`, then returns `200 OK`.
-  - `GET /api/history`: Returns the entire array in `$messageHistory` as a JSON payload to allow newly connected peers to sync full chat session logs.
-  - `POST /api/model`: Receives model change event `{ model, sender, timestamp }` and updates `$cachedModelName`, `$cachedModelSender`, and `$cachedModelTime` (using the provided timestamp or auto-generated epoch if missing).
-  - `GET /api/model`: Returns the active model cache JSON `{ model: $cachedModelName, sender: $cachedModelSender, timestamp: $cachedModelTime }`.
-  - `GET /api/queue`: Returns the current `$jobQueue` array. Automatically checks if the current `running` job has exceeded 120 seconds timeout and ejects it if necessary.
-  - `POST /api/queue`: Accepts a JSON payload `{ action, id, username }` and updates `$jobQueue` accordingly (join, cancel, complete actions).
+  - `GET /api/poll`: Receives client request. Updates client entry in `$activeUsers` if `username` query parameter is provided. Removes users whose last active time is older than 10 seconds. Returns the cached message or `204 No Content`, alongside the `activeUserCount` header or property.
+  - `POST /api/broadcast`: Reads the incoming JSON message body, updates `$cachedMessage`, `$cachedId`, and `$cachedTime`, appends the message to `$messageHistory`, updates `$activeUsers`, and returns `200 OK`.
+  - `GET /api/history`: Returns `$messageHistory` JSON, updates `$activeUsers` last active timestamp.
+  - `POST /api/model`: Receives model change event `{ model, sender, timestamp }` and updates `$cachedModelName`, `$cachedModelSender`, and `$cachedModelTime`.
+  - `GET /api/model`: Returns the active model cache JSON, updates `$activeUsers`.
+  - `GET /api/queue`: Returns the current `$jobQueue` array. Automatically ejects expired running jobs (120s limit). Updates `$activeUsers`.
+  - `POST /api/queue`: Accepts a JSON payload `{ action, id, username }` and updates `$jobQueue` accordingly. Updates `$activeUsers`.
   - `OPTIONS /api/poll` & `OPTIONS /api/broadcast` & `OPTIONS /api/history` & `OPTIONS /api/model` & `OPTIONS /api/queue`: Handles CORS preflight by returning CORS headers with `200 OK` or `204 No Content`.
 
 ## Dependency Map
