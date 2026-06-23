@@ -50,7 +50,7 @@ All states defined below use React's `useState` or `useRef`.
 
 ### `isGeneratingRef`
 - **Type:** `React.MutableRefObject<boolean>`
-- **Description:** A React `useRef` holding the active `isGenerating` boolean value to prevent keep-alive resetting.
+- **Description:** A React `useRef` holding the active `isGenerating` boolean value to prevent keep-alive resetting and double execution of the inference stream.
 
 ### `abortControllerRef`
 - **Type:** `React.MutableRefObject<AbortController | null>`

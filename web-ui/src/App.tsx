@@ -286,11 +286,11 @@ export default function App() {
     if (!settings.isSharedMode || !myJobId || jobQueue.length === 0) return;
     
     const firstJob = jobQueue[0];
-    if (firstJob.id === myJobId && firstJob.status === 'running' && !isGenerating) {
+    if (firstJob.id === myJobId && firstJob.status === 'running' && !isGeneratingRef.current) {
       // It is our turn! Run the inference.
       void runInferenceStream(myJobId);
     }
-  }, [jobQueue, myJobId, pendingMessage, isGenerating, settings.isSharedMode]);
+  }, [jobQueue, myJobId, pendingMessage, settings.isSharedMode]);
 
   // Separate model fallback logic
   useEffect(() => {
@@ -783,17 +783,72 @@ export default function App() {
           isGenerating?: boolean;
           generatingText?: string;
         };
+
+        const wasRemoteGenerating = isRemoteGeneratingRef.current;
+        const isNowGenerating = data.isGenerating === true;
+
         if (data.sender && data.sender !== settings.username) {
           if (data.model !== undefined && data.model !== activeModel) {
             setActiveModel(data.model);
             setLastModelSender(data.sender);
             setLastModelChangeTime(Date.now());
           }
+
+          if (wasRemoteGenerating && !isNowGenerating) {
+            // Commit final text when remote generation ends
+            const textToCommit = data.generatingText || remoteGeneratingText;
+            if (textToCommit && activeChatId) {
+              setChats(prev => prev.map(c => {
+                if (c.id === activeChatId) {
+                  const lastMsg = c.messages[c.messages.length - 1];
+                  if (lastMsg && lastMsg.role === 'assistant' && lastMsg.content === textToCommit) {
+                    return c;
+                  }
+                  return {
+                    ...c,
+                    messages: [...c.messages, {
+                      id: Date.now().toString() + "_remote_ai",
+                      role: 'assistant',
+                      content: textToCommit,
+                      sender: data.model || activeModel || 'AI',
+                      timestamp: formatTimestamp(new Date())
+                    }]
+                  };
+                }
+                return c;
+              }));
+            }
+          }
+
           if (data.isGenerating !== undefined) {
             setIsRemoteGenerating(data.isGenerating);
             setRemoteGeneratingText(data.generatingText || '');
           }
         } else if (!data.sender) {
+          if (wasRemoteGenerating) {
+            // Commit final text when remote generation ends without sender
+            if (remoteGeneratingText && activeChatId) {
+              setChats(prev => prev.map(c => {
+                if (c.id === activeChatId) {
+                  const lastMsg = c.messages[c.messages.length - 1];
+                  if (lastMsg && lastMsg.role === 'assistant' && lastMsg.content === remoteGeneratingText) {
+                    return c;
+                  }
+                  return {
+                    ...c,
+                    messages: [...c.messages, {
+                      id: Date.now().toString() + "_remote_ai",
+                      role: 'assistant',
+                      content: remoteGeneratingText,
+                      sender: activeModel || 'AI',
+                      timestamp: formatTimestamp(new Date())
+                    }]
+                  };
+                }
+                return c;
+              }));
+            }
+          }
           setIsRemoteGenerating(false);
           setRemoteGeneratingText('');
         }
@@ -804,7 +859,7 @@ export default function App() {
     
     const interval = setInterval(startModelPolling, 1500);
     return () => clearInterval(interval);
-  }, [settings.isSharedMode, settings.connectionUrl, settings.accessToken, settings.username, activeModel, lastModelChangeTime, handleActiveCount]);
+  }, [settings.isSharedMode, settings.connectionUrl, settings.accessToken, settings.username, activeModel, lastModelChangeTime, handleActiveCount, activeChatId, remoteGeneratingText]);
 
   // Unload model from VRAM by calling API with keep_alive: 0
   const handleUnloadModel = async () => {
@@ -828,6 +883,8 @@ export default function App() {
   // (definitions moved above startBroadcastPolling)
 
   const runInferenceStream = async (jobIdToComplete?: string) => {
+    if (isGeneratingRef.current) return;
+    isGeneratingRef.current = true;
     setIsGenerating(true);
     setModelLoadError('');
 
@@ -1135,6 +1192,7 @@ export default function App() {
       }
     } finally {
       setIsGenerating(false);
+      isGeneratingRef.current = false;
       abortControllerRef.current = null;
       if (settings.isSharedMode) {
         void broadcastModel(settings.connectionUrl, settings.accessToken, settings.username, activeModel, Date.now(), false, '');
