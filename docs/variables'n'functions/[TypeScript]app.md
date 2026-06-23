@@ -153,8 +153,14 @@ All states defined below use React's `useState` or `useRef`.
 - **Return Value:** `string`
 
 ### `sendMessage`
-- **Description:** Sends a user prompt. If in Shared Room Mode, it first issues a `joinQueue` request to register in the queue. Only after successful queue confirmation does it clear the input field (`setInputText('')`), append the user message bubble to `chats`, and broadcast the user message via `/api/broadcast`. If queue registration fails, it keeps the input text intact without appending a bubble to the UI. If not in Shared Room Mode, it immediately clears the input field, appends the bubble, and calls `runInferenceStream`.
+- **Description:** Sends a user prompt. If in Shared Room Mode, it first issues a `joinQueue` request to register in the queue. Only after successful queue confirmation does it clear the input field (`setInputText('')`), set `pendingMessage` to the prompt text, set `myJobId` to the generated job ID, and poll the queue. Unlike Private Mode, it does not append the user message bubble to `chats` or broadcast it immediately. If not in Shared Room Mode, it immediately clears the input field, appends the user bubble, and calls `runInferenceStream`.
 - **Arguments:** None.
+- **Return Value:** `Promise<void>`
+
+### `runInferenceStream`
+- **Description:** Initiates the Ollama chat stream. In Shared Room Mode, if Nginx returns a 503 Service Unavailable error due to concurrent connection limits, it waits for 1 second and retries (up to 3 times) before throwing an error. Upon completion or abort, it clears the queue status by calling `completeQueue` and resetting queue-related states.
+- **Arguments:**
+  - `jobIdToComplete` (`string | null`, optional): The active queue job ID to complete upon termination.
 - **Return Value:** `Promise<void>`
 
 ### `stopGeneration`
@@ -201,6 +207,7 @@ All states defined below use React's `useState` or `useRef`.
 ```mermaid
 graph TD
     App --> sendMessage
+    App --> runInferenceStream
     App --> stopGeneration
     App --> addNewTab
     App --> deleteTab
@@ -217,12 +224,18 @@ graph TD
     App --> pollModel[pollModel API]
 
     sendMessage --> activeModel
-    sendMessage --> systemPrompt
-    sendMessage --> parameters
-    sendMessage --> thinkMode
-    sendMessage --> chats
     sendMessage --> settings
-    sendMessage --> abortControllerRef
+    sendMessage --> joinQueue[joinQueue API]
+
+    runInferenceStream --> activeModel
+    runInferenceStream --> systemPrompt
+    runInferenceStream --> parameters
+    runInferenceStream --> thinkMode
+    runInferenceStream --> chats
+    runInferenceStream --> settings
+    runInferenceStream --> abortControllerRef
+    runInferenceStream --> completeQueue[completeQueue API]
+    runInferenceStream --> broadcastMessage[broadcastMessage API]
 
     addNewTab --> settings
     deleteTab --> settings

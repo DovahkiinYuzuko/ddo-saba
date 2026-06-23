@@ -6,7 +6,11 @@ echo Stopping DDO Saba servers...
 :: Stop Nginx
 echo Stopping Nginx...
 if exist "nginx\nginx.exe" (
-    nginx\nginx.exe -p nginx -s stop >nul 2>&1
+    if exist "nginx\conf\nginx_active.conf" (
+        nginx\nginx.exe -p nginx -c conf\nginx_active.conf -s stop >nul 2>&1
+    ) else (
+        nginx\nginx.exe -p nginx -s stop >nul 2>&1
+    )
 )
 
 :: Read Nginx PID and kill it if it is still running
@@ -19,6 +23,8 @@ if exist "bin\cloudflared.pid" if not "!CF_PID!"=="" echo Killing Cloudflare Tun
 if exist "bin\cloudflared.pid" if not "!CF_PID!"=="" taskkill /f /pid !CF_PID! >nul 2>&1
 echo Terminating residual Cloudflare Tunnel processes...
 taskkill /f /im cloudflared.exe >nul 2>&1
+echo Terminating residual Nginx processes...
+taskkill /f /im nginx.exe >nul 2>&1
 
 
 :: Kill PowerShell Broadcast Server by PID

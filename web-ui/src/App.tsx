@@ -777,9 +777,51 @@ export default function App() {
     if (systemPrompt) {
       requestMessages.push({ role: 'system' as const, content: systemPrompt });
     }
-    targetChat.messages.forEach(m => {
-      requestMessages.push({ role: m.role, content: m.content });
-    });
+
+    // Shared Room Mode specific prompt append & broadcast on turn start
+    if (settings.isSharedMode && pendingMessage) {
+      const nowStr = formatTimestamp(new Date());
+      const userMsgId = Date.now().toString() + "_user";
+      const userMsg: Message = {
+        id: userMsgId,
+        role: 'user',
+        content: pendingMessage,
+        sender: settings.username,
+        timestamp: nowStr
+      };
+
+      // Append to the list used for the API call
+      const mergedMessages = [...targetChat.messages, userMsg];
+      mergedMessages.forEach(m => {
+        requestMessages.push({ role: m.role, content: m.content });
+      });
+
+      // Update UI state
+      setChats(prev => prev.map(c => {
+        if (c.id === activeChatId) {
+          return { ...c, messages: [...c.messages, userMsg] };
+        }
+        return c;
+      }));
+
+      // Broadcast to other peers
+      try {
+        await broadcastMessage(
+          settings.connectionUrl,
+          settings.accessToken,
+          settings.username,
+          settings.username,
+          'user',
+          pendingMessage
+        );
+      } catch (e) {
+        console.error("Failed to broadcast user message on start", e);
+      }
+    } else {
+      targetChat.messages.forEach(m => {
+        requestMessages.push({ role: m.role, content: m.content });
+      });
+    }
 
     const headers: HeadersInit = { 'Content-Type': 'application/json' };
     if (settings.accessToken) {
@@ -794,18 +836,46 @@ export default function App() {
         delete optionsPayload.num_predict;
       }
 
-      const res = await fetch(`${settings.connectionUrl}/api/chat`, {
-        method: 'POST',
-        headers,
-        signal: abortControllerRef.current.signal,
-        body: JSON.stringify({
-          model: activeModel,
-          messages: requestMessages,
-          options: optionsPayload,
-          think: thinkMode,
-          stream: true
-        })
-      });
+      let res: Response | undefined = undefined;
+      let retries = 3;
+      let delay = 1000;
+
+      for (let attempt = 1; attempt <= retries + 1; attempt++) {
+        try {
+          const fetchRes = await fetch(`${settings.connectionUrl}/api/chat`, {
+            method: 'POST',
+            headers,
+            signal: abortControllerRef.current.signal,
+            body: JSON.stringify({
+              model: activeModel,
+              messages: requestMessages,
+              options: optionsPayload,
+              think: thinkMode,
+              stream: true
+            })
+          });
+
+          res = fetchRes;
+
+          if (fetchRes.status === 503 && attempt <= retries) {
+            console.log(`Received 503 Service Unavailable, retrying in ${delay}ms... (Attempt ${attempt}/${retries})`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            continue;
+          }
+          break;
+        } catch (err) {
+          if (attempt <= retries) {
+            console.log(`Fetch failed, retrying in ${delay}ms... (Attempt ${attempt}/${retries})`, err);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            continue;
+          }
+          throw err;
+        }
+      }
+
+      if (!res) {
+        throw new Error("Failed to fetch response from Ollama server.");
+      }
 
       if (!res.ok) {
         throw new Error(`Server returned status: ${res.status}`);
@@ -1019,40 +1089,8 @@ export default function App() {
         setPendingMessage(userMessageContent);
         setMyJobId(jobId);
 
-        const nowStr = formatTimestamp(new Date());
-        const userMsgId = Date.now().toString() + "_user";
-
-        const userMsg: Message = {
-          id: userMsgId,
-          role: 'user',
-          content: userMessageContent,
-          sender: settings.username,
-          timestamp: nowStr
-        };
-
-        setChats(prev => prev.map(c => {
-          if (c.id === activeChatId) {
-            return { ...c, messages: [...c.messages, userMsg] };
-          }
-          return c;
-        }));
-
         const q = await fetchQueue(settings.connectionUrl, settings.accessToken);
         setJobQueue(q);
-
-        try {
-          await broadcastMessage(
-            settings.connectionUrl,
-            settings.accessToken,
-            settings.username,
-            settings.username,
-            'user',
-            userMessageContent
-          );
-        } catch (e) {
-          console.error("Failed to broadcast user message", e);
-        }
-
       } catch (err) {
         console.error("Failed to join queue", err);
         // Do not clear input, do not append bubble, leave state intact for retry
