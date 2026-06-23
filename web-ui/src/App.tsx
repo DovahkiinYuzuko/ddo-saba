@@ -86,7 +86,12 @@ const locales: Record<'en' | 'ja', LocaleStrings> = {
     sendOnEnter: "Press Enter to send (Shift+Enter for newline)",
     contextLimit: "Context Limit (num_ctx)",
     selectModel: "Select a model...",
-    collapseThinking: "Collapse Thinking Process"
+    collapseThinking: "Collapse Thinking Process",
+    error400: "Bad Request: Please select a model.",
+    error403: "Forbidden: Access token is invalid.",
+    error404: "Not Found: The endpoint was not found.",
+    error503: "Service Unavailable: The server is busy. Please try again.",
+    errorGeneric: "An error occurred: "
   },
   ja: {
     title: "DDO Saba コントロールパネル",
@@ -125,7 +130,12 @@ const locales: Record<'en' | 'ja', LocaleStrings> = {
     sendOnEnter: "Enterキーで送信する (Shift+Enterで改行)",
     contextLimit: "コンテキスト制限 (num_ctx)",
     selectModel: "モデルを選択してください",
-    collapseThinking: "思考プロセスを折りたたむ"
+    collapseThinking: "思考プロセスを折りたたむ",
+    error400: "不正なリクエスト: モデルが選択されているか確認してください。",
+    error403: "アクセス拒否: アクセストークンが無効です。",
+    error404: "未検出: エンドポイントが見つかりません。",
+    error503: "サービス利用不可: サーバーが混雑しています。時間をおいて再試行してください。",
+    errorGeneric: "エラーが発生しました: "
   }
 };
 
@@ -206,6 +216,11 @@ export default function App() {
     sender: string;
   } | null>(null);
   const [isRemoteGenerating, setIsRemoteGenerating] = useState<boolean>(false);
+  const isRemoteGeneratingRef = useRef(isRemoteGenerating);
+  useEffect(() => {
+    isRemoteGeneratingRef.current = isRemoteGenerating;
+  }, [isRemoteGenerating]);
+
   const [remoteGeneratingText, setRemoteGeneratingText] = useState<string>('');
   const [psInfo, setPsInfo] = useState<PsModelInfo | null>(null);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
@@ -469,8 +484,9 @@ export default function App() {
 
       // Automatically clear active model selection if it was unloaded from VRAM (psInfo is null)
       // and we are not currently loading a model, and we are the owner of the last model choice.
+      // Bypassed if local or remote generation is active to prevent VRAM load fluctuation resets.
       const isModelOwner = lastModelSender === settings.username;
-      if (isModelOwner && !fetchedPs && activeModel && !isModelLoading) {
+      if (isModelOwner && !fetchedPs && activeModel && !isModelLoading && !isGeneratingRef.current && !isRemoteGeneratingRef.current) {
         setActiveModel('');
         setLastModelSender(settings.username);
         const now = Date.now();
@@ -1038,13 +1054,26 @@ export default function App() {
         console.log("Inference stream aborted.");
       } else {
         console.error("Inference request failed.", e);
+        let displayError = err.message;
+        if (err.message.includes('status: 400')) {
+          displayError = t.error400;
+        } else if (err.message.includes('status: 403')) {
+          displayError = t.error403;
+        } else if (err.message.includes('status: 404')) {
+          displayError = t.error404;
+        } else if (err.message.includes('status: 503')) {
+          displayError = t.error503;
+        } else {
+          displayError = `${t.errorGeneric}${err.message}`;
+        }
+
         setChats(prev => prev.map(c => {
           if (c.id === activeChatId) {
             return {
               ...c,
               messages: [...c.messages, { 
                 role: 'system', 
-                content: `Error: ${err.message}`,
+                content: displayError,
                 timestamp: formatTimestamp(new Date())
               }]
             };

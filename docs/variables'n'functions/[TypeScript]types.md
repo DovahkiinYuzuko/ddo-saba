@@ -65,3 +65,15 @@ This document defines the common TypeScript interfaces and types shared across t
   - `top_k`: `number`
   - `num_predict`: `number`
   - `repeat_penalty`: `number`
+
+### `LocaleStrings` (L54-97)
+- **Description:** Contains translation keys for language localization.
+- **Fields:** Includes multiple localization key strings, including standard UI text and specific HTTP error mappings (`error400`, `error403`, `error404`, `error503`, `errorGeneric`).
+
+### `QueueJob` (L99-104)
+- **Description:** Represents a job in the shared inference room queue.
+- **Fields:**
+  - `id`: `string`
+  - `username`: `string`
+  - `timestamp`: `number`
+  - `status`: `'waiting' | 'running'`

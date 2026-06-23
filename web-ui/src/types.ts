@@ -89,6 +89,11 @@ export interface LocaleStrings {
   contextLimit: string;
   selectModel: string;
   collapseThinking: string;
+  error400: string;
+  error403: string;
+  error404: string;
+  error503: string;
+  errorGeneric: string;
 }
 
 export interface QueueJob {

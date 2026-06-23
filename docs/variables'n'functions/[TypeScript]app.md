@@ -118,6 +118,11 @@ All states defined below use React's `useState` or `useRef`.
 - **Description:** Tracks whether another client is currently running an inference stream.
 - **Default:** `false`
 
+### `isRemoteGeneratingRef`
+- **Type:** `React.MutableRefObject<boolean>`
+- **Description:** A React `useRef` holding the active `isRemoteGenerating` boolean value to prevent keep-alive and selection resetting during remote generation.
+
+
 ### `remoteGeneratingText`
 - **Type:** `string`
 - **Description:** Stores the real-time generated content streamed from another client.
@@ -194,8 +199,8 @@ All states defined below use React's `useState` or `useRef`.
 - **Arguments:** None.
 - **Return Value:** `void`
 
-### `Model Synchronization & 503 Bypass`
-- **Description:** When the model selection is synchronized automatically via polling (`pollModel`), only `activeModel` is updated. Unlike manual selection, `loadModelOnSelection` (calling `/api/generate`) is bypassed to prevent redundant network pre-loads that trigger Nginx's concurrent connection limit (`503 Service Unavailable`).
+### `Model Synchronization, VRAM Cleanups & 503 Bypass`
+- **Description:** When the model selection is synchronized automatically via polling (`pollModel`), only `activeModel` is updated. Unlike manual selection, `loadModelOnSelection` (calling `/api/generate`) is bypassed to prevent redundant network pre-loads that trigger Nginx's concurrent connection limit (`503 Service Unavailable`). Additionally, when Ollama's active VRAM state changes, `activeModel` is cleared automatically. However, to prevent premature selection resets when Ollama is temporarily loading or busy, this cleanup is bypassed if either local generation (`isGenerating`) or remote generation (`isRemoteGenerating`) is active.
 
 ### `Shared Room Mode Tab Synchronization`
 - **Description:** When `settings.isSharedMode` transitions from `false` to `true`, the local client automatically serializes and broadcasts all existing chat tabs and histories (`chats`) to the broadcast server so they are fully synchronized with newly connected clients (e.g. mobile phones).
