@@ -386,6 +386,35 @@ export default function App() {
     return () => clearInterval(interval);
   }, [activeModel, settings.connectionUrl, settings.accessToken, psInfo]);
 
+  // Automatically unload model when the web UI tab is closed or reloaded (Private Mode only)
+  useEffect(() => {
+    const handleTabClose = () => {
+      if (settings.isSharedMode || !activeModel || activeModel === "") return;
+      
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (settings.accessToken) {
+        headers['X-DDO-Token'] = settings.accessToken;
+      }
+      
+      // Use fetch with keepalive: true to ensure the request completes after tab close
+      void fetch(`${settings.connectionUrl}/api/chat`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          model: activeModel,
+          messages: [],
+          keep_alive: 0
+        }),
+        keepalive: true
+      });
+    };
+
+    window.addEventListener('beforeunload', handleTabClose);
+    return () => {
+      window.removeEventListener('beforeunload', handleTabClose);
+    };
+  }, [activeModel, settings.isSharedMode, settings.connectionUrl, settings.accessToken]);
+
   const [lastPolledMsgId, setLastPolledMsgId] = useState<string>('');
   const lastPolledMsgIdRef = useRef(lastPolledMsgId);
   useEffect(() => {

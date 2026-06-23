@@ -202,6 +202,10 @@ All states defined below use React's `useState` or `useRef`.
 ### `Model Synchronization, VRAM Cleanups & 503 Bypass`
 - **Description:** When the model selection is synchronized automatically via polling (`pollModel`), only `activeModel` is updated. Unlike manual selection, `loadModelOnSelection` (calling `/api/generate`) is bypassed to prevent redundant network pre-loads that trigger Nginx's concurrent connection limit (`503 Service Unavailable`). Additionally, when Ollama's active VRAM state changes, `activeModel` is cleared automatically. However, to prevent premature selection resets when Ollama is temporarily loading or busy, this cleanup is bypassed if either local generation (`isGenerating`) or remote generation (`isRemoteGenerating`) is active.
 
+### `Auto-Unload Model on Tab Closure`
+- **Description:** In Private Mode (when `settings.isSharedMode` is `false`), closing or reloading the browser tab triggers an automatic model unload request (`/api/chat` with `keep_alive: 0`) using `fetch` with `keepalive: true` to free up VRAM instantly. This is bypassed in Shared Room Mode to avoid affecting other active clients.
+
+
 ### `Shared Room Mode Tab Synchronization`
 - **Description:** When `settings.isSharedMode` transitions from `false` to `true`, the local client automatically serializes and broadcasts all existing chat tabs and histories (`chats`) to the broadcast server so they are fully synchronized with newly connected clients (e.g. mobile phones).
 
