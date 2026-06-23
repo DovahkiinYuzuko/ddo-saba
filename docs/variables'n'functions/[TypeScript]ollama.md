@@ -37,8 +37,8 @@ This document specifies the helper functions for communicating with the Ollama s
   - `accessToken` (`string`): Token.
 - **Return Value:** `Promise<void>`
 
-### `unloadModel` (L95-110)
-- **Description:** Unloads a model from VRAM by calling `/api/chat` with `keep_alive: 0`.
+### `unloadModel` (L95-142)
+- **Description:** Unloads a model from VRAM by calling `/api/chat` with `keep_alive: 0`. If Nginx returns a 503 Service Unavailable error, it waits for 1 second and retries up to 3 times before throwing an error.
 - **Arguments:**
   - `modelName` (`string`): Model name.
   - `connectionUrl` (`string`): Host URL.

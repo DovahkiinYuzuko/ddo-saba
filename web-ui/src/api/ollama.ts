@@ -98,13 +98,45 @@ export const unloadModel = async (
   accessToken: string
 ): Promise<void> => {
   const headers = getHeaders(accessToken);
-  await fetch(`${connectionUrl}/api/chat`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      model: modelName,
-      messages: [],
-      keep_alive: 0
-    })
-  });
+  
+  let res: Response | undefined = undefined;
+  const retries = 3;
+  const delay = 1000;
+
+  for (let attempt = 1; attempt <= retries + 1; attempt++) {
+    try {
+      const fetchRes = await fetch(`${connectionUrl}/api/chat`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          model: modelName,
+          messages: [],
+          keep_alive: 0
+        })
+      });
+
+      res = fetchRes;
+
+      if (fetchRes.status === 503 && attempt <= retries) {
+        console.log(`Unload received 503, retrying... (Attempt ${attempt}/${retries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      break;
+    } catch (err) {
+      if (attempt <= retries) {
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  if (!res) {
+    throw new Error("Failed to contact server for model unload");
+  }
+
+  if (!res.ok) {
+    throw new Error(`Unload failed with status ${res.status}`);
+  }
 };
