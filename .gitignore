@@ -23,5 +23,7 @@ nginx/logs/
 
 # Web UI source files
 !web-ui/
-web-ui/node_modules/
-web-ui/dist/
+!web-ui/src/
+!web-ui/src/**
+web-ui/src/assets
+

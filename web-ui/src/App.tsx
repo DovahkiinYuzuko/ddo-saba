@@ -1,28 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { 
-  Send, 
-  Square, 
-  Settings, 
-  Plus, 
-  Trash2, 
-  Globe, 
-  Lock, 
-  Loader2, 
-  LogOut,
-  AlertTriangle,
-  Menu,
-  SlidersHorizontal
-} from 'lucide-react';
-import type { 
-  Message, 
-  ChatSession, 
-  OllamaModelInfo, 
-  PsModelInfo, 
-  DdoSettings, 
-  DdoParameters,
-  LocaleStrings,
-  MessageMetrics
-} from './types';
+import type { ChatSession, LocaleStrings } from './types';
+import { useChatMachineState } from './hooks/useChatMachineState';
 import { 
   loadModelOnSelection as apiLoadModelOnSelection, 
   fetchModels, 
@@ -37,16 +15,18 @@ import {
   broadcastModel,
   pollModel
 } from './api/broadcast';
-import { 
-  fetchQueue, 
-  joinQueue, 
-  cancelQueue, 
-  completeQueue 
-} from './api/queue';
-import type { QueueJob } from './types';
+import { fetchQueue } from './api/queue';
 import SettingsModal from './components/SettingsModal';
 import ParameterPanel from './components/ParameterPanel';
 import ChatMessages from './components/ChatMessages';
+import { useChatActions } from './hooks/useChatActions';
+import { useFileIO } from './hooks/useFileIO';
+import Sidebar from './components/Sidebar';
+import ChatHeader from './components/ChatHeader';
+import ChatInputArea from './components/ChatInputArea';
+import SyncModal from './components/SyncModal';
+import ModelErrorModal from './components/ModelErrorModal';
+import { formatTimestamp } from './utils/format';
 
 const locales: Record<'en' | 'ja', LocaleStrings> = {
   en: {
@@ -139,21 +119,9 @@ const locales: Record<'en' | 'ja', LocaleStrings> = {
   }
 };
 
-const formatTimestamp = (dateInput?: string | Date): string => {
-  if (!dateInput) return '';
-  try {
-    const d = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
-    if (isNaN(d.getTime())) return '';
-    const yyyy = d.getFullYear();
-    const MM = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    const HH = String(d.getHours()).padStart(2, '0');
-    const mm = String(d.getMinutes()).padStart(2, '0');
-    return `${yyyy}/${MM}/${dd}-${HH}:${mm}`;
-  } catch {
-    return '';
-  }
-};
+
+
+
 
 export default function App() {
   const [lang, setLang] = useState<'en' | 'ja'>(
@@ -161,83 +129,114 @@ export default function App() {
   );
   const t = locales[lang];
 
-  // State Definitions matching the variable specification document
-  const [chats, setChats] = useState<ChatSession[]>([]);
-  const [activeChatId, setActiveChatId] = useState<string | null>(null);
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
-  const [isParamsOpen, setIsParamsOpen] = useState<boolean>(false);
-  
-  const [settings, setSettings] = useState<DdoSettings>(() => {
+  // --- XState Machine Integration ---
+  const { state, send, adapters } = useChatMachineState();
+
+  const {
+    setIsSidebarOpen,
+    setIsParamsOpen,
+    setPresetName,
+    setInputText,
+    setShowSettingsModal,
+    setNumPredictEnabled,
+    setIsModelLoading,
+    setModelLoadError,
+    setCollapseThinking,
+    setActiveModel,
+    setSystemPrompt,
+    setParameters,
+    setThinkMode,
+    setSyncRequestPending,
+    setIsRemoteGenerating,
+    setRemoteGeneratingText,
+    setPsInfo,
+    setIsGenerating,
+    setSendOnEnter,
+    setContextUsed,
+    setLastModelChangeTime,
+    setLastModelSender,
+    setJobQueue,
+    setMyJobId,
+    setPendingMessage,
+    setActiveUserCount,
+    setChats,
+    setActiveChatId,
+    setSettings,
+    setModels,
+    setExpandedThinking
+  } = adapters;
+
+  const { 
+    isSidebarOpen, 
+    isParamsOpen, 
+    presetName, 
+    inputText, 
+    showSettingsModal,
+    numPredictEnabled,
+    isModelLoading,
+    modelLoadError,
+    collapseThinking,
+    activeModel,
+    systemPrompt,
+    parameters,
+    thinkMode,
+    syncRequestPending,
+    isRemoteGenerating,
+    remoteGeneratingText,
+    psInfo,
+    isGenerating,
+    sendOnEnter,
+    contextUsed,
+    lastModelChangeTime,
+    lastModelSender,
+    jobQueue,
+    myJobId,
+    pendingMessage,
+    activeUserCount,
+    chats,
+    activeChatId,
+    settings,
+    models,
+    expandedThinking
+  } = state.context;
+
+  useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tokenFromUrl = params.get('token') || params.get('accessToken') || '';
     const isSharedModeFromUrl = params.get('sharedMode') === 'true' || params.get('isSharedMode') === 'true';
-    return {
+    
+    setSettings(prev => ({
+      ...prev,
       connectionUrl: window.location.origin.includes('localhost:3000')
         ? 'http://localhost:8088'
         : window.location.origin,
-      accessToken: tokenFromUrl,
-      isSharedMode: isSharedModeFromUrl,
+      accessToken: tokenFromUrl || prev.accessToken,
+      isSharedMode: isSharedModeFromUrl || prev.isSharedMode,
       username: 'Guest_' + Math.floor(Math.random() * 1000)
-    };
-  });
-
-  const [models, setModels] = useState<OllamaModelInfo[]>([]);
-  const [expandedThinking, setExpandedThinking] = useState<Record<string, boolean>>({});
+    }));
+  }, []); // Run once on mount
 
   const handleThinkingToggle = (msgKey: string, isOpen: boolean) => {
+
     setExpandedThinking(prev => {
       if (prev[msgKey] === isOpen) return prev;
       return { ...prev, [msgKey]: isOpen };
     });
   };
-  const [presetName, setPresetName] = useState<string>("My Preset");
-  const [numPredictEnabled, setNumPredictEnabled] = useState<boolean>(true);
-  const [isModelLoading, setIsModelLoading] = useState<boolean>(false);
-  const [modelLoadError, setModelLoadError] = useState<string>('');
-  const [collapseThinking, setCollapseThinking] = useState<boolean>(true);
-  const [activeModel, setActiveModel] = useState<string>('');
-  const [systemPrompt, setSystemPrompt] = useState<string>('You are a helpful assistant.');
-  const [parameters, setParameters] = useState<DdoParameters>({
-    temperature: 0.7,
-    num_ctx: 2048,
-    min_p: 0.05,
-    top_p: 0.9,
-    top_k: 40,
-    num_predict: 1024,
-    repeat_penalty: 1.1
-  });
-  const [thinkMode, setThinkMode] = useState<boolean>(true);
-  const [syncRequestPending, setSyncRequestPending] = useState<{
-    activeModel?: string;
-    systemPrompt?: string;
-    parameters?: DdoParameters;
-    thinkMode?: boolean;
-    numPredictEnabled?: boolean;
-    sender: string;
-  } | null>(null);
-  const [isRemoteGenerating, setIsRemoteGenerating] = useState<boolean>(false);
+
   const isRemoteGeneratingRef = useRef(isRemoteGenerating);
   useEffect(() => {
     isRemoteGeneratingRef.current = isRemoteGenerating;
   }, [isRemoteGenerating]);
 
-  const [remoteGeneratingText, setRemoteGeneratingText] = useState<string>('');
-  const [psInfo, setPsInfo] = useState<PsModelInfo | null>(null);
-  const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const isGeneratingRef = useRef(isGenerating);
   useEffect(() => {
     isGeneratingRef.current = isGenerating;
   }, [isGenerating]);
+  
   const abortControllerRef = useRef<AbortController | null>(null);
-  const [sendOnEnter, setSendOnEnter] = useState<boolean>(true);
-  const [contextUsed, setContextUsed] = useState<number>(0);
-  const [lastModelChangeTime, setLastModelChangeTime] = useState<number>(0);
-  const [lastModelSender, setLastModelSender] = useState<string>(settings.username);
   const prevIsSharedModeRef = useRef<boolean>(settings.isSharedMode);
-  const [jobQueue, setJobQueue] = useState<QueueJob[]>([]);
-  const [myJobId, setMyJobId] = useState<string | null>(null);
-  const [pendingMessage, setPendingMessage] = useState<string>('');
-  const [activeUserCount, setActiveUserCount] = useState<number>(1);
+
   const handleActiveCount = useCallback((count: number) => {
     setActiveUserCount(count);
   }, []);
@@ -305,8 +304,6 @@ export default function App() {
     }
   }, [models, activeModel]);
 
-  const [inputText, setInputText] = useState<string>('');
-  const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
 
   const broadcastSettings = async () => {
     if (!settings.isSharedMode) return;
@@ -423,11 +420,7 @@ export default function App() {
     };
   }, [activeModel, settings.isSharedMode, settings.connectionUrl, settings.accessToken, settings.username, activeUserCount]);
 
-  const [lastPolledMsgId, setLastPolledMsgId] = useState<string>('');
-  const lastPolledMsgIdRef = useRef(lastPolledMsgId);
-  useEffect(() => {
-    lastPolledMsgIdRef.current = lastPolledMsgId;
-  }, [lastPolledMsgId]);
+
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
 
   // Sync scroll on new messages
@@ -548,90 +541,101 @@ export default function App() {
     return () => clearInterval(interval);
   }, [fetchModelsAndPs]);
 
+  const lastPolledMsgIdRef = useRef(state.context.lastPolledMsgId);
+  useEffect(() => {
+    lastPolledMsgIdRef.current = state.context.lastPolledMsgId;
+  }, [state.context.lastPolledMsgId]);
+
   // Polling for shared room mode
   const startBroadcastPolling = useCallback(async () => {
     try {
-      const data = (await pollMessage(
+      const messages = (await pollMessage(
         settings.connectionUrl,
         settings.accessToken,
+        lastPolledMsgIdRef.current,
         settings.username,
         handleActiveCount
-      )) as {
+      )) as Array<{
         id?: string;
         sender?: string;
         broadcaster?: string;
         role?: 'user' | 'assistant' | 'system';
         content?: string;
         timestamp?: string;
-      };
-      const isMyMessage = data.sender === settings.username || data.broadcaster === settings.username;
-      if (data.id && data.id !== lastPolledMsgIdRef.current && !isMyMessage) {
-        setLastPolledMsgId(data.id);
-        
-        // Handle system sync events
-        if (data.role === 'system' && data.content) {
-          if (data.content.startsWith('sync_request:')) {
-            const parts = data.content.split(':');
-            const sender = parts[1];
-            const payloadStr = parts.slice(2).join(':');
-            if (sender !== settings.username && payloadStr) {
-              try {
-                const payload = JSON.parse(payloadStr);
-                setSyncRequestPending({
-                  ...payload,
-                  sender
-                });
-              } catch (e) {
-                console.error("Failed to parse settings sync payload", e);
-              }
-            }
-            return;
-          } else if (data.content.startsWith('tab_create:')) {
-            const parts = data.content.split(':');
-            const tabId = parts[1];
-            const tabTitle = parts.slice(2).join(':');
-            if (tabId) {
-              addNewTab(true, tabId, tabTitle);
-            }
-            return;
-          } else if (data.content.startsWith('tab_delete:')) {
-            const tabId = data.content.substring('tab_delete:'.length);
-            if (tabId) {
-              deleteTab(tabId, undefined, true);
-            }
-            return;
-          } else if (data.content.startsWith('tab_switch:')) {
-            const tabId = data.content.substring('tab_switch:'.length);
-            if (tabId) {
-              setActiveChatId(tabId);
-            }
-            return;
-          }
-        }
+      }>;
 
-        // Append shared message to currently active chat session
-        if (activeChatId) {
-          setChats(prev => prev.map(c => {
-            if (c.id === activeChatId) {
-              return {
-                ...c,
-                messages: [...c.messages, {
-                  role: data.role || 'user',
-                  content: data.content || '',
-                  sender: data.sender,
-                  broadcaster: data.broadcaster,
-                  timestamp: data.timestamp ? formatTimestamp(data.timestamp) : undefined
-                }]
-              };
+      if (!Array.isArray(messages) || messages.length === 0) return;
+
+      for (const data of messages) {
+        const isMyMessage = data.sender === settings.username || data.broadcaster === settings.username;
+        if (data.id && data.id !== lastPolledMsgIdRef.current && !isMyMessage) {
+          send({ type: 'UPDATE_CONTEXT', payload: { lastPolledMsgId: data.id } });
+          
+          // Handle system sync events
+          if (data.role === 'system' && data.content) {
+            if (data.content.startsWith('sync_request:')) {
+              const parts = data.content.split(':');
+              const sender = parts[1];
+              const payloadStr = parts.slice(2).join(':');
+              if (sender !== settings.username && payloadStr) {
+                try {
+                  const payload = JSON.parse(payloadStr);
+                  setSyncRequestPending({
+                    ...payload,
+                    sender
+                  });
+                } catch (e) {
+                  console.error("Failed to parse settings sync payload", e);
+                }
+              }
+              continue;
+            } else if (data.content.startsWith('tab_create:')) {
+              const parts = data.content.split(':');
+              const tabId = parts[1];
+              const tabTitle = parts.slice(2).join(':');
+              if (tabId) {
+                addNewTab(true, tabId, tabTitle);
+              }
+              continue;
+            } else if (data.content.startsWith('tab_delete:')) {
+              const tabId = data.content.substring('tab_delete:'.length);
+              if (tabId) {
+                deleteTab(tabId, undefined, true);
+              }
+              continue;
+            } else if (data.content.startsWith('tab_switch:')) {
+              const tabId = data.content.substring('tab_switch:'.length);
+              if (tabId) {
+                setActiveChatId(tabId);
+              }
+              continue;
             }
-            return c;
-          }));
+          }
+
+          // Append shared message to currently active chat session
+          if (activeChatId) {
+            setChats(prev => prev.map(c => {
+              if (c.id === activeChatId) {
+                return {
+                  ...c,
+                  messages: [...c.messages, {
+                    role: data.role || 'user',
+                    content: data.content || '',
+                    sender: data.sender,
+                    broadcaster: data.broadcaster,
+                    timestamp: data.timestamp ? formatTimestamp(data.timestamp) : undefined
+                  }]
+                };
+              }
+              return c;
+            }));
+          }
         }
       }
     } catch (e) {
       console.error("Broadcasting poll failed", e);
     }
-  }, [settings.connectionUrl, settings.accessToken, settings.username, activeChatId, addNewTab, deleteTab, handleActiveCount]);
+  }, [settings.connectionUrl, settings.accessToken, settings.username, activeChatId, addNewTab, deleteTab, handleActiveCount, send]);
 
   useEffect(() => {
     if (!settings.isSharedMode) return;
@@ -754,7 +758,7 @@ export default function App() {
           // Update last polled message ID to the last one in history to avoid duplicate polling
           const lastMsg = historyData[historyData.length - 1];
           if (lastMsg.id) {
-            setLastPolledMsgId(lastMsg.id);
+            send({ type: 'UPDATE_CONTEXT', payload: { lastPolledMsgId: lastMsg.id } });
           }
         }
       } catch (e) {
@@ -882,568 +886,27 @@ export default function App() {
 
   // (definitions moved above startBroadcastPolling)
 
-  const runInferenceStream = async (jobIdToComplete?: string) => {
-    if (isGeneratingRef.current) return;
-    isGeneratingRef.current = true;
-    setIsGenerating(true);
-    setModelLoadError('');
+  const {
+    runInferenceStream,
+    sendMessage,
+    handleCancelQueue,
+    stopGeneration
+  } = useChatActions({
+    chats, activeChatId, settings, activeModel, systemPrompt, pendingMessage, parameters, thinkMode, numPredictEnabled, myJobId, inputText, isGeneratingRef, abortControllerRef, t,
+    setChats, setIsGenerating, setModelLoadError, setPendingMessage, setMyJobId, setJobQueue, setInputText, setContextUsed, updateLastPolledMsgId: (id) => send({ type: 'UPDATE_CONTEXT', payload: { lastPolledMsgId: id } })
+  });
 
-    if (settings.isSharedMode) {
-      void broadcastModel(settings.connectionUrl, settings.accessToken, settings.username, activeModel, Date.now(), true, '');
-    }
-
-    const targetChat = chats.find(c => c.id === activeChatId);
-    if (!targetChat) {
-      setIsGenerating(false);
-      return;
-    }
-
-    const requestMessages = [];
-    if (systemPrompt) {
-      requestMessages.push({ role: 'system' as const, content: systemPrompt });
-    }
-
-    // Shared Room Mode specific prompt append & broadcast on turn start
-    if (settings.isSharedMode && pendingMessage) {
-      const nowStr = formatTimestamp(new Date());
-      const userMsgId = Date.now().toString() + "_user";
-      const userMsg: Message = {
-        id: userMsgId,
-        role: 'user',
-        content: pendingMessage,
-        sender: settings.username,
-        timestamp: nowStr
-      };
-
-      // Append to the list used for the API call
-      const mergedMessages = [...targetChat.messages, userMsg];
-      mergedMessages.forEach(m => {
-        requestMessages.push({ role: m.role, content: m.content });
-      });
-
-      // Update UI state
-      setChats(prev => prev.map(c => {
-        if (c.id === activeChatId) {
-          return { ...c, messages: [...c.messages, userMsg] };
-        }
-        return c;
-      }));
-
-      // Broadcast to other peers
-      try {
-        await broadcastMessage(
-          settings.connectionUrl,
-          settings.accessToken,
-          settings.username,
-          settings.username,
-          'user',
-          pendingMessage
-        );
-      } catch (e) {
-        console.error("Failed to broadcast user message on start", e);
-      }
-    } else {
-      targetChat.messages.forEach(m => {
-        requestMessages.push({ role: m.role, content: m.content });
-      });
-    }
-
-    const headers: HeadersInit = { 'Content-Type': 'application/json' };
-    if (settings.accessToken) {
-      headers['X-DDO-Token'] = settings.accessToken;
-    }
-
-    abortControllerRef.current = new AbortController();
-
-    try {
-      const optionsPayload: Record<string, unknown> = { ...parameters };
-      if (!numPredictEnabled) {
-        delete optionsPayload.num_predict;
-      }
-
-      let res: Response | undefined = undefined;
-      let retries = 3;
-      let delay = 1000;
-
-      for (let attempt = 1; attempt <= retries + 1; attempt++) {
-        try {
-          const fetchRes = await fetch(`${settings.connectionUrl}/api/chat`, {
-            method: 'POST',
-            headers,
-            signal: abortControllerRef.current.signal,
-            body: JSON.stringify({
-              model: activeModel,
-              messages: requestMessages,
-              options: optionsPayload,
-              think: thinkMode,
-              stream: true
-            })
-          });
-
-          res = fetchRes;
-
-          if (fetchRes.status === 503 && attempt <= retries) {
-            console.log(`Received 503 Service Unavailable, retrying in ${delay}ms... (Attempt ${attempt}/${retries})`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-            continue;
-          }
-          break;
-        } catch (err) {
-          if (attempt <= retries) {
-            console.log(`Fetch failed, retrying in ${delay}ms... (Attempt ${attempt}/${retries})`, err);
-            await new Promise(resolve => setTimeout(resolve, delay));
-            continue;
-          }
-          throw err;
-        }
-      }
-
-      if (!res) {
-        throw new Error("Failed to fetch response from Ollama server.");
-      }
-
-      if (!res.ok) {
-        throw new Error(`Server returned status: ${res.status}`);
-      }
-
-      const assistantMsgId = Date.now().toString() + "_ai";
-      setChats(prev => prev.map(c => {
-        if (c.id === activeChatId) {
-          return {
-            ...c,
-            messages: [...c.messages, { 
-              id: assistantMsgId, 
-              role: 'assistant', 
-              content: '', 
-              sender: activeModel,
-              timestamp: formatTimestamp(new Date())
-            }]
-          };
-        }
-        return c;
-      }));
-
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
-      let accumulatedContent = '';
-      let thinkStartTime = 0;
-      let thinkEndTime = 0;
-      let isThinkingState = false;
-      let hasThoughtEndedState = false;
-
-      let lastBroadcastTime = Date.now();
-
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split('\n');
-
-          for (const line of lines) {
-            if (!line.trim()) continue;
-            try {
-              const parsed = JSON.parse(line);
-              
-              if (!thinkStartTime) {
-                thinkStartTime = performance.now();
-              }
-
-              if (parsed.message?.thinking) {
-                if (!isThinkingState) {
-                  isThinkingState = true;
-                  accumulatedContent += '<think>\n';
-                }
-                accumulatedContent += parsed.message.thinking;
-              } else if (parsed.message?.content) {
-                if (isThinkingState && !hasThoughtEndedState) {
-                  accumulatedContent += '\n</think>\n';
-                  hasThoughtEndedState = true;
-                  thinkEndTime = performance.now();
-                }
-                accumulatedContent += parsed.message.content;
-              }
-
-              if (accumulatedContent) {
-                setChats(prev => prev.map(c => {
-                  if (c.id === activeChatId) {
-                    return {
-                      ...c,
-                      messages: c.messages.map(m => {
-                        if (m.id === assistantMsgId) {
-                          return { ...m, content: accumulatedContent };
-                        }
-                        return m;
-                      })
-                    };
-                  }
-                  return c;
-                }));
-              }
-
-              const nowMillis = Date.now();
-              if (settings.isSharedMode && accumulatedContent && nowMillis - lastBroadcastTime > 600) {
-                lastBroadcastTime = nowMillis;
-                void broadcastModel(
-                  settings.connectionUrl,
-                  settings.accessToken,
-                  settings.username,
-                  activeModel,
-                  nowMillis,
-                  true,
-                  accumulatedContent
-                );
-              }
-
-              if (parsed.done) {
-                if (isThinkingState && !hasThoughtEndedState) {
-                  accumulatedContent += '\n</think>\n';
-                  hasThoughtEndedState = true;
-                  thinkEndTime = performance.now();
-                }
-                const totalDurationSec = parsed.total_duration ? (parsed.total_duration / 1e9) : 0;
-                const evalDurationSec = parsed.eval_duration ? (parsed.eval_duration / 1e9) : 0;
-                const tokensPerSec = (parsed.eval_count && evalDurationSec > 0) ? (parsed.eval_count / evalDurationSec) : 0;
-                const thinkDurationSec = (thinkStartTime > 0 && thinkEndTime > 0) ? ((thinkEndTime - thinkStartTime) / 1000) : 0;
-
-                const metrics: MessageMetrics = {
-                  totalDurationSec: parseFloat(totalDurationSec.toFixed(2)),
-                  promptTokens: parsed.prompt_eval_count || 0,
-                  evalTokens: parsed.eval_count || 0,
-                  tokensPerSec: parseFloat(tokensPerSec.toFixed(1)),
-                  thinkDurationSec: parseFloat(thinkDurationSec.toFixed(2))
-                };
-
-                setContextUsed((parsed.prompt_eval_count || 0) + (parsed.eval_count || 0));
-
-                setChats(prev => prev.map(c => {
-                  if (c.id === activeChatId) {
-                    return {
-                      ...c,
-                      messages: c.messages.map(m => {
-                        if (m.id === assistantMsgId) {
-                          return { ...m, metrics, content: accumulatedContent };
-                        }
-                        return m;
-                      })
-                    };
-                  }
-                  return c;
-                }));
-              }
-            } catch {
-              // Ignore partial JSON line parse errors
-            }
-          }
-        }
-      }
-
-      if (settings.isSharedMode && accumulatedContent) {
-        try {
-          const result = await broadcastMessage(
-            settings.connectionUrl,
-            settings.accessToken,
-            activeModel,
-            settings.username,
-            'assistant',
-            accumulatedContent
-          );
-          if (result && result.id) {
-            setLastPolledMsgId(result.id);
-          }
-        } catch (e) {
-          console.error("Failed to broadcast assistant message", e);
-        }
-      }
-
-    } catch (e) {
-      const err = e as Error;
-      if (err.name === 'AbortError') {
-        console.log("Inference stream aborted.");
-      } else {
-        console.error("Inference request failed.", e);
-        let displayError = err.message;
-        if (err.message.includes('status: 400')) {
-          displayError = t.error400;
-        } else if (err.message.includes('status: 403')) {
-          displayError = t.error403;
-        } else if (err.message.includes('status: 404')) {
-          displayError = t.error404;
-        } else if (err.message.includes('status: 503')) {
-          displayError = t.error503;
-        } else {
-          displayError = `${t.errorGeneric}${err.message}`;
-        }
-
-        setChats(prev => prev.map(c => {
-          if (c.id === activeChatId) {
-            return {
-              ...c,
-              messages: [...c.messages, { 
-                role: 'system', 
-                content: displayError,
-                timestamp: formatTimestamp(new Date())
-              }]
-            };
-          }
-          return c;
-        }));
-      }
-    } finally {
-      setIsGenerating(false);
-      isGeneratingRef.current = false;
-      abortControllerRef.current = null;
-      if (settings.isSharedMode) {
-        void broadcastModel(settings.connectionUrl, settings.accessToken, settings.username, activeModel, Date.now(), false, '');
-        if (jobIdToComplete) {
-          try {
-            await completeQueue(settings.connectionUrl, settings.accessToken, jobIdToComplete);
-            setMyJobId(null);
-            setPendingMessage('');
-            const q = await fetchQueue(settings.connectionUrl, settings.accessToken);
-            setJobQueue(q);
-          } catch (err) {
-            console.error("Failed to complete queue job", err);
-          }
-        }
-      }
-    }
-  };
-
-  const sendMessage = async () => {
-    if (!inputText.trim() || !activeChatId || !activeModel || isGenerating || myJobId) return;
-
-    const userMessageContent = inputText;
-
-    if (settings.isSharedMode) {
-      const jobId = "job_" + Date.now().toString() + "_" + Math.floor(Math.random() * 1000);
-
-      try {
-        // Try to join the queue first
-        await joinQueue(settings.connectionUrl, settings.accessToken, jobId, settings.username);
-
-        // Queue join succeeded -> confirm transmission
-        setInputText('');
-        setPendingMessage(userMessageContent);
-        setMyJobId(jobId);
-
-        const q = await fetchQueue(settings.connectionUrl, settings.accessToken);
-        setJobQueue(q);
-      } catch (err) {
-        console.error("Failed to join queue", err);
-        // Do not clear input, do not append bubble, leave state intact for retry
-      }
-    } else {
-      setInputText('');
-
-      const nowStr = formatTimestamp(new Date());
-      const userMsgId = Date.now().toString() + "_user";
-
-      const userMsg: Message = {
-        id: userMsgId,
-        role: 'user',
-        content: userMessageContent,
-        sender: settings.username,
-        timestamp: nowStr
-      };
-
-      setChats(prev => prev.map(c => {
-        if (c.id === activeChatId) {
-          return { ...c, messages: [...c.messages, userMsg] };
-        }
-        return c;
-      }));
-
-      void runInferenceStream();
-    }
-  };
-
-  const handleCancelQueue = async () => {
-    if (!myJobId || !settings.isSharedMode) return;
-    const targetJobId = myJobId;
-    setMyJobId(null);
-    setPendingMessage('');
-    
-    setChats(prev => prev.map(c => {
-      if (c.id === activeChatId) {
-        const lastMsg = c.messages[c.messages.length - 1];
-        if (lastMsg && lastMsg.role === 'user' && lastMsg.sender === settings.username) {
-          return {
-            ...c,
-            messages: c.messages.slice(0, -1)
-          };
-        }
-      }
-      return c;
-    }));
-
-    try {
-      await cancelQueue(settings.connectionUrl, settings.accessToken, targetJobId);
-      const q = await fetchQueue(settings.connectionUrl, settings.accessToken);
-      setJobQueue(q);
-    } catch (err) {
-      console.error("Failed to cancel queue job", err);
-    }
-  };
-
-  const stopGeneration = async () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    if (myJobId && settings.isSharedMode) {
-      const targetJobId = myJobId;
-      setMyJobId(null);
-      setPendingMessage('');
-      try {
-        await cancelQueue(settings.connectionUrl, settings.accessToken, targetJobId);
-        const q = await fetchQueue(settings.connectionUrl, settings.accessToken);
-        setJobQueue(q);
-      } catch (err) {
-        console.error("Failed to cancel running job on stop", err);
-      }
-    }
-  };
-
-  const exportCassette = () => {
-    const activeChat = chats.find(c => c.id === activeChatId);
-    if (!activeChat) return;
-
-    const cassetteData = {
-      version: "1.0",
-      system_prompt: systemPrompt,
-      options: parameters,
-      think: thinkMode,
-      messages: activeChat.messages.map(m => ({ role: m.role, content: m.content }))
-    };
-
-    const blob = new Blob([JSON.stringify(cassetteData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `ddo-saba-cassette-${activeChat.title.replace(/\s+/g, '_')}-${new Date().toISOString().slice(0,10)}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const importCassette = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const data = JSON.parse(event.target?.result as string);
-        if (data.messages) {
-          const newId = Date.now().toString();
-          const importedChat: ChatSession = {
-            id: newId,
-            title: `Cassette: ${file.name.replace('.json', '')}`,
-            messages: data.messages
-          };
-          setChats(prev => [...prev, importedChat]);
-          setActiveChatId(newId);
-
-          if (data.system_prompt) setSystemPrompt(data.system_prompt);
-          if (data.options) setParameters(prev => ({ ...prev, ...data.options }));
-          if (data.think !== undefined) setThinkMode(data.think);
-        }
-      } catch {
-        alert("Failed to parse cassette JSON file. Make sure it conforms to DDO Saba specifications.");
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  const exportPreset = () => {
-    const presetData = {
-      version: "1.0-preset",
-      presetName,
-      systemPrompt,
-      parameters,
-      thinkMode,
-      sendOnEnter,
-      numPredictEnabled,
-      collapseThinking
-    };
-
-    const blob = new Blob([JSON.stringify(presetData, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    const sanitizedPresetName = presetName.toLowerCase().replace(/[^a-z0-9]+/g, '_');
-    a.download = `preset-${sanitizedPresetName}.json`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const importPreset = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const data = JSON.parse(event.target?.result as string);
-        if (data.version === "1.0-preset") {
-          if (data.presetName) setPresetName(data.presetName);
-          if (data.systemPrompt) setSystemPrompt(data.systemPrompt);
-          if (data.options) {
-            setParameters(prev => ({ ...prev, ...data.options }));
-          } else if (data.parameters) {
-            setParameters(prev => ({ ...prev, ...data.parameters }));
-          }
-          if (data.thinkMode !== undefined) setThinkMode(data.thinkMode);
-          if (data.sendOnEnter !== undefined) setSendOnEnter(data.sendOnEnter);
-          if (data.numPredictEnabled !== undefined) setNumPredictEnabled(data.numPredictEnabled);
-          if (data.collapseThinking !== undefined) setCollapseThinking(data.collapseThinking);
-        } else {
-          alert("Invalid preset file format. Make sure version matches.");
-        }
-      } catch {
-        alert("Failed to parse preset JSON file.");
-      }
-    };
-    reader.readAsText(file);
-  };
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    const file = e.dataTransfer.files?.[0];
-    if (file && file.type === "application/json") {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        try {
-          const data = JSON.parse(event.target?.result as string);
-          if (data.messages) {
-            const newId = Date.now().toString();
-            const importedChat: ChatSession = {
-              id: newId,
-              title: `Cassette: ${file.name.replace('.json', '')}`,
-              messages: data.messages
-            };
-            setChats(prev => [...prev, importedChat]);
-            setActiveChatId(newId);
-
-            if (data.system_prompt) setSystemPrompt(data.system_prompt);
-            if (data.options) setParameters(prev => ({ ...prev, ...data.options }));
-            if (data.think !== undefined) setThinkMode(data.think);
-          }
-        } catch {
-          alert("Malformed cassette JSON.");
-        }
-      };
-      reader.readAsText(file);
-    }
-  };
+  const {
+    exportCassette,
+    importCassette,
+    exportPreset,
+    importPreset,
+    handleDragOver,
+    handleDropCassette: handleDrop
+  } = useFileIO({
+    chats, activeChatId, systemPrompt, parameters, thinkMode, presetName, sendOnEnter, numPredictEnabled, collapseThinking,
+    setChats, setActiveChatId, setSystemPrompt, setParameters, setThinkMode, setPresetName, setSendOnEnter, setNumPredictEnabled, setCollapseThinking
+  });
 
   const activeChat = chats.find(c => c.id === activeChatId);
 
@@ -1475,125 +938,41 @@ export default function App() {
       )}
 
       {/* 1. Left Column: Chat Tab Manager */}
-      <aside className="sidebar-column">
-        <div className="sidebar-header">
-          <h2>{t.chats}</h2>
-          <button className="icon-btn-accent" onClick={() => addNewTab(false)} title={t.newChat}>
-            <Plus size={18} />
-          </button>
-        </div>
-        
-        <div className="tab-list">
-          {chats.map(c => (
-            <div 
-              key={c.id} 
-              className={`tab-item ${activeChatId === c.id ? 'active' : ''}`}
-              onClick={() => {
-                setActiveChatId(c.id);
-                setIsSidebarOpen(false);
-                if (settings.isSharedMode) {
-                  void broadcastMessage(
-                    settings.connectionUrl,
-                    settings.accessToken,
-                    settings.username,
-                    settings.username,
-                    'system',
-                    `tab_switch:${c.id}`
-                  );
-                }
-              }}
-            >
-              <Trash2 size={16} className="tab-icon" />
-              <span className="tab-title">{c.title}</span>
-              <button className="tab-close-btn" onClick={(e) => deleteTab(c.id, e, false)}>
-                <Trash2 size={14} />
-              </button>
-            </div>
-          ))}
-        </div>
-
-        <div className="sidebar-footer">
-          <div className="alert-card">
-            <AlertTriangle size={16} className="alert-icon" />
-            <p>{t.temporaryWarning}</p>
-          </div>
-        </div>
-      </aside>
+      <Sidebar 
+        chats={chats}
+        activeChatId={activeChatId}
+        isSidebarOpen={isSidebarOpen}
+        onAddTab={addNewTab}
+        onSwitchTab={setActiveChatId}
+        onDeleteTab={deleteTab}
+        t={t}
+      />
 
       {/* 2. Middle Column: Main Chat Room */}
       <main className="chat-column">
-        <header className="chat-header">
-          <button
-            className="mobile-toggle-btn"
-            onClick={() => setIsSidebarOpen(prev => !prev)}
-            title={lang === 'ja' ? 'メニューをトグル' : 'Toggle menu'}
-          >
-            <Menu size={20} />
-          </button>
-
-          <div className="model-selector-wrap">
-            {isEffectivelyLoading && <Loader2 className="animate-spin" size={16} style={{ color: 'hsl(var(--accent))', flexShrink: 0 }} />}
-            <select 
-              value={activeModel} 
-              onChange={(e) => {
-                const selected = e.target.value;
-                setActiveModel(selected);
-                setLastModelSender(settings.username);
-                const now = Date.now();
-                setLastModelChangeTime(now);
-                loadModelOnSelection(selected);
-                if (settings.isSharedMode) {
-                  void broadcastModel(settings.connectionUrl, settings.accessToken, settings.username, selected, now);
-                }
-              }}
-              disabled={isEffectivelyLoading}
-              className="model-select"
-              style={{ 
-                flex: 1,
-                opacity: isEffectivelyLoading ? 0.6 : 1,
-                color: isEffectivelyLoading ? 'hsl(var(--text-muted))' : 'inherit'
-              }}
-            >
-              <option value="">{isEffectivelyLoading ? (lang === 'ja' ? 'モデルをロード中...' : 'Loading Model...') : (models.length === 0 ? "No models detected" : t.selectModel)}</option>
-              {models.map(m => (
-                <option key={m.name} value={m.name}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-            {psInfo && (
-              <button 
-                onClick={handleUnloadModel} 
-                className="unload-btn" 
-                title={lang === 'ja' ? 'VRAMからアンロード' : 'Unload from VRAM'}
-              >
-                <LogOut size={16} />
-              </button>
-            )}
-            {modelLoadError && (
-              <div style={{ color: 'hsl(var(--danger))', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px', marginLeft: '8px', flexShrink: 0 }}>
-                <AlertTriangle size={14} />
-                <span>{modelLoadError}</span>
-              </div>
-            )}
-          </div>
-
-          <div className="header-actions">
-            <button className="lang-toggle" onClick={() => setLang(l => l === 'en' ? 'ja' : 'en')}>
-              {lang === 'en' ? 'JP' : 'EN'}
-            </button>
-            <button
-              className="mobile-toggle-btn"
-              onClick={() => setIsParamsOpen(prev => !prev)}
-              title={lang === 'ja' ? 'パラメータをトグル' : 'Toggle parameters'}
-            >
-              <SlidersHorizontal size={20} />
-            </button>
-            <button className="icon-btn" onClick={() => setShowSettingsModal(true)}>
-              <Settings size={20} />
-            </button>
-          </div>
-        </header>
+        <ChatHeader
+          activeModel={activeModel}
+          models={models}
+          psInfo={psInfo}
+          isEffectivelyLoading={isEffectivelyLoading}
+          onSelectModel={(selected) => {
+            setActiveModel(selected);
+            setLastModelSender(settings.username);
+            const now = Date.now();
+            setLastModelChangeTime(now);
+            loadModelOnSelection(selected);
+            if (settings.isSharedMode) {
+              void broadcastModel(settings.connectionUrl, settings.accessToken, settings.username, selected, now);
+            }
+          }}
+          onUnloadModel={handleUnloadModel}
+          lang={lang}
+          onToggleLang={() => setLang(l => l === 'en' ? 'ja' : 'en')}
+          onToggleParams={() => setIsParamsOpen(prev => !prev)}
+          onOpenSettings={() => setShowSettingsModal(true)}
+          onToggleSidebar={() => setIsSidebarOpen(prev => !prev)}
+          t={t}
+        />
 
         <ChatMessages 
           ref={messagesContainerRef}
@@ -1605,68 +984,23 @@ export default function App() {
           t={t}
         />
 
-        <footer className="chat-input-bar">
-          <div className="input-wrap">
-            <textarea 
-              value={inputText}
-              disabled={isGenerating || isModelLoading || isRemoteGenerating || !activeChatId || myJobId !== null}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  if (sendOnEnter && !e.shiftKey) {
-                    e.preventDefault();
-                    sendMessage();
-                  } else if (!sendOnEnter && e.shiftKey) {
-                    e.preventDefault();
-                    sendMessage();
-                  }
-                }
-              }}
-              placeholder={
-                !activeChatId
-                  ? (lang === 'ja' ? '左側の「＋」から新しいチャットを作成してください' : 'Please create a new chat using the "+" button on the left.')
-                  : myJobId !== null
-                    ? (() => {
-                        const myIdx = jobQueue.findIndex(q => q.id === myJobId);
-                        const pos = myIdx !== -1 ? myIdx + 1 : '?';
-                        return lang === 'ja' ? `順番待ちしています... (キュー ${pos}番目)` : `Waiting in queue... (Position ${pos})`;
-                      })()
-                    : isRemoteGenerating
-                      ? (lang === 'ja' ? '他のユーザーが推論中です...' : 'Another user is thinking...')
-                      : t.placeholder
-              }
-              rows={2}
-              className="input-textarea"
-            />
-            {isGenerating ? (
-              <button className="action-btn stop-btn" onClick={stopGeneration}>
-                <Square size={16} />
-              </button>
-            ) : myJobId !== null ? (
-              <button 
-                className="action-btn stop-btn" 
-                onClick={handleCancelQueue}
-                title={lang === 'ja' ? 'キューから取り下げる' : 'Withdraw from queue'}
-                style={{ width: 'auto', padding: '0 12px', fontSize: '0.8rem' }}
-              >
-                {lang === 'ja' ? '取り下げる' : 'Cancel'}
-              </button>
-            ) : (
-              <button className="action-btn send-btn" onClick={sendMessage} disabled={!inputText.trim() || isModelLoading || isRemoteGenerating || !activeChatId}>
-                <Send size={16} />
-              </button>
-            )}
-          </div>
-          <div className="input-footer-settings">
-            <span>{settings.isSharedMode ? <Globe size={14} className="shared-indicator" /> : <Lock size={14} />}</span>
-            <span className="mode-text">{settings.isSharedMode ? t.sharedRoomMode : t.privateMode}</span>
-            {settings.isSharedMode && jobQueue.length > 0 && (
-              <span className="queue-status-indicator" style={{ marginLeft: '12px', color: 'hsl(var(--warning))', fontSize: '0.75rem', fontWeight: 600 }}>
-                {lang === 'ja' ? `待ち行列: ${jobQueue.length}人` : `Queue: ${jobQueue.length} waiting`}
-              </span>
-            )}
-          </div>
-        </footer>
+        <ChatInputArea 
+          inputText={inputText}
+          isGenerating={isGenerating}
+          isRemoteGenerating={isRemoteGenerating}
+          isModelLoading={isModelLoading}
+          sendOnEnter={sendOnEnter}
+          activeChatId={activeChatId}
+          myJobId={myJobId}
+          jobQueueLength={jobQueue.length}
+          isSharedMode={settings.isSharedMode}
+          onChangeInput={setInputText}
+          onSend={sendMessage}
+          onStop={stopGeneration}
+          onCancelQueue={handleCancelQueue}
+          t={t}
+          lang={lang}
+        />
       </main>
 
       {/* 3. Right Column: Parameters Panel */}
@@ -1707,36 +1041,19 @@ export default function App() {
       />
 
       {/* 5. Synchronize Request Modal */}
-      {syncRequestPending && (
-        <div className="modal-backdrop" style={{ zIndex: 200 }}>
-          <div className="settings-modal" style={{ maxWidth: '400px' }}>
-            <div className="modal-header">
-              <h3>{lang === 'ja' ? '設定同期のリクエスト' : 'Settings Sync Request'}</h3>
-            </div>
-            <div className="modal-body">
-              <p style={{ marginBottom: '16px', fontSize: '0.9rem', lineHeight: '1.5' }}>
-                {lang === 'ja'
-                  ? `ユーザー「${syncRequestPending.sender}」から設定の同期がリクエストされました。モデルとパラメータを同期しますか？`
-                  : `User "${syncRequestPending.sender}" has requested to sync settings. Do you want to sync your model and parameters?`}
-              </p>
-              <div style={{ backgroundColor: 'hsl(var(--bg-input))', padding: '12px', borderRadius: 'var(--radius-md)', border: '1px solid hsl(var(--border))', fontSize: '0.8rem', fontFamily: 'monospace', marginBottom: '20px' }}>
-                <div>Model: {syncRequestPending.activeModel || 'None'}</div>
-                <div>Temp: {syncRequestPending.parameters?.temperature ?? 'N/A'}</div>
-                <div>Context: {syncRequestPending.parameters?.num_ctx ?? 'N/A'}</div>
-                <div>Reasoning: {syncRequestPending.thinkMode ? 'ON' : 'OFF'}</div>
-              </div>
-            </div>
-            <div className="modal-footer" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-              <button className="btn-secondary" onClick={() => setSyncRequestPending(null)}>
-                {lang === 'ja' ? '拒否' : 'Deny'}
-              </button>
-              <button className="btn-accent" onClick={handleAcceptSyncRequest}>
-                {lang === 'ja' ? '承認' : 'Accept'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <SyncModal
+        syncRequestPending={syncRequestPending}
+        onAccept={handleAcceptSyncRequest}
+        onReject={() => setSyncRequestPending(null)}
+        lang={lang}
+      />
+
+      {/* 6. Model Error Modal */}
+      <ModelErrorModal
+        modelLoadError={modelLoadError}
+        onClose={() => setModelLoadError('')}
+        lang={lang}
+      />
 
     </div>
   );

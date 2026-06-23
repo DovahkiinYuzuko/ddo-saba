@@ -77,9 +77,38 @@ function post_message(r) {
 function get_message(r) {
     update_active_users(r);
     var dict = ngx.shared.broadcast_zone;
-    var val = dict.get("latest");
+    var sinceId = r.headersIn['X-DDO-Since-Id'];
+    
+    var historyStr = dict.get("history");
+    var history = [];
+    if (historyStr) {
+        try {
+            history = JSON.parse(historyStr);
+        } catch (e) {
+            history = [];
+        }
+    }
+    
+    var newMessages = [];
+    if (sinceId) {
+        var foundIndex = -1;
+        for (var i = 0; i < history.length; i++) {
+            if (history[i].id === sinceId) {
+                foundIndex = i;
+                break;
+            }
+        }
+        if (foundIndex !== -1) {
+            newMessages = history.slice(foundIndex + 1);
+        } else {
+            newMessages = history;
+        }
+    } else {
+        newMessages = [];
+    }
+    
     r.headersOut['Content-Type'] = 'application/json';
-    r.return(200, val || JSON.stringify({}));
+    r.return(200, JSON.stringify(newMessages));
 }
 
 function get_history(r) {

@@ -1,196 +1,48 @@
 # Variable and Function Specifications: `app.tsx`
 
-This document specifies the states, variables, and functions used in `web-ui/src/app.tsx`, which governs the main ChatUI coordination, tab management, and Ollama integration stream flows.
+This document specifies the states, variables, and functions used in `web-ui/src/App.tsx`, which governs the main ChatUI coordination, tab management, and Ollama integration stream flows. After the refactoring, `App.tsx` delegates sub-functions to custom hooks (`useChatActions`, `useFileIO`) and UI components (`Sidebar`, `ChatHeader`, `ChatInputArea`, `SyncModal`, `ModelErrorModal`).
 
 ---
 
 ## 1. State Variables
 
-All states defined below use React's `useState` or `useRef`.
+Most state is managed via `useChatMachineState`. `App.tsx` extracts these states using the `adapters`.
 
-### `chats`
-- **Type:** `Array` of `ChatSession` objects
-- **Description:** Holds all active temporary chat tabs.
+### Shared States
+Refer to `chatMachine.md` for the core state variables (e.g., `chats`, `activeChatId`, `settings`, `models`, `activeModel`, `systemPrompt`, `parameters`, `thinkMode`, `isGenerating`, `isRemoteGenerating`, `jobQueue`, `myJobId`).
 
-### `activeChatId`
-- **Type:** `string | null`
-- **Description:** Tracks the ID of the currently selected and active chat tab.
-
-### `settings`
-- **Type:** `DdoSettings`
-- **Description:** Tracks host configurations (connectionUrl, accessToken, isSharedMode, username). On initial load, parses `token` or `accessToken` from the URL query parameters to auto-populate the `accessToken`. Additionally, parses `sharedMode` or `isSharedMode` from the query parameters to auto-populate `isSharedMode`.
-
-### `models`
-- **Type:** `Array` of `OllamaModelInfo`
-- **Description:** List of installed models fetched from Ollama tags endpoint.
-
-### `activeModel`
-- **Type:** `string`
-- **Description:** The currently selected active model.
-
-### `systemPrompt`
-- **Type:** `string`
-- **Description:** Prompt instructions configured in the parameters column.
-
-### `parameters`
-- **Type:** `DdoParameters`
-- **Description:** Model generation settings passed inside options payload.
-
-### `thinkMode`
-- **Type:** `boolean`
-- **Description:** Toggles the global `"think"` parameter in the API payload.
-
-### `psInfo`
-- **Type:** `PsModelInfo | null`
-- **Description:** Loaded VRAM/running metrics.
-
-### `isGenerating`
-- **Type:** `boolean`
-- **Description:** Tracks if an inference streaming fetch is currently in progress.
-
-### `isGeneratingRef`
-- **Type:** `React.MutableRefObject<boolean>`
-- **Description:** A React `useRef` holding the active `isGenerating` boolean value to prevent keep-alive resetting and double execution of the inference stream.
-
-### `abortControllerRef`
-- **Type:** `React.MutableRefObject<AbortController | null>`
-- **Description:** Ref holding the `AbortController` instance to cancel ongoing fetch requests.
-
-### `sendOnEnter`
-- **Type:** `boolean`
-- **Description:** Toggles the Enter key behavior shortcut.
-
-### `contextUsed`
-- **Type:** `number`
-- **Description:** Tracks total token usage of the current chat message.
-
-### `presetName`
-- **Type:** `string`
-- **Description:** Name assigned to the current preset parameters.
-
-### `numPredictEnabled`
-- **Type:** `boolean`
-- **Description:** Toggles whether the `num_predict` parameter is included.
-
-### `isModelLoading`
-- **Type:** `boolean`
-- **Description:** Tracks background model loading state.
-
-### `modelLoadError`
-- **Type:** `string`
-- **Description:** Holds error messages when model loading fails.
-
-### `collapseThinking`
-- **Type:** `boolean`
-- **Description:** Toggles whether CoT blocks default to collapsed.
-
-### `lastPolledMsgId`
-- **Type:** `string`
-- **Description:** Tracks the ID of the last polled message in shared room mode.
-
-### `lastPolledMsgIdRef`
-- **Type:** `React.MutableRefObject<string>`
-- **Description:** A React `useRef` holding `lastPolledMsgId` to avoid interval resets.
-
-### `activeUserCount`
-- **Type:** `number`
-- **Description:** Tracks the current number of active users connected to the shared room, received from the polling API. Used to determine if the local client is the last active user before closing the tab.
-- **Default:** `1`
-
-### `isSidebarOpen`
-- **Type:** `boolean`
-- **Description:** Tracks mobile left sidebar status.
-
-### `isParamsOpen`
-- **Type:** `boolean`
-- **Description:** Tracks mobile right panel status.
-
-### `messagesContainerRef`
-- **Type:** `React.MutableRefObject<HTMLDivElement | null>`
-- **Description:** Tracks the HTMLDivElement scroll container of the chat message list to directly manipulate `scrollTop` for scroll synchronization.
-
-### `lastModelChangeTime`
-- **Type:** `number`
-- **Description:** Holds the millisecond timestamp of the last local model change (selection or unload) to prevent poll echoes.
-
-### `syncRequestPending`
-- **Type:** `object | null`
-- **Description:** Holds pending settings sync request data received from other clients (`activeModel`, `systemPrompt`, `parameters`, `thinkMode`, `sender`).
-- **Default:** `null`
-
-### `isRemoteGenerating`
-- **Type:** `boolean`
-- **Description:** Tracks whether another client is currently running an inference stream.
-- **Default:** `false`
-
-### `isRemoteGeneratingRef`
-- **Type:** `React.MutableRefObject<boolean>`
-- **Description:** A React `useRef` holding the active `isRemoteGenerating` boolean value to prevent keep-alive and selection resetting during remote generation.
-
-
-### `remoteGeneratingText`
-- **Type:** `string`
-- **Description:** Stores the real-time generated content streamed from another client.
-- **Default:** `""`
-
-### `lastModelSender`
-- **Type:** `string`
-- **Description:** Tracks the username of the peer who last changed or loaded the active model. Used to determine ownership for handling VRAM unloading cleanups.
-
-### `jobQueue`
-- **Type:** `Array` of `QueueJob` objects
-- **Description:** Holds the list of active jobs in the inference queue.
-- **Default:** `[]`
-
-### `myJobId`
-- **Type:** `string | null`
-- **Description:** Tracks the unique ID of the user's active job in the queue.
-- **Default:** `null`
-
-### `pendingMessage`
-- **Type:** `string`
-- **Description:** Stores the prompt text temporarily in client memory while waiting in the queue.
-- **Default:** `""`
+### Local Refs
+- **`isGeneratingRef`**, **`isRemoteGeneratingRef`**: React `useRef` holding active boolean values to prevent keep-alive resetting during generation.
+- **`abortControllerRef`**: Ref holding the `AbortController` instance to cancel ongoing fetch requests.
+- **`prevIsSharedModeRef`**: Tracks the previous shared mode state to detect toggle transitions.
+- **`messagesContainerRef`**: Tracks the scroll container to synchronize scrolling.
 
 ---
 
 ## 2. Functions
 
-### `formatTimestamp`
-- **Description:** Formats a date object or an ISO timestamp string into `yyyy/MM/dd-HH:mm`.
-- **Arguments:**
-  - `dateInput` (`string | Date`): Input date.
-- **Return Value:** `string`
-
-### `sendMessage`
-- **Description:** Sends a user prompt. If in Shared Room Mode, it first issues a `joinQueue` request to register in the queue. Only after successful queue confirmation does it clear the input field (`setInputText('')`), set `pendingMessage` to the prompt text, set `myJobId` to the generated job ID, and poll the queue. Unlike Private Mode, it does not append the user message bubble to `chats` or broadcast it immediately. If not in Shared Room Mode, it immediately clears the input field, appends the user bubble, and calls `runInferenceStream`.
-- **Arguments:** None.
-- **Return Value:** `Promise<void>`
-
-### `runInferenceStream`
-- **Description:** Initiates the Ollama chat stream. In Shared Room Mode, if Nginx returns a 503 Service Unavailable error due to concurrent connection limits, it waits for 1 second and retries (up to 3 times) before throwing an error. Upon completion or abort, it clears the queue status by calling `completeQueue` and resetting queue-related states.
-- **Arguments:**
-  - `jobIdToComplete` (`string | null`, optional): The active queue job ID to complete upon termination.
-- **Return Value:** `Promise<void>`
-
-### `stopGeneration`
-- **Description:** Aborts the current streaming API request.
-- **Arguments:** None.
-- **Return Value:** `void`
+### Custom Hooks
+- **`useChatActions`**: Provides `runInferenceStream`, `sendMessage`, `handleCancelQueue`, `stopGeneration`.
+- **`useFileIO`**: Provides `exportCassette`, `importCassette`, `exportPreset`, `importPreset`, `handleDropCassette`, `handleDragOver`.
 
 ### `addNewTab`
 - **Description:** Spawns a new chat tab with a default blank history. If in Shared Room Mode, broadcasts a `tab_create:ID:Title` system message.
-- **Arguments:** None.
+- **Arguments:**
+  - `isRemote` (`boolean`): Whether the creation was triggered remotely.
+  - `remoteId` (`string`, optional)
+  - `remoteTitle` (`string`, optional)
 - **Return Value:** `void`
 
 ### `deleteTab`
 - **Description:** Closes and deletes a specific chat session. If in Shared Room Mode, broadcasts a `tab_delete:ID` system message.
 - **Arguments:**
   - `id` (`string`): Target chat session ID.
+  - `e` (`React.MouseEvent`, optional): Click event.
+  - `isRemote` (`boolean`): Whether the deletion was triggered remotely.
 - **Return Value:** `void`
 
 ### `handleUnloadModel`
-- **Description:** Unloads the currently active model from Ollama VRAM by hitting the API, then updates state `psInfo` to null, triggers `fetchModelsAndPs`, clears state `activeModel` to resetting the UI select element back to "Select a model...", updates `lastModelChangeTime`, and broadcasts model clear command if Shared Room Mode is enabled.
+- **Description:** Unloads the currently active model from Ollama VRAM by hitting the API, updates `psInfo`, triggers `fetchModelsAndPs`, and clears `activeModel`.
 - **Arguments:** None.
 - **Return Value:** `Promise<void>`
 
@@ -204,15 +56,11 @@ All states defined below use React's `useState` or `useRef`.
 - **Arguments:** None.
 - **Return Value:** `void`
 
-### `Model Synchronization, VRAM Cleanups & 503 Bypass`
-- **Description:** When the model selection is synchronized automatically via polling (`pollModel`), only `activeModel` is updated. Unlike manual selection, `loadModelOnSelection` (calling `/api/generate`) is bypassed to prevent redundant network pre-loads that trigger Nginx's concurrent connection limit (`503 Service Unavailable`). Additionally, when Ollama's active VRAM state changes, `activeModel` is cleared automatically. However, to prevent premature selection resets when Ollama is temporarily loading or busy, this cleanup is bypassed if either local generation (`isGenerating`) or remote generation (`isRemoteGenerating`) is active.
-
-### `Auto-Unload Model on Tab Closure`
-- **Description:** In Private Mode (when `settings.isSharedMode` is `false`), closing or reloading the browser tab triggers an automatic model unload request (`/api/chat` with `keep_alive: 0`) using `fetch` with `keepalive: true` to free up VRAM instantly. This is bypassed in Shared Room Mode to avoid affecting other active clients.
-
-
-### `Shared Room Mode Tab Synchronization`
-- **Description:** When `settings.isSharedMode` transitions from `false` to `true`, the local client automatically serializes and broadcasts all existing chat tabs and histories (`chats`) to the broadcast server so they are fully synchronized with newly connected clients (e.g. mobile phones).
+### `loadModelOnSelection`
+- **Description:** Initiates pre-loading of a model into VRAM when selected from the dropdown. Sets `isModelLoading` and `modelLoadError` during the process.
+- **Arguments:**
+  - `modelName` (`string`)
+- **Return Value:** `Promise<void>`
 
 ---
 
@@ -220,37 +68,25 @@ All states defined below use React's `useState` or `useRef`.
 
 ```mermaid
 graph TD
-    App --> sendMessage
-    App --> runInferenceStream
-    App --> stopGeneration
+    App --> Sidebar
+    App --> ChatHeader
+    App --> ChatInputArea
+    App --> ChatMessages
+    App --> ParameterPanel
+    App --> SettingsModal
+    App --> SyncModal
+    App --> ModelErrorModal
+
+    App --> useChatMachineState
+    App --> useChatActions
+    App --> useFileIO
+
     App --> addNewTab
     App --> deleteTab
     App --> handleUnloadModel
-    App --> SettingsModal
-    App --> ParameterPanel
-    App --> ChatMessages
-
-    App --> isSidebarOpen
-    App --> isParamsOpen
-    App --> lastModelChangeTime
+    App --> broadcastSettings
 
     App --> broadcastModel[broadcastModel API]
     App --> pollModel[pollModel API]
-
-    sendMessage --> activeModel
-    sendMessage --> settings
-    sendMessage --> joinQueue[joinQueue API]
-
-    runInferenceStream --> activeModel
-    runInferenceStream --> systemPrompt
-    runInferenceStream --> parameters
-    runInferenceStream --> thinkMode
-    runInferenceStream --> chats
-    runInferenceStream --> settings
-    runInferenceStream --> abortControllerRef
-    runInferenceStream --> completeQueue[completeQueue API]
-    runInferenceStream --> broadcastMessage[broadcastMessage API]
-
-    addNewTab --> settings
-    deleteTab --> settings
+    App --> fetchHistory[fetchHistory API]
 ```

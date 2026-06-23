@@ -11,7 +11,7 @@ This document specifies the variables and functions used in `nginx/conf/broadcas
 - **Description:** The global Nginx object provided by the njs runtime. Accesses the shared dictionary zone `shared.broadcast_zone` which is allocated in memory to temporarily cache the latest broadcasted chat message. Key-value pairs in this zone automatically expire after 5 seconds.
 - **Scope:** Global.
 
-### `process` (L247-247)
+### `process` (L276-276)
 - **Type:** `Object` (Global Process Object)
 - **Description:** The process object provided by njs to access environmental variables. Accesses `env.DDO_SABA_TOKEN` to retrieve the access credential set by the server host.
 - **Scope:** Global.
@@ -33,7 +33,7 @@ This document specifies the variables and functions used in `nginx/conf/broadcas
   5. Retrieves `"history"` JSON from `ngx.shared.broadcast_zone`, parses it (defaults to `[]`), pushes the new message, caps the array to the last 100 items, and serializes it back to the `"history"` key.
   6. Returns HTTP `200` with the generated message ID.
 
-### `get_message` (L77-83)
+### `get_message` (L77-112)
 - **Description:** Receives a HTTP `GET` request and returns the latest message stored in the memory zone.
 - **Arguments:**
   - `r` (`Object`): The Nginx HTTP request object.
@@ -43,7 +43,7 @@ This document specifies the variables and functions used in `nginx/conf/broadcas
   2. Sets response `Content-Type` header to `application/json`.
   3. Returns the payload with HTTP status `200`.
 
-### `get_history` (L85-91)
+### `get_history` (L114-120)
 - **Description:** Receives a HTTP `GET` request and returns the entire active session history array.
 - **Arguments:**
   - `r` (`Object`): The Nginx HTTP request object.
@@ -53,19 +53,19 @@ This document specifies the variables and functions used in `nginx/conf/broadcas
   2. Sets response `Content-Type` header to `application/json`.
   3. Returns the payload or `[]` with status `200`.
 
-### `post_model` (L93-106)
+### `post_model` (L122-135)
 - **Description:** Receives a HTTP `POST` request containing model details and real-time generation/sync status, and stores the raw JSON object string under the `"model"` key.
 - **Arguments:**
   - `r` (`Object`): The Nginx HTTP request object.
 - **Return Value:** None (Sends HTTP `200` or `400`).
 
-### `get_model` (L108-114)
+### `get_model` (L137-143)
 - **Description:** Receives a HTTP `GET` request and returns the stored raw JSON object representing the active model and real-time status details.
 - **Arguments:**
   - `r` (`Object`): The Nginx HTTP request object.
 - **Return Value:** None (Sends HTTP `200`).
 
-### `auth_check` (L246-261)
+### `auth_check` (L275-290)
 - **Description:** Authenticates request headers targeting `/api/` endpoints by comparing the incoming token with the host-configured token.
 - **Arguments:**
   - `r` (`Object`): The Nginx HTTP request object.
@@ -76,7 +76,7 @@ This document specifies the variables and functions used in `nginx/conf/broadcas
   3. Inspects header `X-DDO-Token`. If it matches the expected token, sends HTTP `200`.
   4. Otherwise, returns HTTP `403` with a forbidden message.
 
-### `handle_queue` (L124-244)
+### `handle_queue` (L153-273)
 - **Description:** Manages the shared inference queue in Mac/Linux environments using `ngx.shared.broadcast_zone` with `"queue"` key.
 - **Arguments:**
   - `r` (`Object`): The Nginx HTTP request object.

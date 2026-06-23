@@ -12,10 +12,14 @@ const getHeaders = (accessToken: string, username?: string): HeadersInit => {
 export const pollMessage = async (
   connectionUrl: string,
   accessToken: string,
+  sinceId: string,
   username?: string,
   onActiveCount?: (count: number) => void
-): Promise<unknown> => {
-  const headers = getHeaders(accessToken, username);
+): Promise<any[]> => {
+  const headers = getHeaders(accessToken, username) as Record<string, string>;
+  if (sinceId) {
+    headers['X-DDO-Since-Id'] = sinceId;
+  }
   const res = await fetch(`${connectionUrl}/api/poll`, { headers });
   if (!res.ok) {
     throw new Error(`HTTP ${res.status}`);
