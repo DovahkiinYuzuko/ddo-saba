@@ -7,159 +7,128 @@ export function useChatMachineState() {
   const [state, send] = useMachine(chatMachine);
 
   const setIsSidebarOpen = useCallback((val: boolean | ((prev: boolean) => boolean)) => {
-    const newVal = typeof val === 'function' ? val(state.context.isSidebarOpen) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { isSidebarOpen: newVal } });
-  }, [send, state.context.isSidebarOpen]);
+    send({ type: 'UPDATE_CONTEXT', payload: { isSidebarOpen: val } });
+  }, [send]);
 
   const setIsParamsOpen = useCallback((val: boolean | ((prev: boolean) => boolean)) => {
-    const newVal = typeof val === 'function' ? val(state.context.isParamsOpen) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { isParamsOpen: newVal } });
-  }, [send, state.context.isParamsOpen]);
+    send({ type: 'UPDATE_CONTEXT', payload: { isParamsOpen: val } });
+  }, [send]);
 
   const setPresetName = useCallback((val: string | ((prev: string) => string)) => {
-    const newVal = typeof val === 'function' ? val(state.context.presetName) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { presetName: newVal } });
-  }, [send, state.context.presetName]);
+    send({ type: 'UPDATE_CONTEXT', payload: { presetName: val } });
+  }, [send]);
 
   const setInputText = useCallback((val: string | ((prev: string) => string)) => {
-    const newVal = typeof val === 'function' ? val(state.context.inputText) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { inputText: newVal } });
-  }, [send, state.context.inputText]);
+    send({ type: 'UPDATE_CONTEXT', payload: { inputText: val } });
+  }, [send]);
 
   const setShowSettingsModal = useCallback((val: boolean | ((prev: boolean) => boolean)) => {
-    const newVal = typeof val === 'function' ? val(state.context.showSettingsModal) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { showSettingsModal: newVal } });
-  }, [send, state.context.showSettingsModal]);
+    send({ type: 'UPDATE_CONTEXT', payload: { showSettingsModal: val } });
+  }, [send]);
 
   const setNumPredictEnabled = useCallback((val: boolean | ((prev: boolean) => boolean)) => {
-    const newVal = typeof val === 'function' ? val(state.context.numPredictEnabled) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { numPredictEnabled: newVal } });
-  }, [send, state.context.numPredictEnabled]);
+    send({ type: 'UPDATE_CONTEXT', payload: { numPredictEnabled: val } });
+  }, [send]);
 
   const setIsModelLoading = useCallback((val: boolean | ((prev: boolean) => boolean)) => {
-    const newVal = typeof val === 'function' ? val(state.context.isModelLoading) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { isModelLoading: newVal } });
-  }, [send, state.context.isModelLoading]);
+    send({ type: 'UPDATE_CONTEXT', payload: { isModelLoading: val } });
+  }, [send]);
 
   const setModelLoadError = useCallback((val: string | ((prev: string) => string)) => {
-    const newVal = typeof val === 'function' ? val(state.context.modelLoadError) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { modelLoadError: newVal } });
-  }, [send, state.context.modelLoadError]);
+    send({ type: 'UPDATE_CONTEXT', payload: { modelLoadError: val } });
+  }, [send]);
 
   const setCollapseThinking = useCallback((val: boolean | ((prev: boolean) => boolean)) => {
-    const newVal = typeof val === 'function' ? val(state.context.collapseThinking) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { collapseThinking: newVal } });
-  }, [send, state.context.collapseThinking]);
+    send({ type: 'UPDATE_CONTEXT', payload: { collapseThinking: val } });
+  }, [send]);
 
   const setActiveModel = useCallback((val: string | ((prev: string) => string)) => {
-    const newVal = typeof val === 'function' ? val(state.context.activeModel) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { activeModel: newVal } });
-  }, [send, state.context.activeModel]);
+    send({ type: 'UPDATE_CONTEXT', payload: { activeModel: val } });
+  }, [send]);
 
   const setSystemPrompt = useCallback((val: string | ((prev: string) => string)) => {
-    const newVal = typeof val === 'function' ? val(state.context.systemPrompt) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { systemPrompt: newVal } });
-  }, [send, state.context.systemPrompt]);
+    send({ type: 'UPDATE_CONTEXT', payload: { systemPrompt: val } });
+  }, [send]);
 
   const setParameters = useCallback((val: DdoParameters | ((prev: DdoParameters) => DdoParameters)) => {
-    const newVal = typeof val === 'function' ? val(state.context.parameters) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { parameters: newVal } });
-  }, [send, state.context.parameters]);
+    send({ type: 'UPDATE_CONTEXT', payload: { parameters: val } });
+  }, [send]);
 
   const setThinkMode = useCallback((val: boolean | ((prev: boolean) => boolean)) => {
-    const newVal = typeof val === 'function' ? val(state.context.thinkMode) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { thinkMode: newVal } });
-  }, [send, state.context.thinkMode]);
+    send({ type: 'UPDATE_CONTEXT', payload: { thinkMode: val } });
+  }, [send]);
 
   const setSyncRequestPending = useCallback((val: any | ((prev: any) => any)) => {
-    const newVal = typeof val === 'function' ? val(state.context.syncRequestPending) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { syncRequestPending: newVal } });
-  }, [send, state.context.syncRequestPending]);
+    send({ type: 'UPDATE_CONTEXT', payload: { syncRequestPending: val } });
+  }, [send]);
 
   const setIsRemoteGenerating = useCallback((val: boolean | ((prev: boolean) => boolean)) => {
-    const newVal = typeof val === 'function' ? val(state.context.isRemoteGenerating) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { isRemoteGenerating: newVal } });
-  }, [send, state.context.isRemoteGenerating]);
+    send({ type: 'UPDATE_CONTEXT', payload: { isRemoteGenerating: val } });
+  }, [send]);
 
   const setRemoteGeneratingText = useCallback((val: string | ((prev: string) => string)) => {
-    const newVal = typeof val === 'function' ? val(state.context.remoteGeneratingText) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { remoteGeneratingText: newVal } });
-  }, [send, state.context.remoteGeneratingText]);
+    send({ type: 'UPDATE_CONTEXT', payload: { remoteGeneratingText: val } });
+  }, [send]);
 
   const setPsInfo = useCallback((val: PsModelInfo | null | ((prev: PsModelInfo | null) => PsModelInfo | null)) => {
-    const newVal = typeof val === 'function' ? val(state.context.psInfo) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { psInfo: newVal } });
-  }, [send, state.context.psInfo]);
+    send({ type: 'UPDATE_CONTEXT', payload: { psInfo: val } });
+  }, [send]);
 
   const setIsGenerating = useCallback((val: boolean | ((prev: boolean) => boolean)) => {
-    const newVal = typeof val === 'function' ? val(state.context.isGenerating) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { isGenerating: newVal } });
-  }, [send, state.context.isGenerating]);
+    send({ type: 'UPDATE_CONTEXT', payload: { isGenerating: val } });
+  }, [send]);
 
   const setSendOnEnter = useCallback((val: boolean | ((prev: boolean) => boolean)) => {
-    const newVal = typeof val === 'function' ? val(state.context.sendOnEnter) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { sendOnEnter: newVal } });
-  }, [send, state.context.sendOnEnter]);
+    send({ type: 'UPDATE_CONTEXT', payload: { sendOnEnter: val } });
+  }, [send]);
 
   const setContextUsed = useCallback((val: number | ((prev: number) => number)) => {
-    const newVal = typeof val === 'function' ? val(state.context.contextUsed) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { contextUsed: newVal } });
-  }, [send, state.context.contextUsed]);
+    send({ type: 'UPDATE_CONTEXT', payload: { contextUsed: val } });
+  }, [send]);
 
   const setLastModelChangeTime = useCallback((val: number | ((prev: number) => number)) => {
-    const newVal = typeof val === 'function' ? val(state.context.lastModelChangeTime) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { lastModelChangeTime: newVal } });
-  }, [send, state.context.lastModelChangeTime]);
+    send({ type: 'UPDATE_CONTEXT', payload: { lastModelChangeTime: val } });
+  }, [send]);
 
   const setLastModelSender = useCallback((val: string | ((prev: string) => string)) => {
-    const newVal = typeof val === 'function' ? val(state.context.lastModelSender) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { lastModelSender: newVal } });
-  }, [send, state.context.lastModelSender]);
+    send({ type: 'UPDATE_CONTEXT', payload: { lastModelSender: val } });
+  }, [send]);
 
   const setJobQueue = useCallback((val: QueueJob[] | ((prev: QueueJob[]) => QueueJob[])) => {
-    const newVal = typeof val === 'function' ? val(state.context.jobQueue) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { jobQueue: newVal } });
-  }, [send, state.context.jobQueue]);
+    send({ type: 'UPDATE_CONTEXT', payload: { jobQueue: val } });
+  }, [send]);
 
   const setMyJobId = useCallback((val: string | null | ((prev: string | null) => string | null)) => {
-    const newVal = typeof val === 'function' ? val(state.context.myJobId) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { myJobId: newVal } });
-  }, [send, state.context.myJobId]);
+    send({ type: 'UPDATE_CONTEXT', payload: { myJobId: val } });
+  }, [send]);
 
   const setPendingMessage = useCallback((val: string | ((prev: string) => string)) => {
-    const newVal = typeof val === 'function' ? val(state.context.pendingMessage) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { pendingMessage: newVal } });
-  }, [send, state.context.pendingMessage]);
+    send({ type: 'UPDATE_CONTEXT', payload: { pendingMessage: val } });
+  }, [send]);
 
   const setActiveUserCount = useCallback((val: number | ((prev: number) => number)) => {
-    const newVal = typeof val === 'function' ? val(state.context.activeUserCount) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { activeUserCount: newVal } });
-  }, [send, state.context.activeUserCount]);
+    send({ type: 'UPDATE_CONTEXT', payload: { activeUserCount: val } });
+  }, [send]);
 
   const setChats = useCallback((val: ChatSession[] | ((prev: ChatSession[]) => ChatSession[])) => {
-    const newVal = typeof val === 'function' ? val(state.context.chats) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { chats: newVal } });
-  }, [send, state.context.chats]);
+    send({ type: 'UPDATE_CONTEXT', payload: { chats: val } });
+  }, [send]);
 
   const setActiveChatId = useCallback((val: string | null | ((prev: string | null) => string | null)) => {
-    const newVal = typeof val === 'function' ? val(state.context.activeChatId) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { activeChatId: newVal } });
-  }, [send, state.context.activeChatId]);
+    send({ type: 'UPDATE_CONTEXT', payload: { activeChatId: val } });
+  }, [send]);
 
   const setSettings = useCallback((val: DdoSettings | ((prev: DdoSettings) => DdoSettings)) => {
-    const newVal = typeof val === 'function' ? val(state.context.settings) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { settings: newVal } });
-  }, [send, state.context.settings]);
+    send({ type: 'UPDATE_CONTEXT', payload: { settings: val } });
+  }, [send]);
 
   const setModels = useCallback((val: OllamaModelInfo[] | ((prev: OllamaModelInfo[]) => OllamaModelInfo[])) => {
-    const newVal = typeof val === 'function' ? val(state.context.models) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { models: newVal } });
-  }, [send, state.context.models]);
+    send({ type: 'UPDATE_CONTEXT', payload: { models: val } });
+  }, [send]);
 
   const setExpandedThinking = useCallback((val: Record<string, boolean> | ((prev: Record<string, boolean>) => Record<string, boolean>)) => {
-    const newVal = typeof val === 'function' ? val(state.context.expandedThinking) : val;
-    send({ type: 'UPDATE_CONTEXT', payload: { expandedThinking: newVal } });
-  }, [send, state.context.expandedThinking]);
+    send({ type: 'UPDATE_CONTEXT', payload: { expandedThinking: val } });
+  }, [send]);
 
   return {
     state,

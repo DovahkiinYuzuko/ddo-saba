@@ -65,7 +65,7 @@ Manages real-time polling synchronization with the server in Shared Room Mode.
 - **`UNLOAD_SUCCESS`**: Indicates the VRAM was successfully cleared.
 - **`PEER_START_GENERATE`**: Detected via polling; signals that a remote client has started generation.
 - **`PEER_COMPLETE_GENERATE`**: Detected via polling; signals that a remote client has finished generation.
-- **`UPDATE_CONTEXT`**: Generic event to update context fields (e.g., `chats`, `jobQueue`, `activeUserCount`).
+- **`UPDATE_CONTEXT`**: Generic event to update context fields (e.g., `chats`, `jobQueue`, `activeUserCount`). Supports functional updates: if a payload property is a function, it evaluates the function with the current context's field value as the parameter.
 
 ---
 
@@ -75,6 +75,14 @@ Manages real-time polling synchronization with the server in Shared Room Mode.
 graph TD
     App --> useMachine[useMachine hook]
     useMachine --> chatMachine
+    
+    UPDATE_CONTEXT[UPDATE_CONTEXT Event] --> AssignAction[Assign Action]
+    AssignAction --> EvaluateVal{Is payload value a function?}
+    EvaluateVal -- Yes --> EvalFn[val(currentContextValue)]
+    EvaluateVal -- No --> DirectVal[Direct Value]
+    
+    EvalFn --> ApplyContext[Apply to context]
+    DirectVal --> ApplyContext
 
     chatMachine --> localState[Local State]
     chatMachine --> syncState[Sync State]
@@ -88,3 +96,11 @@ graph TD
     localState -.-> context[Machine Context]
     syncState -.-> context
 ```
+
+---
+
+## 5. Impact Scope
+
+The modifications to `UPDATE_CONTEXT` affect:
+1. `useChatMachineState.ts`: Every setter function (adapter) can now dispatch values or functional state updaters without listing context fields in their React `useCallback` dependency arrays, mitigating React stale closure issues.
+2. `useChatActions.ts` and `useFileIO.ts`: Consumers of setters can invoke functions like `setChats(prev => ...)` or `setParameters(prev => ...)` reliably, ensuring updates are batched and executed sequentially on the latest state machine context.

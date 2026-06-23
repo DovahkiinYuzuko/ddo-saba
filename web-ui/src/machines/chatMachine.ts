@@ -39,6 +39,10 @@ export interface ChatMachineContext {
   lastPolledMsgId: string;
 }
 
+export type FunctionalUpdate<T> = {
+  [K in keyof T]?: T[K] | ((prev: T[K]) => T[K]);
+};
+
 export type ChatMachineEvent =
   | { type: 'SELECT_MODEL'; modelName: string }
   | { type: 'START_GENERATE' }
@@ -54,7 +58,7 @@ export type ChatMachineEvent =
   | { type: 'STOP_POLLING' }
   | { type: 'PEER_START_GENERATE' }
   | { type: 'PEER_COMPLETE_GENERATE' }
-  | { type: 'UPDATE_CONTEXT'; payload: Partial<ChatMachineContext> };
+  | { type: 'UPDATE_CONTEXT'; payload: FunctionalUpdate<ChatMachineContext> };
 
 export const chatMachine = createMachine(
   {
@@ -176,7 +180,17 @@ export const chatMachine = createMachine(
       UPDATE_CONTEXT: {
         actions: assign(({ context, event }) => {
           if (event.type === 'UPDATE_CONTEXT') {
-            return { ...context, ...event.payload };
+            const nextContext = { ...context };
+            const payload = event.payload as FunctionalUpdate<ChatMachineContext>;
+            for (const key in payload) {
+              const val = (payload as any)[key];
+              if (typeof val === 'function') {
+                (nextContext as any)[key] = val((context as any)[key]);
+              } else {
+                (nextContext as any)[key] = val;
+              }
+            }
+            return nextContext;
           }
           return context;
         })

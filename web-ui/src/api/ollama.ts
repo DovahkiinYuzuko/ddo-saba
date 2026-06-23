@@ -28,13 +28,16 @@ export const loadModelOnSelection = async (
     body: JSON.stringify({
       model: modelName,
       options: optionsPayload,
-      keep_alive: 300
+      keep_alive: 300,
+      stream: false
     })
   });
 
   if (!res.ok) {
     throw new Error(`HTTP ${res.status}: ${res.statusText}`);
   }
+
+  await res.text();
 };
 
 export const fetchModels = async (
@@ -111,7 +114,8 @@ export const unloadModel = async (
         body: JSON.stringify({
           model: modelName,
           messages: [],
-          keep_alive: 0
+          keep_alive: 0,
+          stream: false
         })
       });
 
@@ -139,4 +143,6 @@ export const unloadModel = async (
   if (!res.ok) {
     throw new Error(`Unload failed with status ${res.status}`);
   }
+
+  await res.text();
 };

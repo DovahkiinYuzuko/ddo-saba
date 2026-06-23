@@ -513,10 +513,10 @@ export default function App() {
       setPsInfo(fetchedPs);
 
       // Automatically clear active model selection if it was unloaded from VRAM (psInfo is null)
-      // and we are not currently loading a model, and we are the owner of the last model choice.
       // Bypassed if local or remote generation is active to prevent VRAM load fluctuation resets.
-      const isModelOwner = lastModelSender === settings.username;
-      if (isModelOwner && !fetchedPs && activeModel && !isModelLoading && !isGeneratingRef.current && !isRemoteGeneratingRef.current) {
+      // Implement 15 seconds grace period from lastModelChangeTime to prevent clearing right after load.
+      const isGracePeriodOver = (Date.now() - lastModelChangeTime) > 15000;
+      if (!fetchedPs && activeModel && !isModelLoading && isGracePeriodOver && !isGeneratingRef.current && !isRemoteGeneratingRef.current) {
         setActiveModel('');
         setLastModelSender(settings.username);
         const now = Date.now();
@@ -524,12 +524,11 @@ export default function App() {
         if (settings.isSharedMode) {
           void broadcastModel(settings.connectionUrl, settings.accessToken, settings.username, '', now);
         }
-        fetchModelsAndPs();
       }
     } catch (e) {
       console.error("Failed to connect to Ollama Server status endpoints.", e);
     }
-  }, [settings.connectionUrl, settings.accessToken, activeModel, isModelLoading, lastModelSender, settings.username]);
+  }, [settings.connectionUrl, settings.accessToken, activeModel, isModelLoading, lastModelSender, settings.username, lastModelChangeTime]);
 
   useEffect(() => {
     setTimeout(() => {
@@ -791,70 +790,59 @@ export default function App() {
         const wasRemoteGenerating = isRemoteGeneratingRef.current;
         const isNowGenerating = data.isGenerating === true;
 
+        // 1. Update remote generating state regardless of who the sender is
+        if (data.isGenerating !== undefined) {
+          setIsRemoteGenerating(data.isGenerating);
+          if (data.generatingText !== undefined) {
+            setRemoteGeneratingText(data.generatingText || '');
+          }
+        }
+
+        // 2. Handle remote model changes (only when from a peer user)
         if (data.sender && data.sender !== settings.username) {
           if (data.model !== undefined && data.model !== activeModel) {
             setActiveModel(data.model);
             setLastModelSender(data.sender);
             setLastModelChangeTime(Date.now());
           }
+        }
 
-          if (wasRemoteGenerating && !isNowGenerating) {
-            // Commit final text when remote generation ends
-            const textToCommit = data.generatingText || remoteGeneratingText;
-            if (textToCommit && activeChatId) {
-              setChats(prev => prev.map(c => {
-                if (c.id === activeChatId) {
-                  const lastMsg = c.messages[c.messages.length - 1];
-                  if (lastMsg && lastMsg.role === 'assistant' && lastMsg.content === textToCommit) {
-                    return c;
-                  }
-                  return {
-                    ...c,
-                    messages: [...c.messages, {
-                      id: Date.now().toString() + "_remote_ai",
-                      role: 'assistant',
-                      content: textToCommit,
-                      sender: data.model || activeModel || 'AI',
-                      timestamp: formatTimestamp(new Date())
-                    }]
-                  };
+        // 3. Commit final text when remote generation ends
+        if (wasRemoteGenerating && !isNowGenerating) {
+          const textToCommit = data.generatingText || remoteGeneratingText;
+          if (textToCommit && activeChatId) {
+            setChats(prev => prev.map(c => {
+              if (c.id === activeChatId) {
+                const lastMsg = c.messages[c.messages.length - 1];
+                if (lastMsg && lastMsg.role === 'assistant' && lastMsg.content === textToCommit) {
+                  return c;
                 }
-                return c;
-              }));
-            }
+                return {
+                  ...c,
+                  messages: [...c.messages, {
+                    id: Date.now().toString() + "_remote_ai",
+                    role: 'assistant',
+                    content: textToCommit,
+                    sender: data.model || activeModel || 'AI',
+                    timestamp: formatTimestamp(new Date())
+                  }]
+                };
+              }
+              return c;
+            }));
           }
-
-          if (data.isGenerating !== undefined) {
-            setIsRemoteGenerating(data.isGenerating);
-            setRemoteGeneratingText(data.generatingText || '');
-          }
-        } else if (!data.sender) {
-          if (wasRemoteGenerating) {
-            // Commit final text when remote generation ends without sender
-            if (remoteGeneratingText && activeChatId) {
-              setChats(prev => prev.map(c => {
-                if (c.id === activeChatId) {
-                  const lastMsg = c.messages[c.messages.length - 1];
-                  if (lastMsg && lastMsg.role === 'assistant' && lastMsg.content === remoteGeneratingText) {
-                    return c;
-                  }
-                  return {
-                    ...c,
-                    messages: [...c.messages, {
-                      id: Date.now().toString() + "_remote_ai",
-                      role: 'assistant',
-                      content: remoteGeneratingText,
-                      sender: activeModel || 'AI',
-                      timestamp: formatTimestamp(new Date())
-                    }]
-                  };
-                }
-                return c;
-              }));
-            }
-          }
-          setIsRemoteGenerating(false);
           setRemoteGeneratingText('');
+        }
+
+        // 4. If there is no sender and model status is empty, clear local activeModel
+        if (!data.sender && (data.model === undefined || data.model === '')) {
+          if (wasRemoteGenerating) {
+            setIsRemoteGenerating(false);
+            setRemoteGeneratingText('');
+          }
+          if (activeModel !== '') {
+            setActiveModel('');
+          }
         }
       } catch (e) {
         console.error("Model poll failed", e);

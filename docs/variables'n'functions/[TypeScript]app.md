@@ -62,6 +62,12 @@ Refer to `chatMachine.md` for the core state variables (e.g., `chats`, `activeCh
   - `modelName` (`string`)
 - **Return Value:** `Promise<void>`
 
+### `fetchModelsAndPs`
+- **Description:** Fetches tags and ps info from Ollama. Automatically clears `activeModel` if the model has vanished from VRAM (psInfo is null), but implements a **15 seconds grace period** since the last model change (tracked via `lastModelChangeTime`) to prevent premature reset during the initial load lag.
+
+### `pollModel` (polling loop)
+- **Description:** Polls the broadcast model and generation state. Resets `isRemoteGenerating` to `false` when peer generation finishes (independent of whether the current user is the sender), commits finalized remote text, and clears `activeModel` globally if the broadcast model payload is empty.
+
 ---
 
 ## 3. Dependency Mapping
@@ -85,8 +91,18 @@ graph TD
     App --> deleteTab
     App --> handleUnloadModel
     App --> broadcastSettings
+    App --> fetchModelsAndPs
+    App --> pollModel
 
-    App --> broadcastModel[broadcastModel API]
-    App --> pollModel[pollModel API]
-    App --> fetchHistory[fetchHistory API]
+    fetchModelsAndPs -->|Grace Period Check| lastModelChangeTime[lastModelChangeTime]
+    pollModel -->|Remote Reset| isRemoteGeneratingRef[isRemoteGeneratingRef]
 ```
+
+---
+
+## 4. Impact Scope
+
+- `web-ui/src/App.tsx`: Manages the lifecycle of UI states. Setting a 15s grace period inside `fetchModelsAndPs` prevents the model selection dropdown from clearing itself immediately after a model finishes loading.
+- `web-ui/src/components/ChatInputArea.tsx` and sending actions: Ensuring `activeModel` is not prematurely cleared ensures that users can type and send messages successfully without encountering blank model check failures.
+- `web-ui/src/hooks/useChatActions.ts`: Relies on `chats`, `activeModel`, and generation states from `App.tsx`. Safety improvements to generation states ensure `isGeneratingRef.current` is consistently freed, preventing deadlock on sending messages.
+
