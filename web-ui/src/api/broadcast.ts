@@ -28,7 +28,11 @@ export const pollMessage = async (
   if (countHeader && onActiveCount) {
     onActiveCount(parseInt(countHeader, 10));
   }
-  return res.json();
+  if (res.status === 204) {
+    return [];
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : [];
 };
 
 export const broadcastMessage = async (
@@ -54,7 +58,8 @@ export const broadcastMessage = async (
   if (countHeader && onActiveCount) {
     onActiveCount(parseInt(countHeader, 10));
   }
-  return res.json();
+  const text = await res.text();
+  return text ? JSON.parse(text) : { status: 'ok', id: '' };
 };
 
 export const fetchHistory = async (
@@ -72,7 +77,11 @@ export const fetchHistory = async (
   if (countHeader && onActiveCount) {
     onActiveCount(parseInt(countHeader, 10));
   }
-  return res.json();
+  if (res.status === 204) {
+    return [];
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : [];
 };
 
 export const broadcastModel = async (
@@ -116,5 +125,9 @@ export const pollModel = async (
   if (countHeader && onActiveCount) {
     onActiveCount(parseInt(countHeader, 10));
   }
-  return res.json();
+  if (res.status === 204) {
+    return {};
+  }
+  const text = await res.text();
+  return text ? JSON.parse(text) : {};
 };

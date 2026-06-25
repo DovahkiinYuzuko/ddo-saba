@@ -53,7 +53,7 @@ This script runs a lightweight in-memory broadcast relay server for Windows envi
 ### `Start-BroadcastServer`
 - **Description:** Initializes and starts the HTTP Listener loop, routing requests based on URLs.
 - **Routes:**
-  - `GET /api/poll`: Receives client request. Updates client entry in `$activeUsers` if `username` query parameter is provided. Removes users whose last active time is older than 10 seconds. Returns the cached message or `204 No Content`, alongside the `activeUserCount` header or property.
+  - `GET /api/poll`: `X-DDO-Since-Id` ヘッダーまたは `lastId` クエリパラメータから取得した `sinceId` 以降のメッセージ履歴（`$messageHistory` からフィルタされた配列）を JSON 配列で返す。差分メッセージがない場合は `204 No Content` を返す。
   - `POST /api/broadcast`: Reads the incoming JSON message body, updates `$cachedMessage`, `$cachedId`, and `$cachedTime`, appends the message to `$messageHistory`, updates `$activeUsers`, and returns `200 OK`.
   - `GET /api/history`: Returns `$messageHistory` JSON, updates `$activeUsers` last active timestamp.
   - `POST /api/model`: Receives model change event `{ model, sender, timestamp }` and updates `$cachedModelName`, `$cachedModelSender`, and `$cachedModelTime`.
@@ -61,6 +61,10 @@ This script runs a lightweight in-memory broadcast relay server for Windows envi
   - `GET /api/queue`: Returns the current `$jobQueue` array. Automatically ejects expired running jobs (120s limit). Updates `$activeUsers`.
   - `POST /api/queue`: Accepts a JSON payload `{ action, id, username }` and updates `$jobQueue` accordingly. Updates `$activeUsers`.
   - `OPTIONS /api/poll` & `OPTIONS /api/broadcast` & `OPTIONS /api/history` & `OPTIONS /api/model` & `OPTIONS /api/queue`: Handles CORS preflight by returning CORS headers with `200 OK` or `204 No Content`.
+
+## Impact Scope
+- **`bin/broadcast_server.ps1`:** `/api/poll` (GET) のレスポンスを、単一メッセージオブジェクトの返却から、差分ID以降の履歴（配列）を返却する形式に修正。
+- **`web-ui`:** `/api/poll` から返る配列を正しくパース・受信できるようになり、複数端末間のリアルタイムチャット同期が正常に機能する。
 
 ## Dependency Map
 

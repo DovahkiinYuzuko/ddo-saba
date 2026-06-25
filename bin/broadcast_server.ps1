@@ -76,15 +76,34 @@ while ($listener.IsListening) {
         $url = $request.Url.LocalPath
         if ($url -eq "/api/poll") {
             if ($request.HttpMethod -eq "GET") {
-                $clientLastId = $request.QueryString["lastId"]
-                $currentTime = [double]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
+                $clientLastId = $request.Headers["X-DDO-Since-Id"]
+                if (-not $clientLastId) {
+                    $clientLastId = $request.QueryString["lastId"]
+                }
                 
-                # Check expiration (5 seconds)
-                if ($cachedId -and $cachedId -ne $clientLastId -and ($currentTime - $cachedTime -le 5)) {
-                    $buffer = [System.Text.Encoding]::UTF8.GetBytes($cachedMessage)
+                $diffMessages = @()
+                if ($clientLastId) {
+                    $found = $false
+                    foreach ($msg in $messageHistory) {
+                        if ($found) {
+                            $diffMessages += $msg
+                        }
+                        elseif ($msg.id -eq $clientLastId) {
+                            $found = $true
+                        }
+                    }
+                }
+                
+                if ($diffMessages.Count -gt 0) {
+                    $pollJson = ConvertTo-Json $diffMessages -Compress
+                    if (-not $pollJson.StartsWith("[")) {
+                        $pollJson = "[" + $pollJson + "]"
+                    }
+                    $buffer = [System.Text.Encoding]::UTF8.GetBytes($pollJson)
                     $response.ContentType = "application/json"
                     $response.ContentLength64 = $buffer.Length
                     $response.OutputStream.Write($buffer, 0, $buffer.Length)
+                    $response.StatusCode = 200
                 } else {
                     $response.StatusCode = 204 # No Content
                 }
