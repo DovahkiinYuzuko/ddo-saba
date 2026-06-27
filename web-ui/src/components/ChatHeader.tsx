@@ -8,8 +8,6 @@ export interface ChatHeaderProps {
   isEffectivelyLoading: boolean;
   onSelectModel: (modelName: string) => void;
   onUnloadModel: () => void;
-  lang: 'en' | 'ja';
-  onToggleLang: () => void;
   onToggleParams: () => void;
   onOpenSettings: () => void;
   onToggleSidebar: () => void;
@@ -23,8 +21,6 @@ export default function ChatHeader({
   isEffectivelyLoading,
   onSelectModel,
   onUnloadModel,
-  lang,
-  onToggleLang,
   onToggleParams,
   onOpenSettings,
   onToggleSidebar,
@@ -35,7 +31,7 @@ export default function ChatHeader({
       <button
         className="mobile-toggle-btn"
         onClick={onToggleSidebar}
-        title={lang === 'ja' ? 'メニューをトグル' : 'Toggle menu'}
+        title="Toggle menu"
       >
         <Menu size={20} />
       </button>
@@ -53,7 +49,7 @@ export default function ChatHeader({
             color: isEffectivelyLoading ? 'hsl(var(--text-muted))' : 'inherit'
           }}
         >
-          <option value="">{isEffectivelyLoading ? (lang === 'ja' ? 'モデルをロード中...' : 'Loading Model...') : (models.length === 0 ? "No models detected" : t.selectModel)}</option>
+          <option value="">{isEffectivelyLoading ? 'Loading Model...' : (models.length === 0 ? "No models detected" : t.selectModel)}</option>
           {models.map(m => (
             <option key={m.name} value={m.name}>
               {m.name}
@@ -64,7 +60,7 @@ export default function ChatHeader({
           <button 
             onClick={onUnloadModel} 
             className="unload-btn" 
-            title={lang === 'ja' ? 'VRAMからアンロード' : 'Unload from VRAM'}
+            title="Unload from VRAM"
           >
             <LogOut size={16} />
           </button>
@@ -72,13 +68,10 @@ export default function ChatHeader({
       </div>
 
       <div className="header-actions">
-        <button className="lang-toggle" onClick={onToggleLang}>
-          {lang === 'en' ? 'JP' : 'EN'}
-        </button>
         <button
           className="mobile-toggle-btn"
           onClick={onToggleParams}
-          title={lang === 'ja' ? 'パラメータをトグル' : 'Toggle parameters'}
+          title="Toggle parameters"
         >
           <SlidersHorizontal size={20} />
         </button>

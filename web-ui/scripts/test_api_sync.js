@@ -13,13 +13,15 @@ async function runTests() {
 
   // Helper for requests
   const request = async (path, method = 'GET', body = null, username = null, extraHeaders = {}) => {
+    const activeUsername = username || (body && body.sender) || 'TestRunner';
     const headers = {
       'Content-Type': 'application/json',
       'X-DDO-Token': accessToken,
+      'X-DDO-Client-Id': 'test-api-sync-client-id_' + activeUsername,
       ...extraHeaders
     };
-    if (username) {
-      headers['X-DDO-Username'] = username;
+    if (activeUsername) {
+      headers['X-DDO-Username'] = activeUsername;
     }
     const res = await fetch(`${connectionUrl}${path}`, {
       method,

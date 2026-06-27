@@ -174,8 +174,8 @@ http {
             auth_request /auth_check;
             limit_conn ollama_limit 3;
             proxy_pass http://127.0.0.1:11434/api/chat;
-            # Fix: Use 'localhost' to pass Ollama's internal origin check (avoids 403 via Cloudflare Tunnel)
-            proxy_set_header Host localhost;
+            # Fix: Use original $host to pass Ollama's port checks
+            proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
 
             # Streaming integrity: disable buffering for LLM chunk transfer
@@ -205,8 +205,8 @@ http {
             auth_request /auth_check;
             limit_conn ollama_limit 3;
             proxy_pass http://127.0.0.1:11434/api/generate;
-            # Fix: Use 'localhost' to pass Ollama's internal origin check
-            proxy_set_header Host localhost;
+            # Fix: Use original $host to pass Ollama's port checks
+            proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
 
             # Streaming integrity: disable buffering for preload progress
@@ -235,8 +235,8 @@ http {
 
             auth_request /auth_check;
             proxy_pass http://127.0.0.1:11434/api/tags;
-            # Fix: Use 'localhost' to pass Ollama's internal origin check
-            proxy_set_header Host localhost;
+            # Fix: Use original $host to pass Ollama's port checks
+            proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
         }
 
@@ -255,8 +255,8 @@ http {
 
             auth_request /auth_check;
             proxy_pass http://127.0.0.1:11434/api/ps;
-            # Fix: Use 'localhost' to pass Ollama's internal origin check
-            proxy_set_header Host localhost;
+            # Fix: Use original $host to pass Ollama's port checks
+            proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
         }
     }

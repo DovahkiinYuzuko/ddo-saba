@@ -34,7 +34,7 @@ import { locales } from './i18n';
 
 
 export default function App() {
-  const [lang, setLang] = useState<'en' | 'ja'>(
+  const [lang] = useState<'en' | 'ja'>(
     navigator.language.startsWith('ja') ? 'ja' : 'en'
   );
   const t = locales[lang];
@@ -961,8 +961,6 @@ export default function App() {
             }
           }}
           onUnloadModel={handleUnloadModel}
-          lang={lang}
-          onToggleLang={() => setLang(l => l === 'en' ? 'ja' : 'en')}
           onToggleParams={() => setIsParamsOpen(prev => !prev)}
           onOpenSettings={() => setShowSettingsModal(true)}
           onToggleSidebar={() => setIsSidebarOpen(prev => !prev)}
@@ -1033,8 +1031,6 @@ export default function App() {
         onExportCassette={exportCassette}
         onImportCassette={importCassette}
         t={t}
-        lang={lang}
-        setLang={setLang}
       />
 
       {/* 5. Synchronize Request Modal */}

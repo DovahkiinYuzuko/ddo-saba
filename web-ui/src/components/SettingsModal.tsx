@@ -13,8 +13,6 @@ interface SettingsModalProps {
   onExportCassette: () => void;
   onImportCassette: (e: React.ChangeEvent<HTMLInputElement>) => void;
   t: LocaleStrings;
-  lang: 'en' | 'ja';
-  setLang: (l: 'en' | 'ja') => void;
 }
 
 export default function SettingsModal({
@@ -26,9 +24,7 @@ export default function SettingsModal({
   onClose,
   onExportCassette,
   onImportCassette,
-  t,
-  lang,
-  setLang
+  t
 }: SettingsModalProps) {
   if (!show) return null;
 
@@ -101,17 +97,6 @@ export default function SettingsModal({
               />
               <label htmlFor="send-toggle"></label>
             </div>
-          </div>
-
-          <div className="form-group inline-group">
-            <label>{isJa ? '言語 / Language' : 'Language / 言語'}</label>
-            <select
-              value={lang}
-              onChange={(e) => setLang(e.target.value as 'en' | 'ja')}
-            >
-              <option value="ja">日本語 (Japanese)</option>
-              <option value="en">English</option>
-            </select>
           </div>
 
           <div className="qr-code-section-wrap">

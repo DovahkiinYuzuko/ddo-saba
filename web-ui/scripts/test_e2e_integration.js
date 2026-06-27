@@ -83,9 +83,27 @@ function section(title) {
  * @param {boolean} withToken - X-DDO-Tokenヘッダーを付けるか
  */
 async function req(endpoint, opts = {}, withToken = true) {
+  let activeUsername = 'E2ETestBot';
+  if (opts.body) {
+    try {
+      const parsedBody = JSON.parse(opts.body);
+      if (parsedBody.sender) {
+        activeUsername = parsedBody.sender;
+      } else if (parsedBody.username) {
+        activeUsername = parsedBody.username;
+      }
+    } catch (e) {
+      // Ignore JSON parse error
+    }
+  }
+
   const headers = {
     'Content-Type': 'application/json',
-    ...(withToken ? { 'X-DDO-Token': ACCESS_TOKEN } : {}),
+    ...(withToken ? { 
+      'X-DDO-Token': ACCESS_TOKEN,
+      'X-DDO-Client-Id': `e2e-test-client-id_${activeUsername}`,
+      'X-DDO-Username': activeUsername
+    } : {}),
     ...(opts.headers || {}),
   };
   const res = await fetch(`${NGINX_URL}${endpoint}`, {
