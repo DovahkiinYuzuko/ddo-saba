@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test:api": "node scripts/test_api_sync.js"
+    "test:api": "node scripts/test_api_sync.js",
+    "test:unit": "vitest run"
   },
   "dependencies": {
     "@xstate/react": "^6.1.0",
@@ -35,6 +36,7 @@
     "globals": "^17.6.0",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.59.2",
-    "vite": "^8.0.12"
+    "vite": "^8.0.12",
+    "vitest": "^4.1.9"
   }
 }
