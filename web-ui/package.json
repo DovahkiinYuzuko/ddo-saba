@@ -11,7 +11,8 @@
     "test": "vitest",
     "test:api": "node scripts/test_api_sync.js",
     "test:api:watch": "node --watch scripts/test_api_sync.js",
-    "test:unit": "vitest run"
+    "test:unit": "vitest run",
+    "test:e2e": "node scripts/test_e2e_integration.js"
   },
   "dependencies": {
     "@xstate/react": "^6.1.0",
