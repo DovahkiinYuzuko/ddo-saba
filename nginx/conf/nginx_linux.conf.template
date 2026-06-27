@@ -25,11 +25,19 @@ http {
         listen       8088;
         server_name  localhost;
 
+        # Security Headers (applied globally to this server block)
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
         # Static Web UI distribution
         location / {
             root   html;
             index  index.html;
             try_files $uri $uri/ /index.html;
+
+            # Strict CSP for static assets (API endpoints use wildcard CORS instead)
+            add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' http: https: ws: wss:;" always;
         }
 
         # Nginx JS (njs) Poll endpoint
@@ -140,9 +148,15 @@ http {
             auth_request /auth_check;
             limit_conn ollama_limit 3;
             proxy_pass http://127.0.0.1:11434/api/chat;
-            proxy_set_header Host $host;
+            # Fix: Use 'localhost' to pass Ollama's internal origin check (avoids 403 via Cloudflare Tunnel)
+            proxy_set_header Host localhost;
             proxy_set_header X-Real-IP $remote_addr;
-            
+
+            # Streaming integrity: disable buffering for LLM chunk transfer
+            proxy_buffering off;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+
             # 24h Timeouts for long reasoning
             proxy_read_timeout 86400s;
             proxy_connect_timeout 86400s;
@@ -162,9 +176,15 @@ http {
             auth_request /auth_check;
             limit_conn ollama_limit 3;
             proxy_pass http://127.0.0.1:11434/api/generate;
-            proxy_set_header Host $host;
+            # Fix: Use 'localhost' to pass Ollama's internal origin check
+            proxy_set_header Host localhost;
             proxy_set_header X-Real-IP $remote_addr;
-            
+
+            # Streaming integrity: disable buffering for preload progress
+            proxy_buffering off;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+
             # 24h Timeouts for long model preload
             proxy_read_timeout 86400s;
             proxy_connect_timeout 86400s;
@@ -183,7 +203,8 @@ http {
 
             auth_request /auth_check;
             proxy_pass http://127.0.0.1:11434/api/tags;
-            proxy_set_header Host $host;
+            # Fix: Use 'localhost' to pass Ollama's internal origin check
+            proxy_set_header Host localhost;
             proxy_set_header X-Real-IP $remote_addr;
         }
 
@@ -199,7 +220,8 @@ http {
 
             auth_request /auth_check;
             proxy_pass http://127.0.0.1:11434/api/ps;
-            proxy_set_header Host $host;
+            # Fix: Use 'localhost' to pass Ollama's internal origin check
+            proxy_set_header Host localhost;
             proxy_set_header X-Real-IP $remote_addr;
         }
     }
