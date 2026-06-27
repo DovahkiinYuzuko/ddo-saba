@@ -34,14 +34,16 @@ This document specifies the variables and functions used in `nginx/conf/broadcas
   6. Returns HTTP `200` with the resolved message ID.
 
 ### `get_message` (L77-112)
-- **Description:** Receives a HTTP `GET` request and returns the latest message stored in the memory zone.
+- **Description:** Receives a HTTP `GET` request and returns new messages since the message ID specified by the `X-DDO-Since-Id` header.
 - **Arguments:**
   - `r` (`Object`): The Nginx HTTP request object.
-- **Return Value:** None (Sends HTTP response code `200` with the cached JSON payload, or an empty JSON object `{}`).
+- **Return Value:** None (Sends HTTP response code `200` with the filtered JSON payload array).
 - **Behavior:**
-  1. Retrieves the string under `"latest"` from `ngx.shared.broadcast_zone`.
-  2. Sets response `Content-Type` header to `application/json`.
-  3. Returns the payload with HTTP status `200`.
+  1. Retrieves the string under `"history"` from `ngx.shared.broadcast_zone` and parses it as an array.
+  2. Inspects the `X-DDO-Since-Id` header.
+  3. If the header is empty or undefined, returns the entire session history array with status `200` to allow initial client synchronization.
+  4. If the header is set, filters the history array to include only messages appended after the matching ID.
+  5. Returns the resulting array with HTTP status `200`.
 
 ### `get_history` (L114-120)
 - **Description:** Receives a HTTP `GET` request and returns the entire active session history array.
@@ -94,7 +96,7 @@ This document specifies the variables and functions used in `nginx/conf/broadcas
   5. Returns HTTP `200` on success, or `500` on internal write error.
 
 ### `update_active_users` (L1-37)
-- **Description:** On every API endpoint request, this function reads the client's token (`X-DDO-Token`) from headers, updates their last active timestamp in a JSON string stored in `ngx.shared.broadcast_zone` under the `"active_users"` key (using the token as the key instead of username to prevent duplicates on name changes), cleans up entries older than 10 seconds, and includes the active count in the response.
+- **Description:** On every API endpoint request, this function reads the client's unique session identifier (`X-DDO-Client-Id`) from headers, updates their last active timestamp in a JSON string stored in `ngx.shared.broadcast_zone` under the `"active_users"` key (using the client ID as the key instead of token or username to prevent duplicates when multiple users share the same token), cleans up entries older than 10 seconds, and includes the active count in the response.
 
 ---
 

@@ -211,13 +211,17 @@ export function useChatActions({
 
       let lastBroadcastTime = Date.now();
 
+      let streamBuffer = '';
+
       if (reader) {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
           const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split('\n');
+          streamBuffer += chunk;
+          const lines = streamBuffer.split('\n');
+          streamBuffer = lines.pop() || '';
 
           for (const line of lines) {
             if (!line.trim()) continue;

@@ -12,18 +12,6 @@ This script runs a lightweight in-memory broadcast relay server for Windows envi
 - **Type:** `System.Net.HttpListener`
 - **Description:** The .NET HttpListener instance that listens for HTTP requests.
 
-### `$cachedMessage`
-- **Type:** `String` (JSON)
-- **Description:** The last message posted to the broadcast API. Cached in memory.
-
-### `$cachedId`
-- **Type:** `String`
-- **Description:** The unique ID of the last cached message.
-
-### `$cachedTime`
-- **Type:** `Double` (Unix timestamp)
-- **Description:** The epoch timestamp when the message was cached. Used to expire messages after 5 seconds.
-
 ### `$messageHistory`
 - **Type:** `Array`
 - **Description:** An in-memory list storing the chronological sequence of all messages broadcasted within the active session. Used to sync client history.
@@ -46,15 +34,15 @@ This script runs a lightweight in-memory broadcast relay server for Windows envi
 
 ### `$activeUsers`
 - **Type:** `System.Collections.Hashtable`
-- **Description:** Keeps track of each client's token (`X-DDO-Token`) and their last active Unix epoch timestamp to count concurrent users without duplicates during username modifications.
+- **Description:** Keeps track of each client's session ID (`X-DDO-Client-Id`) and their last active Unix epoch timestamp to count concurrent users without duplicates or omissions when sharing tokens.
 
 ## Functions
 
 ### `Start-BroadcastServer`
 - **Description:** Initializes and starts the HTTP Listener loop, routing requests based on URLs.
 - **Routes:**
-  - `GET /api/poll`: `X-DDO-Since-Id` ヘッダーまたは `lastId` クエリパラメータから取得した `sinceId` 以降のメッセージ履歴（`$messageHistory` からフィルタされた配列）を JSON 配列で返す。差分メッセージがない場合は `204 No Content` を返す。
-  - `POST /api/broadcast`: Reads the incoming JSON message body, updates `$cachedMessage`, `$cachedId`, and `$cachedTime`, appends the message to `$messageHistory`, updates `$activeUsers`, and returns `200 OK`.
+  - `GET /api/poll`: `X-DDO-Since-Id` ヘッダーまたは `lastId` クエリパラメータから取得した `sinceId` 以降のメッセージ履歴（`$messageHistory` からフィルタされた配列）を JSON 配列で返す。`sinceId` が指定されていない場合は `$messageHistory` 全件を返す。差分メッセージがない場合は `204 No Content` を返す。
+  - `POST /api/broadcast`: Reads the incoming JSON message body, appends the message to `$messageHistory` (automatically adding timestamp if missing), updates `$activeUsers`, and returns JSON `{ "status": "success", "id": "..." }`.
   - `GET /api/history`: Returns `$messageHistory` JSON, updates `$activeUsers` last active timestamp.
   - `POST /api/model`: Receives model change event `{ model, sender, timestamp }` and updates `$cachedModelName`, `$cachedModelSender`, and `$cachedModelTime`.
   - `GET /api/model`: Returns the active model cache JSON, updates `$activeUsers`.

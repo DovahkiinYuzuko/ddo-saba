@@ -1,6 +1,9 @@
 function update_active_users(r) {
     var dict = ngx.shared.broadcast_zone;
-    var clientToken = r.headersIn['X-DDO-Token'] || 'anonymous';
+    var clientId = r.headersIn['X-DDO-Client-Id'];
+    if (!clientId) {
+        clientId = r.headersIn['X-DDO-Token'] || 'anonymous';
+    }
     var now = Math.floor(Date.now() / 1000);
     
     var usersStr = dict.get("active_users");
@@ -13,7 +16,7 @@ function update_active_users(r) {
         }
     }
     
-    users[clientToken] = now;
+    users[clientId] = now;
     
     // Clean up old entries (inactive for > 10 seconds)
     var cleaned = {};
@@ -40,13 +43,14 @@ function post_message(r) {
     try {
         var body = JSON.parse(r.requestBody);
         var msgId = body.id || Date.now().toString();
+        var msgTimestamp = body.timestamp || new Date().toISOString();
         var msgData = {
             id: msgId,
             sender: body.sender || 'unknown',
             broadcaster: body.broadcaster || '',
             role: body.role || 'user',
             content: body.content || '',
-            timestamp: new Date().toISOString()
+            timestamp: msgTimestamp
         };
         dict.set("latest", JSON.stringify(msgData));
 
@@ -88,7 +92,7 @@ function get_message(r) {
     }
     
     var newMessages = [];
-    if (sinceId) {
+    if (sinceId && sinceId !== "") {
         var foundIndex = -1;
         for (var i = 0; i < history.length; i++) {
             if (history[i].id === sinceId) {
@@ -102,7 +106,7 @@ function get_message(r) {
             newMessages = history;
         }
     } else {
-        newMessages = [];
+        newMessages = history;
     }
     
     r.headersOut['Content-Type'] = 'application/json';

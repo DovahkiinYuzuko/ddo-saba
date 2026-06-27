@@ -3,9 +3,6 @@ $pidFile = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "broadcas
 [System.IO.File]::WriteAllText($pidFile, $pid.ToString())
 
 # Message Cache
-$cachedMessage = ""
-$cachedId = ""
-$cachedTime = 0
 $messageHistory = @()
 $cachedModelData = $null
 $jobQueue = @()
@@ -39,13 +36,14 @@ while ($listener.IsListening) {
         $request = $context.Request
         $response = $context.Response
 
-        # Get client token from header and update active users
-        $clientToken = $request.Headers["X-DDO-Token"]
-        if (-not $clientToken) {
-            $clientToken = "anonymous"
+        # Get client unique ID from header and update active users
+        $clientId = $request.Headers["X-DDO-Client-Id"]
+        if (-not $clientId) {
+            $clientId = $request.Headers["X-DDO-Token"]
+            if (-not $clientId) { $clientId = "anonymous" }
         }
         $currentTime = [double]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
-        $activeUsers[$clientToken] = $currentTime
+        $activeUsers[$clientId] = $currentTime
 
         # Clean up users inactive for more than 10 seconds
         $now = [double]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
@@ -83,7 +81,7 @@ while ($listener.IsListening) {
                 }
                 
                 $diffMessages = @()
-                if ($clientLastId) {
+                if ($clientLastId -and $clientLastId -ne "") {
                     $found = $false
                     foreach ($msg in $messageHistory) {
                         if ($found) {
@@ -93,6 +91,8 @@ while ($listener.IsListening) {
                             $found = $true
                         }
                     }
+                } else {
+                    $diffMessages = $messageHistory
                 }
                 
                 if ($diffMessages.Count -gt 0) {
@@ -118,30 +118,30 @@ while ($listener.IsListening) {
                 $reader = New-Object System.IO.StreamReader($request.InputStream, [System.Text.Encoding]::UTF8)
                 $body = $reader.ReadToEnd()
                 
-                # Update cache
                 try {
                     $data = ConvertFrom-Json $body
                     
-                    # Ensure the message has an ID and timestamp (auto-generate if missing)
-                    if (-not $data.id) {
+                    if (-not $data.id -or $data.id -eq "") {
                         $autoId = [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds().ToString() + "_" + [Guid]::NewGuid().ToString().Substring(0,8)
-                        $data = $data | Add-Member -NotePropertyName "id" -NotePropertyValue $autoId -PassThru
+                        $data = $data | Add-Member -NotePropertyName "id" -NotePropertyValue $autoId -Force -PassThru
+                    }
+                    if (-not $data.timestamp -or $data.timestamp -eq "") {
                         $autoTime = [DateTime]::UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")
-                        $data = $data | Add-Member -NotePropertyName "timestamp" -NotePropertyValue $autoTime -PassThru
-                        $body = ConvertTo-Json $data -Compress
+                        $data = $data | Add-Member -NotePropertyName "timestamp" -NotePropertyValue $autoTime -Force -PassThru
                     }
                     
-                    $cachedMessage = $body
-                    $cachedId = $data.id
-                    $cachedTime = [double]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
-                    
-                    # Append message to session history (limit to last 100 to save memory)
                     $messageHistory += $data
                     if ($messageHistory.Count -gt 100) {
                         $messageHistory = @($messageHistory | Select-Object -Last 100)
                     }
                     
                     Write-Host "[BROADCAST] Received msg from '$($data.sender)' (broadcaster: '$($data.broadcaster)', role: '$($data.role)', id: '$($data.id)')" -ForegroundColor Yellow
+                    
+                    $responseJson = ConvertTo-Json @{ status = "success"; id = $data.id } -Compress
+                    $buffer = [System.Text.Encoding]::UTF8.GetBytes($responseJson)
+                    $response.ContentType = "application/json"
+                    $response.ContentLength64 = $buffer.Length
+                    $response.OutputStream.Write($buffer, 0, $buffer.Length)
                     $response.StatusCode = 200
                 } catch {
                     $response.StatusCode = 400

@@ -1,3 +1,5 @@
+import { clientId } from './clientId';
+
 const getHeaders = (accessToken: string, username?: string): HeadersInit => {
   const headers: HeadersInit = { 'Content-Type': 'application/json' };
   if (accessToken) {
@@ -6,6 +8,7 @@ const getHeaders = (accessToken: string, username?: string): HeadersInit => {
   if (username) {
     headers['X-DDO-Username'] = username;
   }
+  headers['X-DDO-Client-Id'] = clientId;
   return headers;
 };
 

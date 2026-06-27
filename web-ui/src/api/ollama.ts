@@ -1,10 +1,13 @@
 import type { DdoSettings, DdoParameters, OllamaModelInfo, PsModelInfo } from '../types';
 
+import { clientId } from './clientId';
+
 const getHeaders = (accessToken: string): HeadersInit => {
   const headers: HeadersInit = { 'Content-Type': 'application/json' };
   if (accessToken) {
     headers['X-DDO-Token'] = accessToken;
   }
+  headers['X-DDO-Client-Id'] = clientId;
   return headers;
 };
 
