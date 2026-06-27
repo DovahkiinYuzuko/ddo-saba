@@ -51,6 +51,9 @@ http {
             }
 
             if ($auth_status = "fail") {
+                add_header Access-Control-Allow-Origin * always;
+                add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
+                add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
                 return 403;
             }
 
@@ -75,6 +78,9 @@ http {
             }
 
             if ($auth_status = "fail") {
+                add_header Access-Control-Allow-Origin * always;
+                add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
+                add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
                 return 403;
             }
 
@@ -99,6 +105,9 @@ http {
             }
 
             if ($auth_status = "fail") {
+                add_header Access-Control-Allow-Origin * always;
+                add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
+                add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
                 return 403;
             }
 
@@ -123,6 +132,9 @@ http {
             }
 
             if ($auth_status = "fail") {
+                add_header Access-Control-Allow-Origin * always;
+                add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
+                add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
                 return 403;
             }
 
@@ -147,6 +159,9 @@ http {
             }
 
             if ($auth_status = "fail") {
+                add_header Access-Control-Allow-Origin * always;
+                add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
+                add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
                 return 403;
             }
 
@@ -169,6 +184,9 @@ http {
             }
 
             if ($auth_status = "fail") {
+                add_header Access-Control-Allow-Origin * always;
+                add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
+                add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
                 return 403;
             }
 
@@ -191,6 +209,9 @@ http {
             }
 
             if ($auth_status = "fail") {
+                add_header Access-Control-Allow-Origin * always;
+                add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
+                add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
                 return 403;
             }
 
@@ -225,6 +246,9 @@ http {
             }
 
             if ($auth_status = "fail") {
+                add_header Access-Control-Allow-Origin * always;
+                add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
+                add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
                 return 403;
             }
 
@@ -259,6 +283,9 @@ http {
             }
 
             if ($auth_status = "fail") {
+                add_header Access-Control-Allow-Origin * always;
+                add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
+                add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
                 return 403;
             }
 
@@ -282,6 +309,9 @@ http {
             }
 
             if ($auth_status = "fail") {
+                add_header Access-Control-Allow-Origin * always;
+                add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
+                add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
                 return 403;
             }
 

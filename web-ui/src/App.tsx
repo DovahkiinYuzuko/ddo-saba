@@ -38,6 +38,7 @@ export default function App() {
     navigator.language.startsWith('ja') ? 'ja' : 'en'
   );
   const t = locales[lang];
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // --- XState Machine Integration ---
   const { state, send, adapters } = useChatMachineState();
@@ -128,6 +129,7 @@ export default function App() {
       isSharedMode: isSharedModeFromUrl || prev.isSharedMode,
       username: 'Guest_' + Math.floor(Math.random() * 1000)
     }));
+    setIsInitialized(true);
   }, []); // Run once on mount
 
   const handleThinkingToggle = (msgKey: string, isOpen: boolean) => {
@@ -378,12 +380,13 @@ export default function App() {
 
   // Create default tab if none exists (Private Mode only)
   useEffect(() => {
-    if (!settings.isSharedMode && chats.length === 0) {
-      setTimeout(() => {
+    if (isInitialized && !settings.isSharedMode && chats.length === 0) {
+      const timer = setTimeout(() => {
         addNewTab(false);
       }, 0);
+      return () => clearTimeout(timer);
     }
-  }, [chats.length, addNewTab, settings.isSharedMode]);
+  }, [isInitialized, chats.length, addNewTab, settings.isSharedMode]);
 
   const deleteTab = useCallback((id: string, e?: React.MouseEvent, isRemote = false) => {
     if (e) e.stopPropagation();
@@ -458,14 +461,18 @@ export default function App() {
   }, [settings.connectionUrl, settings.accessToken, activeModel, isModelLoading, lastModelSender, settings.username, lastModelChangeTime]);
 
   useEffect(() => {
-    setTimeout(() => {
+    if (!isInitialized) return;
+    const timer = setTimeout(() => {
       void fetchModelsAndPs();
     }, 0);
     const interval = setInterval(() => {
       void fetchModelsAndPs();
     }, 5000);
-    return () => clearInterval(interval);
-  }, [fetchModelsAndPs]);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
+  }, [fetchModelsAndPs, isInitialized]);
 
   const lastPolledMsgIdRef = useRef(state.context.lastPolledMsgId);
   useEffect(() => {
@@ -577,7 +584,7 @@ export default function App() {
   }, [settings.connectionUrl, settings.accessToken, settings.username, activeChatId, addNewTab, deleteTab, handleActiveCount, send]);
 
   useEffect(() => {
-    if (!settings.isSharedMode) return;
+    if (!isInitialized || !settings.isSharedMode) return;
     let active = true;
     let timerId: ReturnType<typeof setTimeout> | null = null;
 
@@ -595,11 +602,11 @@ export default function App() {
       active = false;
       if (timerId) clearTimeout(timerId);
     };
-  }, [settings.isSharedMode, startBroadcastPolling]);
+  }, [isInitialized, settings.isSharedMode, startBroadcastPolling]);
 
   // Polling for queue status in shared room mode
   useEffect(() => {
-    if (!settings.isSharedMode) return;
+    if (!isInitialized || !settings.isSharedMode) return;
     let active = true;
     let timerId: ReturnType<typeof setTimeout> | null = null;
 
@@ -627,7 +634,7 @@ export default function App() {
       active = false;
       if (timerId) clearTimeout(timerId);
     };
-  }, [settings.isSharedMode, settings.connectionUrl, settings.accessToken, settings.username, handleActiveCount]);
+  }, [isInitialized, settings.isSharedMode, settings.connectionUrl, settings.accessToken, settings.username, handleActiveCount]);
 
   // Fetch initial history when Shared Room mode is enabled
   useEffect(() => {
