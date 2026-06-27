@@ -70,10 +70,9 @@ describe('Shared Room Sync Logics', () => {
   describe('Delay Fallback and Timer Cancel', () => {
     it('should trigger fallback commit after 5 seconds if no message arrives', () => {
       let fallbackTriggered = false;
-      let timerId: ReturnType<typeof setTimeout> | null = null;
 
       const triggerRemoteEnd = () => {
-        timerId = setTimeout(() => {
+        setTimeout(() => {
           fallbackTriggered = true;
         }, 5000);
       };
