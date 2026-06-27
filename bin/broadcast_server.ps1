@@ -200,14 +200,23 @@ while ($listener.IsListening) {
             $newQueue = @()
             $hasChanges = $false
             
-            # Find the running job and see if it timed out (120 seconds limit)
+            # Find the running job and see if it timed out (120 seconds limit by default, dynamic via header)
+            $timeoutLimit = 120
+            $clientTimeoutHeader = $request.Headers["X-DDO-Queue-Timeout"]
+            if ($clientTimeoutHeader) {
+                try {
+                    $timeoutLimit = [int]$clientTimeoutHeader
+                } catch {}
+            }
+            
+            # Find the running job and see if it timed out
             foreach ($job in $jobQueue) {
                 if ($job.status -eq "running") {
                     $jobStart = $job.timestamp
-                    if ($nowEpoch - $jobStart -gt 120) {
+                    if ($nowEpoch - $jobStart -gt $timeoutLimit) {
                         # Eject due to timeout
                         $hasChanges = $true
-                        Write-Host "Job $($job.id) of $($job.username) timed out (120s) and was ejected." -ForegroundColor Yellow
+                        Write-Host "Job $($job.id) of $($job.username) timed out ($($timeoutLimit)s) and was ejected." -ForegroundColor Yellow
                         continue
                     }
                 }

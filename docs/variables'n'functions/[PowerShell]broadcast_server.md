@@ -58,8 +58,8 @@ This script runs a lightweight in-memory broadcast relay server for Windows envi
   - `GET /api/history`: Returns `$messageHistory` JSON, updates `$activeUsers` last active timestamp.
   - `POST /api/model`: Receives model change event `{ model, sender, timestamp }` and updates `$cachedModelName`, `$cachedModelSender`, and `$cachedModelTime`.
   - `GET /api/model`: Returns the active model cache JSON, updates `$activeUsers`.
-  - `GET /api/queue`: Returns the current `$jobQueue` array. Automatically ejects expired running jobs (120s limit). Updates `$activeUsers`.
-  - `POST /api/queue`: Accepts a JSON payload `{ action, id, username }` and updates `$jobQueue` accordingly. Updates `$activeUsers`.
+  - `GET /api/queue`: Returns the current `$jobQueue` array. Automatically ejects expired running jobs (120s limit, or customizable via `X-DDO-Queue-Timeout` request header). Updates `$activeUsers`.
+  - `POST /api/queue`: Accepts a JSON payload `{ action, id, username }` and updates `$jobQueue` accordingly. Automatically ejects expired running jobs before processing the payload (uses `X-DDO-Queue-Timeout` header if provided). Updates `$activeUsers`.
   - `OPTIONS /api/poll` & `OPTIONS /api/broadcast` & `OPTIONS /api/history` & `OPTIONS /api/model` & `OPTIONS /api/queue`: Handles CORS preflight by returning CORS headers with `200 OK` or `204 No Content`.
 
 ## Impact Scope

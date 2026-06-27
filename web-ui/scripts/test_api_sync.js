@@ -5,10 +5,11 @@ async function runTests() {
   console.log('\x1b[36m%s\x1b[0m', 'Starting API Sync Integration Tests...');
 
   // Helper for requests
-  const request = async (path, method = 'GET', body = null, username = null) => {
+  const request = async (path, method = 'GET', body = null, username = null, extraHeaders = {}) => {
     const headers = {
       'Content-Type': 'application/json',
-      'X-DDO-Token': accessToken
+      'X-DDO-Token': accessToken,
+      ...extraHeaders
     };
     if (username) {
       headers['X-DDO-Username'] = username;
@@ -121,6 +122,53 @@ async function runTests() {
     }
 
     console.log('\x1b[32m%s\x1b[0m', '✓ Test 3 Passed: Queue lock and promotion success');
+
+    // ----------------------------------------------------
+    // TEST 4: Model Unload (Clear) Sync
+    // ----------------------------------------------------
+    console.log('\nRunning Test 4: Model Unload Synchronization...');
+    await request('/api/model', 'POST', {
+      sender: 'Alice',
+      model: '',
+      timestamp: Date.now(),
+      isGenerating: false,
+      generatingText: ''
+    });
+
+    const unloadedStatus = await request('/api/model', 'GET');
+    if (unloadedStatus.model !== '') {
+      throw new Error(`Model expected to be empty after unload, got ${unloadedStatus.model}`);
+    }
+    console.log('\x1b[32m%s\x1b[0m', '✓ Test 4 Passed: Model Unload Sync Success');
+
+    // ----------------------------------------------------
+    // TEST 5: Queue Timeout Ejection
+    // ----------------------------------------------------
+    console.log('\nRunning Test 5: Queue Timeout Ejection...');
+    
+    const timeoutAliceJobId = 'job_alice_timeout_' + Date.now();
+    await request('/api/queue', 'POST', { action: 'join', id: timeoutAliceJobId, username: 'Alice' });
+
+    const timeoutBobJobId = 'job_bob_timeout_' + Date.now();
+    await request('/api/queue', 'POST', { action: 'join', id: timeoutBobJobId, username: 'Bob' });
+
+    console.log('Waiting 2.1 seconds for timeout...');
+    await new Promise(resolve => setTimeout(resolve, 2100));
+
+    queue = await request('/api/queue', 'GET', null, null, { 'X-DDO-Queue-Timeout': '1' });
+    
+    const checkAliceJob = queue.find(j => j.id === timeoutAliceJobId);
+    const checkBobJob = queue.find(j => j.id === timeoutBobJobId);
+
+    if (checkAliceJob) {
+      throw new Error(`Alice job expected to be ejected due to timeout`);
+    }
+    if (!checkBobJob || checkBobJob.status !== 'running') {
+      throw new Error(`Bob job expected promoted to running, got ${checkBobJob ? checkBobJob.status : 'null'}`);
+    }
+
+    await request('/api/queue', 'POST', { action: 'complete', id: timeoutBobJobId, username: 'Bob' });
+    console.log('\x1b[32m%s\x1b[0m', '✓ Test 5 Passed: Queue Timeout Ejection and Auto-Promotion Success');
 
     console.log('\n\x1b[32;1m%s\x1b[0m', '======================================');
     console.log('\x1b[32;1m%s\x1b[0m', '  ALL API SYNC TESTS PASSED SUCCESSFULLY!  ');
