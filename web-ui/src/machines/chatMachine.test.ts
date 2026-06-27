@@ -45,4 +45,73 @@ describe('chatMachine unit tests', () => {
     state = actor.getSnapshot();
     expect(state.context.activeUserCount).toBe(3); // Default is 1, so 1 + 2 = 3
   });
+
+  it('should handle local generation lifecycle and assign isGenerating', () => {
+    const actor = createActor(chatMachine).start();
+    
+    actor.send({ type: 'START_GENERATE' });
+    let state = actor.getSnapshot();
+    expect(state.value).toEqual({ local: 'generating', sync: 'idle' });
+    expect(state.context.isGenerating).toBe(true);
+
+    actor.send({ type: 'GENERATE_COMPLETE' });
+    state = actor.getSnapshot();
+    expect(state.value).toEqual({ local: 'idle', sync: 'idle' });
+    expect(state.context.isGenerating).toBe(false);
+  });
+
+  it('should handle remote generation lifecycle with guards and cleanup', () => {
+    const actor = createActor(chatMachine).start();
+    
+    // Start polling to enable sync transitions
+    actor.send({ type: 'START_POLLING' });
+    let state = actor.getSnapshot();
+    expect(state.value).toEqual({ local: 'idle', sync: 'polling' });
+
+    // Peer starts generating
+    actor.send({ type: 'PEER_START_GENERATE' });
+    state = actor.getSnapshot();
+    expect(state.value).toEqual({ local: 'idle', sync: 'remoteGenerating' });
+    expect(state.context.isRemoteGenerating).toBe(true);
+
+    // Peer completes generating
+    actor.send({ type: 'PEER_COMPLETE_GENERATE' });
+    state = actor.getSnapshot();
+    expect(state.value).toEqual({ local: 'idle', sync: 'polling' });
+    expect(state.context.isRemoteGenerating).toBe(false);
+  });
+
+  it('should block PEER_START_GENERATE when local user is generating (guard test)', () => {
+    const actor = createActor(chatMachine).start();
+    
+    actor.send({ type: 'START_POLLING' });
+    actor.send({ type: 'START_GENERATE' });
+    
+    let state = actor.getSnapshot();
+    expect(state.value).toEqual({ local: 'generating', sync: 'polling' });
+    expect(state.context.isGenerating).toBe(true);
+
+    // Send PEER_START_GENERATE -> should be blocked by guard
+    actor.send({ type: 'PEER_START_GENERATE' });
+    state = actor.getSnapshot();
+    expect(state.value).toEqual({ local: 'generating', sync: 'polling' }); // Still in polling
+    expect(state.context.isRemoteGenerating).toBe(false);
+  });
+
+  it('should transition sync state to polling and reset isRemoteGenerating when local generation starts', () => {
+    const actor = createActor(chatMachine).start();
+    
+    actor.send({ type: 'START_POLLING' });
+    actor.send({ type: 'PEER_START_GENERATE' });
+    
+    let state = actor.getSnapshot();
+    expect(state.value).toEqual({ local: 'idle', sync: 'remoteGenerating' });
+    expect(state.context.isRemoteGenerating).toBe(true);
+
+    // Local user starts generating -> forces sync to polling and resets isRemoteGenerating
+    actor.send({ type: 'START_GENERATE' });
+    state = actor.getSnapshot();
+    expect(state.value).toEqual({ local: 'generating', sync: 'polling' });
+    expect(state.context.isRemoteGenerating).toBe(false);
+  });
 });
