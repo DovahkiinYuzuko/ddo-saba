@@ -23,6 +23,9 @@ nginx/logs/
 
 # Web UI source files
 !web-ui/
+!web-ui/package.json
+!web-ui/scripts/
+!web-ui/scripts/**
 !web-ui/src/
 !web-ui/src/**
 web-ui/src/assets
