@@ -117,7 +117,7 @@ export const unloadModel = async (
         body: JSON.stringify({
           model: modelName,
           messages: [],
-          keep_alive: 0,
+          keep_alive: '0s',
           stream: false
         })
       });

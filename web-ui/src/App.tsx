@@ -325,7 +325,7 @@ export default function App() {
         body: JSON.stringify({
           model: activeModel,
           messages: [],
-          keep_alive: 0
+          keep_alive: '0s'
         }),
         keepalive: true
       });
@@ -461,7 +461,7 @@ export default function App() {
   }, [settings.connectionUrl, settings.accessToken, activeModel, isModelLoading, lastModelSender, settings.username, lastModelChangeTime]);
 
   useEffect(() => {
-    if (!isInitialized) return;
+    if (!isInitialized || !settings.accessToken) return;
     const timer = setTimeout(() => {
       void fetchModelsAndPs();
     }, 0);
@@ -472,7 +472,7 @@ export default function App() {
       clearTimeout(timer);
       clearInterval(interval);
     };
-  }, [fetchModelsAndPs, isInitialized]);
+  }, [fetchModelsAndPs, isInitialized, settings.accessToken]);
 
   const lastPolledMsgIdRef = useRef(state.context.lastPolledMsgId);
   useEffect(() => {
@@ -584,7 +584,7 @@ export default function App() {
   }, [settings.connectionUrl, settings.accessToken, settings.username, activeChatId, addNewTab, deleteTab, handleActiveCount, send]);
 
   useEffect(() => {
-    if (!isInitialized || !settings.isSharedMode) return;
+    if (!isInitialized || !settings.accessToken || !settings.isSharedMode) return;
     let active = true;
     let timerId: ReturnType<typeof setTimeout> | null = null;
 
@@ -602,11 +602,11 @@ export default function App() {
       active = false;
       if (timerId) clearTimeout(timerId);
     };
-  }, [isInitialized, settings.isSharedMode, startBroadcastPolling]);
+  }, [isInitialized, settings.accessToken, settings.isSharedMode, startBroadcastPolling]);
 
   // Polling for queue status in shared room mode
   useEffect(() => {
-    if (!isInitialized || !settings.isSharedMode) return;
+    if (!isInitialized || !settings.accessToken || !settings.isSharedMode) return;
     let active = true;
     let timerId: ReturnType<typeof setTimeout> | null = null;
 
@@ -634,7 +634,7 @@ export default function App() {
       active = false;
       if (timerId) clearTimeout(timerId);
     };
-  }, [isInitialized, settings.isSharedMode, settings.connectionUrl, settings.accessToken, settings.username, handleActiveCount]);
+  }, [isInitialized, settings.accessToken, settings.isSharedMode, settings.connectionUrl, settings.username, handleActiveCount]);
 
   // Fetch initial history when Shared Room mode is enabled
   useEffect(() => {

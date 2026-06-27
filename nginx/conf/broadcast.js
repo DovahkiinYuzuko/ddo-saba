@@ -33,9 +33,33 @@ function update_active_users(r) {
     }
     
     dict.set("active_users", JSON.stringify(cleaned));
+
+    // Clear model cache if the sender is no longer active
+    var modelStr = dict.get("model");
+    if (modelStr) {
+        try {
+            var modelData = JSON.parse(modelStr);
+            if (modelData.sender) {
+                var senderActive = false;
+                for (var k in cleaned) {
+                    if (cleaned.hasOwnProperty(k)) {
+                        if (k.indexOf("_" + modelData.sender) !== -1) {
+                            senderActive = true;
+                            break;
+                        }
+                    }
+                }
+                if (!senderActive) {
+                    dict.set("model", "{}");
+                }
+            }
+        } catch (e) {
+            // Ignore
+        }
+    }
     
     // Add header to response
-    var activeCount = count > 0 ? count : 1;
+    var activeCount = count;
     r.headersOut['X-DDO-Active-Count'] = activeCount.toString();
 }
 
