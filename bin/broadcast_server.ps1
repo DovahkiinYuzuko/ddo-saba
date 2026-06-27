@@ -95,6 +95,7 @@ while ($listener.IsListening) {
                 }
                 
                 if ($diffMessages.Count -gt 0) {
+                    Write-Host "[POLL] User '$clientUsername' polled. Returned $($diffMessages.Count) messages (LastId: $clientLastId)" -ForegroundColor Cyan
                     $pollJson = ConvertTo-Json $diffMessages -Compress
                     if (-not $pollJson.StartsWith("[")) {
                         $pollJson = "[" + $pollJson + "]"
@@ -139,6 +140,7 @@ while ($listener.IsListening) {
                         $messageHistory = @($messageHistory | Select-Object -Last 100)
                     }
                     
+                    Write-Host "[BROADCAST] Received msg from '$($data.sender)' (broadcaster: '$($data.broadcaster)', role: '$($data.role)', id: '$($data.id)')" -ForegroundColor Yellow
                     $response.StatusCode = 200
                 } catch {
                     $response.StatusCode = 400
@@ -173,6 +175,7 @@ while ($listener.IsListening) {
                         $data = $data | Add-Member -NotePropertyName "timestamp" -NotePropertyValue [double]([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) -PassThru
                     }
                     $cachedModelData = $data
+                    Write-Host "[MODEL] Sync selected model: '$($data.model)' (sender: '$($data.sender)', isGenerating: $($data.isGenerating))" -ForegroundColor Green
                     $response.StatusCode = 200
                 } catch {
                     $response.StatusCode = 400
@@ -261,6 +264,7 @@ while ($listener.IsListening) {
                                 $newJob.status = "running"
                             }
                             $jobQueue += $newJob
+                            Write-Host "[QUEUE] User '$username' joined queue (id: $id, status: $($newJob.status))" -ForegroundColor Magenta
                         }
                         $response.StatusCode = 200
                     }
@@ -279,6 +283,7 @@ while ($listener.IsListening) {
                             $jobQueue[0].status = "running"
                             $jobQueue[0].timestamp = $nowEpoch
                         }
+                        Write-Host "[QUEUE] User '$username' cancelled job (id: $id)" -ForegroundColor Magenta
                         $response.StatusCode = 200
                     }
                     elseif ($action -eq "complete") {
@@ -292,6 +297,7 @@ while ($listener.IsListening) {
                             $jobQueue[0].status = "running"
                             $jobQueue[0].timestamp = $nowEpoch
                         }
+                        Write-Host "[QUEUE] Job completed (id: $id)" -ForegroundColor Magenta
                         $response.StatusCode = 200
                     }
                     else {

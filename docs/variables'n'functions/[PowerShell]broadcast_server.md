@@ -63,8 +63,8 @@ This script runs a lightweight in-memory broadcast relay server for Windows envi
   - `OPTIONS /api/poll` & `OPTIONS /api/broadcast` & `OPTIONS /api/history` & `OPTIONS /api/model` & `OPTIONS /api/queue`: Handles CORS preflight by returning CORS headers with `200 OK` or `204 No Content`.
 
 ## Impact Scope
-- **`bin/broadcast_server.ps1`:** `/api/poll` (GET) のレスポンスを、単一メッセージオブジェクトの返却から、差分ID以降の履歴（配列）を返却する形式に修正。
-- **`web-ui`:** `/api/poll` から返る配列を正しくパース・受信できるようになり、複数端末間のリアルタイムチャット同期が正常に機能する。
+- **`bin/broadcast_server.ps1`:** `/api/poll` (GET) のレスポンスを差分履歴（配列）で返す形式に修正。また、デバッグ効率向上のため、各エンドポイント（`/api/poll`, `/api/broadcast`, `/api/model`, `/api/queue`）のアクセス時に、ユーザー名やリクエストボディ、生成ID等をコンソールへ詳細に出力（Write-Host）するログ出力を追加。
+- **`web-ui`:** `/api/poll` から返る配列を正しくパース・受信できるようになり、複数端末間のリアルタイムチャット同期が正常に機能する。また、コンソールログからリクエストの流れを追跡可能になる。
 
 ## Dependency Map
 
