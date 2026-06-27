@@ -809,6 +809,9 @@ export default function App() {
             setActiveModel(data.model);
             setLastModelSender(data.sender);
             setLastModelChangeTime(Date.now());
+            if (data.model) {
+              void loadModelOnSelection(data.model);
+            }
           }
         }
 
