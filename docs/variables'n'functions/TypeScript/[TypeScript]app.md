@@ -17,6 +17,15 @@ Refer to `chatMachine.md` for the core state variables (e.g., `chats`, `activeCh
 - **`fallbackTimerRef`**: Ref holding the `NodeJS.Timeout` instance for the remote completion fallback timer (delaying remote text commit by 5 seconds to allow broadcast message receipt).
 - **`prevIsSharedModeRef`**: Tracks the previous shared mode state to detect toggle transitions.
 - **`messagesContainerRef`**: Tracks the scroll container to synchronize scrolling.
+- **`isInitialized`** (`boolean`): State variable indicating that the web-ui has completed its mount cycle, parsed settings from the URL query parameters (e.g. `token`), and initialized the context. Used to guard API pollings.
+
+---
+
+## 1.1 API Poll Guards & Lifecycles
+
+To prevent premature HTTP 403 Forbidden race conditions (sending requests with an empty token before the URL parser completes), all critical API polling loops are guarded:
+- **`fetchModelsAndPs`**, **`startBroadcastPolling`**, **`pollQueue`**: Will not execute unless `isInitialized` is `true` and `settings.accessToken` is populated.
+- **`beforeunload`**: When the window is closed, calls `/api/chat` with `keep_alive: '0s'` to immediately release Ollama VRAM if the client is the last active user.
 
 ---
 
