@@ -1,6 +1,6 @@
 function update_active_users(r) {
     var dict = ngx.shared.broadcast_zone;
-    var clientUsername = r.headersIn['X-DDO-Username'];
+    var clientToken = r.headersIn['X-DDO-Token'] || 'anonymous';
     var now = Math.floor(Date.now() / 1000);
     
     var usersStr = dict.get("active_users");
@@ -13,9 +13,7 @@ function update_active_users(r) {
         }
     }
     
-    if (clientUsername) {
-        users[clientUsername] = now;
-    }
+    users[clientToken] = now;
     
     // Clean up old entries (inactive for > 10 seconds)
     var cleaned = {};

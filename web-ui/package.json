@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "test": "vitest",
     "test:api": "node scripts/test_api_sync.js",
+    "test:api:watch": "node --watch scripts/test_api_sync.js",
     "test:unit": "vitest run"
   },
   "dependencies": {

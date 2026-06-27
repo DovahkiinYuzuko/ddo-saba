@@ -46,7 +46,7 @@ This script runs a lightweight in-memory broadcast relay server for Windows envi
 
 ### `$activeUsers`
 - **Type:** `System.Collections.Hashtable`
-- **Description:** Keeps track of each client's username and their last active Unix epoch timestamp to count concurrent users.
+- **Description:** Keeps track of each client's token (`X-DDO-Token`) and their last active Unix epoch timestamp to count concurrent users without duplicates during username modifications.
 
 ## Functions
 

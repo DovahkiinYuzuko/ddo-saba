@@ -13,6 +13,8 @@ interface SettingsModalProps {
   onExportCassette: () => void;
   onImportCassette: (e: React.ChangeEvent<HTMLInputElement>) => void;
   t: LocaleStrings;
+  lang: 'en' | 'ja';
+  setLang: (l: 'en' | 'ja') => void;
 }
 
 export default function SettingsModal({
@@ -24,9 +26,13 @@ export default function SettingsModal({
   onClose,
   onExportCassette,
   onImportCassette,
-  t
+  t,
+  lang,
+  setLang
 }: SettingsModalProps) {
   if (!show) return null;
+
+  const isJa = t.close === '閉じる';
 
   const handleFieldChange = (key: keyof DdoSettings, value: string | boolean) => {
     onChangeSettings({
@@ -97,9 +103,19 @@ export default function SettingsModal({
             </div>
           </div>
 
+          <div className="form-group inline-group">
+            <label>{isJa ? '言語 / Language' : 'Language / 言語'}</label>
+            <select
+              value={lang}
+              onChange={(e) => setLang(e.target.value as 'en' | 'ja')}
+            >
+              <option value="ja">日本語 (Japanese)</option>
+              <option value="en">English</option>
+            </select>
+          </div>
+
           <div className="qr-code-section-wrap">
             {(() => {
-              const isJa = t.close === '閉じる';
               const isPublicOrIp = settings.connectionUrl &&
                 !settings.connectionUrl.includes('localhost') &&
                 !settings.connectionUrl.includes('127.0.0.1');

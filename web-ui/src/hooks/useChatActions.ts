@@ -401,10 +401,10 @@ export function useChatActions({
       if (settings.isSharedMode) {
         void broadcastModel(settings.connectionUrl, settings.accessToken, settings.username, activeModel, Date.now(), false, '');
         if (jobIdToComplete) {
+          setMyJobId(null);
+          setPendingMessage('');
           try {
             await completeQueue(settings.connectionUrl, settings.accessToken, jobIdToComplete);
-            setMyJobId(null);
-            setPendingMessage('');
             const q = await fetchQueue(settings.connectionUrl, settings.accessToken);
             setJobQueue(q);
           } catch (err) {

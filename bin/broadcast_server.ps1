@@ -39,12 +39,13 @@ while ($listener.IsListening) {
         $request = $context.Request
         $response = $context.Response
 
-        # Get client username from header and update active users
-        $clientUsername = $request.Headers["X-DDO-Username"]
-        if ($clientUsername) {
-            $currentTime = [double]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
-            $activeUsers[$clientUsername] = $currentTime
+        # Get client token from header and update active users
+        $clientToken = $request.Headers["X-DDO-Token"]
+        if (-not $clientToken) {
+            $clientToken = "anonymous"
         }
+        $currentTime = [double]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
+        $activeUsers[$clientToken] = $currentTime
 
         # Clean up users inactive for more than 10 seconds
         $now = [double]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())

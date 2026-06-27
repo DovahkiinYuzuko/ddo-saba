@@ -20,6 +20,8 @@ This document specifies the popover modal logic for editing connection URLs, aut
 - `onExportCassette` (`() => void`): Triggers file download of the current chat.
 - `onImportCassette` (`(e: React.ChangeEvent<HTMLInputElement>) => void`): Handler triggered when local JSON files are uploaded.
 - `t` (`LocaleStrings`): Localization language mappings.
+- `lang` (`'en' | 'ja'`): Current UI language indicator.
+- `setLang` (`(l: 'en' | 'ja') => void`): Callback to swap active language between 'en' and 'ja'.
 
 ---
 
@@ -39,4 +41,6 @@ graph TD
     SettingsModal --> onChangeSettings
     SettingsModal --> onExportCassette
     SettingsModal --> onImportCassette
+    SettingsModal --> lang
+    SettingsModal --> setLang
 ```

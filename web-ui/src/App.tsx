@@ -944,6 +944,8 @@ export default function App() {
         onExportCassette={exportCassette}
         onImportCassette={importCassette}
         t={t}
+        lang={lang}
+        setLang={setLang}
       />
 
       {/* 5. Synchronize Request Modal */}
