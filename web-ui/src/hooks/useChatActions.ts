@@ -110,7 +110,8 @@ export function useChatActions({
           settings.username,
           settings.username,
           'user',
-          pendingMessage
+          pendingMessage,
+          userMsgId
         );
       } catch (e) {
         console.error("Failed to broadcast user message on start", e);
@@ -320,7 +321,8 @@ export function useChatActions({
             activeModel,
             settings.username,
             'assistant',
-            accumulatedContent
+            accumulatedContent,
+            assistantMsgId
           );
           if (result && result.id) {
             updateLastPolledMsgId(result.id);

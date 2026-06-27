@@ -615,9 +615,13 @@ export default function App() {
           if (activeChatId) {
             setChats(prev => prev.map(c => {
               if (c.id === activeChatId) {
+                if (data.id && c.messages.some(m => m.id === data.id)) {
+                  return c;
+                }
                 return {
                   ...c,
                   messages: [...c.messages, {
+                    id: data.id,
                     role: data.role || 'user',
                     content: data.content || '',
                     sender: data.sender,
@@ -714,6 +718,7 @@ export default function App() {
                       return {
                         ...c,
                         messages: [...c.messages, {
+                          id: h.id,
                           role: 'system',
                           content: h.content || '',
                           sender: h.sender,

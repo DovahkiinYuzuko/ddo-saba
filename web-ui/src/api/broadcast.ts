@@ -42,6 +42,7 @@ export const broadcastMessage = async (
   broadcaster: string,
   role: string,
   content: string,
+  id?: string,
   username?: string,
   onActiveCount?: (count: number) => void
 ): Promise<{ status: string; id: string }> => {
@@ -49,7 +50,7 @@ export const broadcastMessage = async (
   const res = await fetch(`${connectionUrl}/api/broadcast`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ sender, broadcaster, role, content })
+    body: JSON.stringify({ id, sender, broadcaster, role, content })
   });
   if (!res.ok) {
     throw new Error(`HTTP ${res.status}`);

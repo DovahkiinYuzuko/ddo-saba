@@ -102,7 +102,7 @@ graph TD
 
 ## 4. Impact Scope
 
-- `web-ui/src/App.tsx`: Manages the lifecycle of UI states. Setting a 15s grace period inside `fetchModelsAndPs` prevents the model selection dropdown from clearing itself immediately after a model finishes loading.
+- `web-ui/src/App.tsx`: Manages the lifecycle of UI states. Setting a 15s grace period inside `fetchModelsAndPs` prevents the model selection dropdown from clearing itself immediately after a model finishes loading. Also, polling message handling now correctly persists message IDs (`id: data.id`) and implements duplicate prevention check (`some` logic) to prevent duplicate rendering of assistant messages across peers.
 - `web-ui/src/components/ChatInputArea.tsx` and sending actions: Ensuring `activeModel` is not prematurely cleared ensures that users can type and send messages successfully without encountering blank model check failures.
-- `web-ui/src/hooks/useChatActions.ts`: Relies on `chats`, `activeModel`, and generation states from `App.tsx`. Safety improvements to generation states ensure `isGeneratingRef.current` is consistently freed, preventing deadlock on sending messages.
+- `web-ui/src/hooks/useChatActions.ts`: Relies on `chats`, `activeModel`, and generation states from `App.tsx`. Safety improvements to generation states ensure `isGeneratingRef.current` is consistently freed, preventing deadlock on sending messages. Also, broadcasts user and assistant messages with local message IDs attached to synchronize message identity.
 
