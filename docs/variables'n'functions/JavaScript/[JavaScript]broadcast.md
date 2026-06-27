@@ -96,7 +96,7 @@ This document specifies the variables and functions used in `nginx/conf/broadcas
   5. Returns HTTP `200` on success, or `500` on internal write error.
 
 ### `update_active_users` (L1-37)
-- **Description:** On every API endpoint request, this function reads the client's unique session identifier (`X-DDO-Client-Id`) from headers, updates their last active timestamp in a JSON string stored in `ngx.shared.broadcast_zone` under the `"active_users"` key (using the client ID as the key instead of token or username to prevent duplicates when multiple users share the same token), cleans up entries older than 10 seconds, and includes the active count in the response.
+- **Description:** On every API endpoint request, this function reads the client's unique session identifier (`X-DDO-Client-Id`) from headers. If not present, it falls back to a concatenated ID using `X-DDO-Token` and `X-DDO-Username` headers (formatted as `token + "_" + username`). It updates their last active timestamp in a JSON string stored in `ngx.shared.broadcast_zone` under the `"active_users"` key (using this client ID as the key to prevent duplicates when multiple users share the same token), cleans up entries older than 10 seconds, and includes the active count in the response.
 
 ---
 

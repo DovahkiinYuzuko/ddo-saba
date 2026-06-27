@@ -34,7 +34,7 @@ This script runs a lightweight in-memory broadcast relay server for Windows envi
 
 ### `$activeUsers`
 - **Type:** `System.Collections.Hashtable`
-- **Description:** Keeps track of each client's session ID (`X-DDO-Client-Id`) and their last active Unix epoch timestamp to count concurrent users without duplicates or omissions when sharing tokens.
+- **Description:** Keeps track of each client's session ID (`X-DDO-Client-Id`) and their last active Unix epoch timestamp. If the client ID is missing from headers, it falls back to a concatenated ID using `X-DDO-Token` and `X-DDO-Username` headers (formatted as `$token + "_" + $username`) to count concurrent users without duplicates or omissions.
 
 ## Functions
 

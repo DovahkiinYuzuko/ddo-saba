@@ -130,6 +130,26 @@ export function useChatMachineState() {
     send({ type: 'UPDATE_CONTEXT', payload: { expandedThinking: val } });
   }, [send]);
 
+  const startGenerate = useCallback(() => {
+    send({ type: 'START_GENERATE' });
+  }, [send]);
+
+  const completeGenerate = useCallback(() => {
+    send({ type: 'GENERATE_COMPLETE' });
+  }, [send]);
+
+  const abortGenerate = useCallback(() => {
+    send({ type: 'GENERATE_ABORT' });
+  }, [send]);
+
+  const peerStartGenerate = useCallback(() => {
+    send({ type: 'PEER_START_GENERATE' });
+  }, [send]);
+
+  const peerCompleteGenerate = useCallback(() => {
+    send({ type: 'PEER_COMPLETE_GENERATE' });
+  }, [send]);
+
   return {
     state,
     send,
@@ -164,7 +184,12 @@ export function useChatMachineState() {
       setActiveChatId,
       setSettings,
       setModels,
-      setExpandedThinking
+      setExpandedThinking,
+      startGenerate,
+      completeGenerate,
+      abortGenerate,
+      peerStartGenerate,
+      peerCompleteGenerate
     }
   };
 }

@@ -39,8 +39,11 @@ while ($listener.IsListening) {
         # Get client unique ID from header and update active users
         $clientId = $request.Headers["X-DDO-Client-Id"]
         if (-not $clientId) {
-            $clientId = $request.Headers["X-DDO-Token"]
-            if (-not $clientId) { $clientId = "anonymous" }
+            $token = $request.Headers["X-DDO-Token"]
+            $username = $request.Headers["X-DDO-Username"]
+            if (-not $token) { $token = "anonymous" }
+            if (-not $username) { $username = "guest" }
+            $clientId = $token + "_" + $username
         }
         $currentTime = [double]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
         $activeUsers[$clientId] = $currentTime
@@ -63,7 +66,7 @@ while ($listener.IsListening) {
         # CORS Headers
         $response.Headers.Add("Access-Control-Allow-Origin", "*")
         $response.Headers.Add("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
-        $response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, X-DDO-Token, X-DDO-Username")
+        $response.Headers.Add("Access-Control-Allow-Headers", "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id")
         $response.Headers.Add("X-DDO-Active-Count", $activeCount.ToString())
 
         if ($request.HttpMethod -eq "OPTIONS") {

@@ -122,7 +122,10 @@ export const chatMachine = createMachine(
           idle: {
             on: {
               SELECT_MODEL: 'loadingModel',
-              START_GENERATE: 'generating',
+              START_GENERATE: {
+                target: 'generating',
+                actions: assign({ isGenerating: true })
+              },
               UNLOAD_MODEL: 'unloadingModel',
               SET_ACTIVE_MODEL: {
                 actions: assign({
@@ -139,8 +142,14 @@ export const chatMachine = createMachine(
           },
           generating: {
             on: {
-              GENERATE_COMPLETE: 'idle',
-              GENERATE_ABORT: 'idle'
+              GENERATE_COMPLETE: {
+                target: 'idle',
+                actions: assign({ isGenerating: false })
+              },
+              GENERATE_ABORT: {
+                target: 'idle',
+                actions: assign({ isGenerating: false })
+              }
             }
           },
           unloadingModel: {
@@ -164,13 +173,24 @@ export const chatMachine = createMachine(
           },
           polling: {
             on: {
-              PEER_START_GENERATE: 'remoteGenerating',
+              PEER_START_GENERATE: {
+                target: 'remoteGenerating',
+                guard: ({ context }) => !context.isGenerating,
+                actions: assign({ isRemoteGenerating: true })
+              },
               STOP_POLLING: 'idle'
             }
           },
           remoteGenerating: {
             on: {
-              PEER_COMPLETE_GENERATE: 'polling'
+              PEER_COMPLETE_GENERATE: {
+                target: 'polling',
+                actions: assign({ isRemoteGenerating: false, remoteGeneratingText: '' })
+              },
+              START_GENERATE: {
+                target: 'polling',
+                actions: assign({ isRemoteGenerating: false, remoteGeneratingText: '' })
+              }
             }
           }
         }

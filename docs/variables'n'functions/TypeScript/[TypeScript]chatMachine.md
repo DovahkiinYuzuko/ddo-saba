@@ -44,7 +44,7 @@ Manages user-initiated local operations.
 
 - **`idle`**: The resting state. It listens for `SELECT_MODEL`, `START_GENERATE`, and `UNLOAD_MODEL` events.
 - **`loadingModel`**: Entered when a model is selected. Transitions to `idle` on `LOAD_SUCCESS` or `LOAD_FAILURE`.
-- **`generating`**: Entered when the queue processes a prompt. Transitions to `idle` on `GENERATE_COMPLETE` or `GENERATE_ABORT`. It rejects new `START_GENERATE` events to prevent race conditions (double execution).
+- **`generating`**: Entered when the queue processes a prompt. On entry, automatically sets `isGenerating: true` in context. Transitions to `idle` on `GENERATE_COMPLETE` or `GENERATE_ABORT` (setting `isGenerating: false`). It rejects new `START_GENERATE` events to prevent race conditions.
 - **`unloadingModel`**: Entered when the unload action is triggered. On `UNLOAD_SUCCESS`, clears the `activeModel` in context.
 
 ### `sync` Region
@@ -52,19 +52,20 @@ Manages real-time polling synchronization with the server in Shared Room Mode.
 
 - **`idle`**: The polling loop is inactive (e.g., Private Mode).
 - **`polling`**: Active polling mode. Polls for `activeModel`, `jobQueue`, and `isGenerating` statuses of other clients.
-- **`remoteGenerating`**: Entered when another client broadcasts `isGenerating: true`. Prevents local keep-alive pings and local `activeModel` resets. Transitions back to `polling` automatically when the peer signals completion (`isGenerating: false`).
+- **`remoteGenerating`**: Entered when another client broadcasts `isGenerating: true` via `PEER_START_GENERATE` (guarded to transition only if the local user is not generating). On entry, sets `isRemoteGenerating: true`. Transitions back to `polling` when the peer signals completion via `PEER_COMPLETE_GENERATE` (setting `isRemoteGenerating: false` and clearing the remote text buffer) or if the local user starts generating via `START_GENERATE` (forcing remote sync back to `polling`).
 
 ---
 
 ## 3. Events
 
 - **`SELECT_MODEL`**: Triggered when a user selects a model from the dropdown. payload: `{ modelName: string }`
-- **`START_GENERATE`**: Triggered when the queue is ready to execute a prompt.
-- **`GENERATE_COMPLETE`**: Emitted when the inference stream finishes successfully.
+- **`START_GENERATE`**: Triggered when the queue is ready to execute a prompt. Sets `isGenerating: true` in context, and forces remote sync back to `polling` if it was in `remoteGenerating`.
+- **`GENERATE_COMPLETE`**: Emitted when the inference stream finishes successfully. Sets `isGenerating: false`.
+- **`GENERATE_ABORT`**: Emitted when the inference stream is cancelled or errors out. Sets `isGenerating: false`.
 - **`UNLOAD_MODEL`**: Triggered by the unload button.
 - **`UNLOAD_SUCCESS`**: Indicates the VRAM was successfully cleared.
-- **`PEER_START_GENERATE`**: Detected via polling; signals that a remote client has started generation.
-- **`PEER_COMPLETE_GENERATE`**: Detected via polling; signals that a remote client has finished generation.
+- **`PEER_START_GENERATE`**: Detected via polling; signals that a remote client has started generation. Sets `isRemoteGenerating: true`. Guarded by `!isGenerating`.
+- **`PEER_COMPLETE_GENERATE`**: Detected via polling; signals that a remote client has finished generation. Sets `isRemoteGenerating: false` and clears `remoteGeneratingText`.
 - **`UPDATE_CONTEXT`**: Generic event to update context fields (e.g., `chats`, `jobQueue`, `activeUserCount`). Supports functional updates: if a payload property is a function, it evaluates the function with the current context's field value as the parameter.
 
 ---

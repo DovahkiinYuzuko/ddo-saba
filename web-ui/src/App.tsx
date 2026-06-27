@@ -60,7 +60,6 @@ export default function App() {
     setIsRemoteGenerating,
     setRemoteGeneratingText,
     setPsInfo,
-    setIsGenerating,
     setSendOnEnter,
     setContextUsed,
     setLastModelChangeTime,
@@ -73,7 +72,12 @@ export default function App() {
     setActiveChatId,
     setSettings,
     setModels,
-    setExpandedThinking
+    setExpandedThinking,
+    startGenerate,
+    completeGenerate,
+    abortGenerate,
+    peerStartGenerate,
+    peerCompleteGenerate
   } = adapters;
 
   const { 
@@ -145,6 +149,7 @@ export default function App() {
   }, [isGenerating]);
   
   const abortControllerRef = useRef<AbortController | null>(null);
+  const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevIsSharedModeRef = useRef<boolean>(settings.isSharedMode);
 
   const handleActiveCount = useCallback((count: number) => {
@@ -363,7 +368,11 @@ export default function App() {
         settings.username,
         'system',
         `tab_create:${newId}:${title}`
-      );
+      ).then(result => {
+        if (result && result.id) {
+          send({ type: 'UPDATE_CONTEXT', payload: { lastPolledMsgId: result.id } });
+        }
+      }).catch(e => console.error("Failed to broadcast tab_create", e));
     }
   }, [t.newChat, chats.length, settings.isSharedMode, settings.connectionUrl, settings.accessToken, settings.username]);
 
@@ -391,7 +400,11 @@ export default function App() {
             settings.username,
             'system',
             `tab_switch:${nextActiveId}`
-          );
+          ).then(result => {
+            if (result && result.id) {
+              send({ type: 'UPDATE_CONTEXT', payload: { lastPolledMsgId: result.id } });
+            }
+          }).catch(e => console.error("Failed to broadcast tab_switch", e));
         }
         return nextActiveId;
       }
@@ -406,7 +419,11 @@ export default function App() {
         settings.username,
         'system',
         `tab_delete:${id}`
-      );
+      ).then(result => {
+        if (result && result.id) {
+          send({ type: 'UPDATE_CONTEXT', payload: { lastPolledMsgId: result.id } });
+        }
+      }).catch(e => console.error("Failed to broadcast tab_delete", e));
     }
   }, [chats, settings.isSharedMode, settings.connectionUrl, settings.accessToken, settings.username]);
 
@@ -477,71 +494,80 @@ export default function App() {
 
       for (const data of messages) {
         const isMyMessage = data.sender === settings.username || data.broadcaster === settings.username;
-        if (data.id && data.id !== lastPolledMsgIdRef.current && !isMyMessage) {
+        if (data.id && data.id !== lastPolledMsgIdRef.current) {
+          // Update cursor immediately to prevent duplicate processing in the same loop
+          lastPolledMsgIdRef.current = data.id;
           send({ type: 'UPDATE_CONTEXT', payload: { lastPolledMsgId: data.id } });
           
-          // Handle system sync events
-          if (data.role === 'system' && data.content) {
-            if (data.content.startsWith('sync_request:')) {
-              const parts = data.content.split(':');
-              const sender = parts[1];
-              const payloadStr = parts.slice(2).join(':');
-              if (sender !== settings.username && payloadStr) {
-                try {
-                  const payload = JSON.parse(payloadStr);
-                  setSyncRequestPending({
-                    ...payload,
-                    sender
-                  });
-                } catch (e) {
-                  console.error("Failed to parse settings sync payload", e);
+          if (!isMyMessage) {
+            // Handle system sync events
+            if (data.role === 'system' && data.content) {
+              if (data.content.startsWith('sync_request:')) {
+                const parts = data.content.split(':');
+                const sender = parts[1];
+                const payloadStr = parts.slice(2).join(':');
+                if (sender !== settings.username && payloadStr) {
+                  try {
+                    const payload = JSON.parse(payloadStr);
+                    setSyncRequestPending({
+                      ...payload,
+                      sender
+                    });
+                  } catch (e) {
+                    console.error("Failed to parse settings sync payload", e);
+                  }
                 }
+                continue;
+              } else if (data.content.startsWith('tab_create:')) {
+                const parts = data.content.split(':');
+                const tabId = parts[1];
+                const tabTitle = parts.slice(2).join(':');
+                if (tabId) {
+                  addNewTab(true, tabId, tabTitle);
+                }
+                continue;
+              } else if (data.content.startsWith('tab_delete:')) {
+                const tabId = data.content.substring('tab_delete:'.length);
+                if (tabId) {
+                  deleteTab(tabId, undefined, true);
+                }
+                continue;
+              } else if (data.content.startsWith('tab_switch:')) {
+                const tabId = data.content.substring('tab_switch:'.length);
+                if (tabId) {
+                  setActiveChatId(tabId);
+                }
+                continue;
               }
-              continue;
-            } else if (data.content.startsWith('tab_create:')) {
-              const parts = data.content.split(':');
-              const tabId = parts[1];
-              const tabTitle = parts.slice(2).join(':');
-              if (tabId) {
-                addNewTab(true, tabId, tabTitle);
-              }
-              continue;
-            } else if (data.content.startsWith('tab_delete:')) {
-              const tabId = data.content.substring('tab_delete:'.length);
-              if (tabId) {
-                deleteTab(tabId, undefined, true);
-              }
-              continue;
-            } else if (data.content.startsWith('tab_switch:')) {
-              const tabId = data.content.substring('tab_switch:'.length);
-              if (tabId) {
-                setActiveChatId(tabId);
-              }
-              continue;
             }
-          }
 
-          // Append shared message to currently active chat session
-          if (activeChatId) {
-            setChats(prev => prev.map(c => {
-              if (c.id === activeChatId) {
-                if (data.id && c.messages.some(m => m.id === data.id)) {
-                  return c;
+            // Append shared message to currently active chat session
+            if (activeChatId) {
+              setChats(prev => prev.map(c => {
+                if (c.id === activeChatId) {
+                  if (data.id && c.messages.some(m => m.id === data.id)) {
+                    return c;
+                  }
+                  if (data.role === 'assistant' && fallbackTimerRef.current) {
+                    clearTimeout(fallbackTimerRef.current);
+                    fallbackTimerRef.current = null;
+                    setRemoteGeneratingText('');
+                  }
+                  return {
+                    ...c,
+                    messages: [...c.messages, {
+                      id: data.id,
+                      role: data.role || 'user',
+                      content: data.content || '',
+                      sender: data.sender,
+                      broadcaster: data.broadcaster,
+                      timestamp: data.timestamp ? formatTimestamp(data.timestamp) : undefined
+                    }]
+                  };
                 }
-                return {
-                  ...c,
-                  messages: [...c.messages, {
-                    id: data.id,
-                    role: data.role || 'user',
-                    content: data.content || '',
-                    sender: data.sender,
-                    broadcaster: data.broadcaster,
-                    timestamp: data.timestamp ? formatTimestamp(data.timestamp) : undefined
-                  }]
-                };
-              }
-              return c;
-            }));
+                return c;
+              }));
+            }
           }
         }
       }
@@ -552,14 +578,33 @@ export default function App() {
 
   useEffect(() => {
     if (!settings.isSharedMode) return;
-    const interval = setInterval(startBroadcastPolling, 1500);
-    return () => clearInterval(interval);
+    let active = true;
+    let timerId: ReturnType<typeof setTimeout> | null = null;
+
+    const poll = async () => {
+      if (!active) return;
+      await startBroadcastPolling();
+      if (active) {
+        timerId = setTimeout(poll, 1500);
+      }
+    };
+
+    poll();
+
+    return () => {
+      active = false;
+      if (timerId) clearTimeout(timerId);
+    };
   }, [settings.isSharedMode, startBroadcastPolling]);
 
   // Polling for queue status in shared room mode
   useEffect(() => {
     if (!settings.isSharedMode) return;
+    let active = true;
+    let timerId: ReturnType<typeof setTimeout> | null = null;
+
     const pollQueue = async () => {
+      if (!active) return;
       try {
         const q = await fetchQueue(
           settings.connectionUrl,
@@ -567,14 +612,21 @@ export default function App() {
           settings.username,
           handleActiveCount
         );
-        setJobQueue(q);
+        if (active) setJobQueue(q);
       } catch (e) {
         console.error("Queue poll failed", e);
       }
+      if (active) {
+        timerId = setTimeout(pollQueue, 1500);
+      }
     };
-    pollQueue(); // initial run
-    const interval = setInterval(pollQueue, 1500);
-    return () => clearInterval(interval);
+
+    pollQueue();
+
+    return () => {
+      active = false;
+      if (timerId) clearTimeout(timerId);
+    };
   }, [settings.isSharedMode, settings.connectionUrl, settings.accessToken, settings.username, handleActiveCount]);
 
   // Fetch initial history when Shared Room mode is enabled
@@ -686,8 +738,11 @@ export default function App() {
   // Polling for shared model selection and generation status
   useEffect(() => {
     if (!settings.isSharedMode) return;
+    let active = true;
+    let timerId: ReturnType<typeof setTimeout> | null = null;
     
     const startModelPolling = async () => {
+      if (!active) return;
       try {
         const data = await pollModel(
           settings.connectionUrl,
@@ -702,11 +757,18 @@ export default function App() {
           generatingText?: string;
         };
 
+        if (!active) return;
+
         const wasRemoteGenerating = isRemoteGeneratingRef.current;
         const isNowGenerating = data.isGenerating === true;
 
         // 1. Update remote generating state regardless of who the sender is
         if (data.isGenerating !== undefined) {
+          if (!wasRemoteGenerating && isNowGenerating) {
+            peerStartGenerate();
+          } else if (wasRemoteGenerating && !isNowGenerating) {
+            peerCompleteGenerate();
+          }
           setIsRemoteGenerating(data.isGenerating);
           if (data.generatingText !== undefined) {
             setRemoteGeneratingText(data.generatingText || '');
@@ -725,31 +787,42 @@ export default function App() {
           }
         }
 
-        // 3. Commit final text when remote generation ends
+        // 3. Commit final text when remote generation ends (with fallback delay)
         if (wasRemoteGenerating && !isNowGenerating) {
           const textToCommit = data.generatingText || remoteGeneratingText;
-          if (textToCommit && activeChatId) {
-            setChats(prev => prev.map(c => {
-              if (c.id === activeChatId) {
-                const lastMsg = c.messages[c.messages.length - 1];
-                if (lastMsg && lastMsg.role === 'assistant' && lastMsg.content === textToCommit) {
-                  return c;
-                }
-                return {
-                  ...c,
-                  messages: [...c.messages, {
-                    id: Date.now().toString() + "_remote_ai",
-                    role: 'assistant',
-                    content: textToCommit,
-                    sender: data.model || activeModel || 'AI',
-                    timestamp: formatTimestamp(new Date())
-                  }]
-                };
-              }
-              return c;
-            }));
+          if (fallbackTimerRef.current) {
+            clearTimeout(fallbackTimerRef.current);
           }
-          setRemoteGeneratingText('');
+          if (textToCommit && activeChatId) {
+            fallbackTimerRef.current = setTimeout(() => {
+              if (!active) return;
+              setChats(prev => prev.map(c => {
+                if (c.id === activeChatId) {
+                  // Avoid duplication (check last 5 messages)
+                  const lastMessages = c.messages.slice(-5);
+                  const hasDuplicate = lastMessages.some(m => 
+                    m.role === 'assistant' && 
+                    (m.content === textToCommit || m.content.includes(textToCommit) || textToCommit.includes(m.content))
+                  );
+                  if (hasDuplicate) return c;
+                  return {
+                    ...c,
+                    messages: [...c.messages, {
+                      id: Date.now().toString() + "_remote_ai_fallback",
+                      role: 'assistant',
+                      content: textToCommit,
+                      sender: data.model || activeModel || 'AI',
+                      timestamp: formatTimestamp(new Date())
+                    }]
+                  };
+                }
+                return c;
+              }));
+              setRemoteGeneratingText('');
+            }, 5000);
+          } else {
+            setRemoteGeneratingText('');
+          }
         }
 
         // 4. If there is no sender and model status is empty, clear local activeModel
@@ -765,11 +838,18 @@ export default function App() {
       } catch (e) {
         console.error("Model poll failed", e);
       }
+      if (active) {
+        timerId = setTimeout(startModelPolling, 1500);
+      }
     };
     
-    const interval = setInterval(startModelPolling, 1500);
-    return () => clearInterval(interval);
-  }, [settings.isSharedMode, settings.connectionUrl, settings.accessToken, settings.username, activeModel, lastModelChangeTime, handleActiveCount, activeChatId, remoteGeneratingText]);
+    startModelPolling();
+
+    return () => {
+      active = false;
+      if (timerId) clearTimeout(timerId);
+    };
+  }, [settings.isSharedMode, settings.connectionUrl, settings.accessToken, settings.username, activeModel, lastModelChangeTime, handleActiveCount, activeChatId, remoteGeneratingText, peerStartGenerate, peerCompleteGenerate]);
 
   // Unload model from VRAM by calling API with keep_alive: 0
   const handleUnloadModel = async () => {
@@ -799,7 +879,9 @@ export default function App() {
     stopGeneration
   } = useChatActions({
     chats, activeChatId, settings, activeModel, systemPrompt, pendingMessage, parameters, thinkMode, numPredictEnabled, myJobId, inputText, isGeneratingRef, abortControllerRef, t,
-    setChats, setIsGenerating, setModelLoadError, setPendingMessage, setMyJobId, setJobQueue, setInputText, setContextUsed, updateLastPolledMsgId: (id) => send({ type: 'UPDATE_CONTEXT', payload: { lastPolledMsgId: id } })
+    setChats, setModelLoadError, setPendingMessage, setMyJobId, setJobQueue, setInputText, setContextUsed,
+    updateLastPolledMsgId: (id) => send({ type: 'UPDATE_CONTEXT', payload: { lastPolledMsgId: id } }),
+    startGenerate, completeGenerate, abortGenerate
   });
 
   const {

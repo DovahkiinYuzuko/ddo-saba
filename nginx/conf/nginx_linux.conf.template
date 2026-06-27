@@ -44,10 +44,14 @@ http {
         location /api/poll {
             add_header Access-Control-Allow-Origin * always;
             add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
-            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username" always;
+            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
             add_header Access-Control-Expose-Headers "X-DDO-Active-Count" always;
 
             if ($request_method = OPTIONS) {
+                add_header Access-Control-Allow-Origin * always;
+                add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
+                add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
+                add_header Access-Control-Expose-Headers "X-DDO-Active-Count" always;
                 return 204;
             }
 
@@ -59,10 +63,14 @@ http {
         location /api/broadcast {
             add_header Access-Control-Allow-Origin * always;
             add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
-            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username" always;
+            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
             add_header Access-Control-Expose-Headers "X-DDO-Active-Count" always;
 
             if ($request_method = OPTIONS) {
+                add_header Access-Control-Allow-Origin * always;
+                add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
+                add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
+                add_header Access-Control-Expose-Headers "X-DDO-Active-Count" always;
                 return 204;
             }
 
@@ -74,10 +82,14 @@ http {
         location /api/history {
             add_header Access-Control-Allow-Origin * always;
             add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
-            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username" always;
+            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
             add_header Access-Control-Expose-Headers "X-DDO-Active-Count" always;
 
             if ($request_method = OPTIONS) {
+                add_header Access-Control-Allow-Origin * always;
+                add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
+                add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
+                add_header Access-Control-Expose-Headers "X-DDO-Active-Count" always;
                 return 204;
             }
 
@@ -89,10 +101,14 @@ http {
         location /api/model {
             add_header Access-Control-Allow-Origin * always;
             add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
-            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username" always;
+            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
             add_header Access-Control-Expose-Headers "X-DDO-Active-Count" always;
 
             if ($request_method = OPTIONS) {
+                add_header Access-Control-Allow-Origin * always;
+                add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
+                add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
+                add_header Access-Control-Expose-Headers "X-DDO-Active-Count" always;
                 return 204;
             }
 
@@ -104,10 +120,14 @@ http {
         location /api/queue {
             add_header Access-Control-Allow-Origin * always;
             add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
-            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username" always;
+            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
             add_header Access-Control-Expose-Headers "X-DDO-Active-Count" always;
 
             if ($request_method = OPTIONS) {
+                add_header Access-Control-Allow-Origin * always;
+                add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
+                add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
+                add_header Access-Control-Expose-Headers "X-DDO-Active-Count" always;
                 return 204;
             }
 
@@ -119,9 +139,12 @@ http {
         location /api/usage {
             add_header Access-Control-Allow-Origin * always;
             add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
-            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token" always;
+            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
 
             if ($request_method = OPTIONS) {
+                add_header Access-Control-Allow-Origin * always;
+                add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
+                add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
                 return 204;
             }
 
@@ -139,9 +162,12 @@ http {
         location /api/chat {
             add_header Access-Control-Allow-Origin * always;
             add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
-            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token" always;
+            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
 
             if ($request_method = OPTIONS) {
+                add_header Access-Control-Allow-Origin * always;
+                add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
+                add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
                 return 204;
             }
 
@@ -167,9 +193,12 @@ http {
         location /api/generate {
             add_header Access-Control-Allow-Origin * always;
             add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
-            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token" always;
+            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
 
             if ($request_method = OPTIONS) {
+                add_header Access-Control-Allow-Origin * always;
+                add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
+                add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
                 return 204;
             }
 
@@ -195,9 +224,12 @@ http {
         location /api/tags {
             add_header Access-Control-Allow-Origin * always;
             add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
-            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token" always;
+            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
 
             if ($request_method = OPTIONS) {
+                add_header Access-Control-Allow-Origin * always;
+                add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
+                add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
                 return 204;
             }
 
@@ -212,9 +244,12 @@ http {
         location /api/ps {
             add_header Access-Control-Allow-Origin * always;
             add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
-            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token" always;
+            add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
 
             if ($request_method = OPTIONS) {
+                add_header Access-Control-Allow-Origin * always;
+                add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
+                add_header Access-Control-Allow-Headers "Content-Type, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
                 return 204;
             }
 

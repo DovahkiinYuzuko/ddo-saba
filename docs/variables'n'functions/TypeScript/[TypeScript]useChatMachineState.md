@@ -34,6 +34,26 @@ Every adapter function wraps the XState `send` call by dispatching an `UPDATE_CO
 
 *(Other adapters include `setIsSidebarOpen`, `setIsParamsOpen`, `setPresetName`, `setInputText`, `setShowSettingsModal`, `setNumPredictEnabled`, `setModelLoadError`, `setCollapseThinking`, `setSystemPrompt`, `setThinkMode`, `setSyncRequestPending`, `setIsRemoteGenerating`, `setRemoteGeneratingText`, `setPsInfo`, `setIsGenerating`, `setSendOnEnter`, `setContextUsed`, `setLastModelChangeTime`, `setLastModelSender`, `setJobQueue`, `setMyJobId`, `setPendingMessage`, `setActiveUserCount`, `setActiveChatId`, `setSettings`, `setModels`, `setExpandedThinking`)*
 
+### `startGenerate`
+- **Signature:** `() => void`
+- **Description:** Dispatches `START_GENERATE` to transition `local` state to `generating` and set `isGenerating: true`.
+
+### `completeGenerate`
+- **Signature:** `() => void`
+- **Description:** Dispatches `GENERATE_COMPLETE` to transition `local` state to `idle` and set `isGenerating: false`.
+
+### `abortGenerate`
+- **Signature:** `() => void`
+- **Description:** Dispatches `GENERATE_ABORT` to transition `local` state to `idle` and set `isGenerating: false`.
+
+### `peerStartGenerate`
+- **Signature:** `() => void`
+- **Description:** Dispatches `PEER_START_GENERATE` to transition `sync` state to `remoteGenerating` and set `isRemoteGenerating: true`.
+
+### `peerCompleteGenerate`
+- **Signature:** `() => void`
+- **Description:** Dispatches `PEER_COMPLETE_GENERATE` to transition `sync` state to `polling`, set `isRemoteGenerating: false`, and clear the remote buffer.
+
 ---
 
 ## 3. Dependency Mapping

@@ -14,6 +14,7 @@ Refer to `chatMachine.md` for the core state variables (e.g., `chats`, `activeCh
 ### Local Refs
 - **`isGeneratingRef`**, **`isRemoteGeneratingRef`**: React `useRef` holding active boolean values to prevent keep-alive resetting during generation.
 - **`abortControllerRef`**: Ref holding the `AbortController` instance to cancel ongoing fetch requests.
+- **`fallbackTimerRef`**: Ref holding the `NodeJS.Timeout` instance for the remote completion fallback timer (delaying remote text commit by 5 seconds to allow broadcast message receipt).
 - **`prevIsSharedModeRef`**: Tracks the previous shared mode state to detect toggle transitions.
 - **`messagesContainerRef`**: Tracks the scroll container to synchronize scrolling.
 
@@ -66,7 +67,7 @@ Refer to `chatMachine.md` for the core state variables (e.g., `chats`, `activeCh
 - **Description:** Fetches tags and ps info from Ollama. Automatically clears `activeModel` if the model has vanished from VRAM (psInfo is null), but implements a **15 seconds grace period** since the last model change (tracked via `lastModelChangeTime`) to prevent premature reset during the initial load lag.
 
 ### `pollModel` (polling loop)
-- **Description:** Polls the broadcast model and generation state. Resets `isRemoteGenerating` to `false` when peer generation finishes (independent of whether the current user is the sender), commits finalized remote text, and clears `activeModel` globally if the broadcast model payload is empty.
+- **Description:** Runs on a recursive `setTimeout` loop. Polls the broadcast model and generation state. Sets `isRemoteGenerating` and `remoteGeneratingText` from peer state. On remote generation end, triggers `peerCompleteGenerate` and schedules a 5-second fallback timer (`fallbackTimerRef`) to append the remote text into chat history if the corresponding broadcast message doesn't arrive in time (guarded against duplicate entries by verifying the last 5 messages). Clears `activeModel` globally if the broadcast model payload is empty.
 
 ---
 

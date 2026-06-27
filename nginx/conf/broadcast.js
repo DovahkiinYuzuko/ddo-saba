@@ -2,7 +2,9 @@ function update_active_users(r) {
     var dict = ngx.shared.broadcast_zone;
     var clientId = r.headersIn['X-DDO-Client-Id'];
     if (!clientId) {
-        clientId = r.headersIn['X-DDO-Token'] || 'anonymous';
+        var token = r.headersIn['X-DDO-Token'] || 'anonymous';
+        var username = r.headersIn['X-DDO-Username'] || 'guest';
+        clientId = token + "_" + username;
     }
     var now = Math.floor(Date.now() / 1000);
     

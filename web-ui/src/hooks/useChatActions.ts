@@ -22,7 +22,6 @@ export interface UseChatActionsProps {
   t: LocaleStrings;
 
   setChats: React.Dispatch<React.SetStateAction<ChatSession[]>>;
-  setIsGenerating: (isGen: boolean) => void;
   setModelLoadError: (err: string) => void;
   setPendingMessage: (msg: string) => void;
   setMyJobId: (id: string | null) => void;
@@ -30,6 +29,9 @@ export interface UseChatActionsProps {
   setInputText: (text: string) => void;
   setContextUsed: (used: number) => void;
   updateLastPolledMsgId: (id: string) => void;
+  startGenerate: () => void;
+  completeGenerate: () => void;
+  abortGenerate: () => void;
 }
 
 export function useChatActions({
@@ -49,20 +51,22 @@ export function useChatActions({
   t,
 
   setChats,
-  setIsGenerating,
   setModelLoadError,
   setPendingMessage,
   setMyJobId,
   setJobQueue,
   setInputText,
   setContextUsed,
-  updateLastPolledMsgId
+  updateLastPolledMsgId,
+  startGenerate,
+  completeGenerate,
+  abortGenerate
 }: UseChatActionsProps) {
 
   const runInferenceStream = async (jobIdToComplete?: string) => {
     if (isGeneratingRef.current) return;
     isGeneratingRef.current = true;
-    setIsGenerating(true);
+    startGenerate();
     setModelLoadError('');
 
     if (settings.isSharedMode) {
@@ -71,7 +75,7 @@ export function useChatActions({
 
     const targetChat = chats.find(c => c.id === activeChatId);
     if (!targetChat) {
-      setIsGenerating(false);
+      completeGenerate();
       isGeneratingRef.current = false;
       return;
     }
@@ -105,7 +109,7 @@ export function useChatActions({
       }));
 
       try {
-        await broadcastMessage(
+        const result = await broadcastMessage(
           settings.connectionUrl,
           settings.accessToken,
           settings.username,
@@ -114,6 +118,9 @@ export function useChatActions({
           pendingMessage,
           userMsgId
         );
+        if (result && result.id) {
+          updateLastPolledMsgId(result.id);
+        }
       } catch (e) {
         console.error("Failed to broadcast user message on start", e);
       }
@@ -331,6 +338,45 @@ export function useChatActions({
             }
           }
         }
+
+        // Parse any remaining data in streamBuffer on stream end
+        if (streamBuffer.trim()) {
+          try {
+            const parsed = JSON.parse(streamBuffer);
+            if (parsed.message?.thinking) {
+              if (!isThinkingState) {
+                isThinkingState = true;
+                accumulatedContent += '<think>\n';
+              }
+              accumulatedContent += parsed.message.thinking;
+            } else if (parsed.message?.content) {
+              if (isThinkingState && !hasThoughtEndedState) {
+                accumulatedContent += '\n</think>\n';
+                hasThoughtEndedState = true;
+              }
+              accumulatedContent += parsed.message.content;
+            }
+
+            if (accumulatedContent) {
+              setChats(prev => prev.map(c => {
+                if (c.id === activeChatId) {
+                  return {
+                    ...c,
+                    messages: c.messages.map(m => {
+                      if (m.id === assistantMsgId) {
+                        return { ...m, content: accumulatedContent };
+                      }
+                      return m;
+                    })
+                  };
+                }
+                return c;
+              }));
+            }
+          } catch {
+            // Ignore
+          }
+        }
       }
 
       if (settings.isSharedMode && accumulatedContent) {
@@ -353,6 +399,7 @@ export function useChatActions({
       }
 
     } catch (e) {
+      abortGenerate();
       const err = e as Error;
       const elapsedSec = parseFloat(((performance.now() - startTime) / 1000).toFixed(2));
       const isAbort = err.name === 'AbortError';
@@ -399,7 +446,7 @@ export function useChatActions({
         }));
       }
     } finally {
-      setIsGenerating(false);
+      completeGenerate();
       isGeneratingRef.current = false;
       abortControllerRef.current = null;
       if (settings.isSharedMode) {
