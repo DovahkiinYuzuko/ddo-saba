@@ -41,7 +41,7 @@ function post_message(r) {
     var dict = ngx.shared.broadcast_zone;
     try {
         var body = JSON.parse(r.requestBody);
-        var msgId = Date.now().toString();
+        var msgId = body.id || Date.now().toString();
         var msgData = {
             id: msgId,
             sender: body.sender || 'unknown',

@@ -28,10 +28,10 @@ This document specifies the variables and functions used in `nginx/conf/broadcas
 - **Behavior:**
   1. Parses `r.requestBody` as JSON.
   2. Extracts `sender`, `broadcaster`, `role`, and `content`.
-  3. Formulates a JSON string containing an `id` (using `Date.now()`), the input message, and `timestamp`.
+  3. Formulates a JSON string containing an `id` (using `body.id` if provided by the client, falling back to `Date.now().toString()`), the input message, and `timestamp`.
   4. Stores the string into `ngx.shared.broadcast_zone` under the key `"latest"`.
   5. Retrieves `"history"` JSON from `ngx.shared.broadcast_zone`, parses it (defaults to `[]`), pushes the new message, caps the array to the last 100 items, and serializes it back to the `"history"` key.
-  6. Returns HTTP `200` with the generated message ID.
+  6. Returns HTTP `200` with the resolved message ID.
 
 ### `get_message` (L77-112)
 - **Description:** Receives a HTTP `GET` request and returns the latest message stored in the memory zone.
