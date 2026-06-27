@@ -1,4 +1,6 @@
-$port = 8089
+param(
+    [int]$port = 8089
+)
 $pidFile = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "broadcast.pid"
 [System.IO.File]::WriteAllText($pidFile, $pid.ToString())
 
