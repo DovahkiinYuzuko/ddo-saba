@@ -320,6 +320,54 @@ while ($listener.IsListening) {
                 $response.StatusCode = 405
             }
         }
+        elseif ($url -eq "/api/usage") {
+            if ($request.HttpMethod -eq "POST") {
+                $reader = New-Object System.IO.StreamReader($request.InputStream, [System.Text.Encoding]::UTF8)
+                $body = $reader.ReadToEnd()
+                try {
+                    $data = ConvertFrom-Json $body
+                    $csvPath = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "../data/token_usage.csv"
+                    $csvDir = Split-Path $csvPath
+                    if (-not (Test-Path $csvDir)) {
+                        $null = New-Item -ItemType Directory -Path $csvDir -Force
+                    }
+
+                    $timestamp = [DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
+                    $token = $request.Headers["X-DDO-Token"]
+                    $username = $request.Headers["X-DDO-Username"]
+                    if (-not $username) { $username = "anonymous" }
+
+                    $model = $data.model
+                    $promptTokens = $data.promptTokens
+                    $completionTokens = $data.completionTokens
+                    $totalDurationSec = $data.totalDurationSec
+                    $loadDurationSec = $data.loadDurationSec
+                    $evalDurationSec = $data.evalDurationSec
+                    $status = $data.status
+
+                    # Escape CSV values
+                    $escapedToken = $token -replace '"', '""'
+                    $escapedUsername = $username -replace '"', '""'
+                    $escapedModel = $model -replace '"', '""'
+                    $escapedStatus = $status -replace '"', '""'
+
+                    $line = """$timestamp"",""$escapedToken"",""$escapedUsername"",""$escapedModel"",$promptTokens,$completionTokens,$totalDurationSec,$loadDurationSec,$evalDurationSec,""$escapedStatus"""
+
+                    $headers = "Timestamp,Token,Username,Model,PromptTokens,CompletionTokens,TotalDurationSec,LoadDurationSec,EvalDurationSec,Status"
+                    if (-not (Test-Path $csvPath)) {
+                        [System.IO.File]::WriteAllText($csvPath, "$headers`r`n")
+                    }
+                    [System.IO.File]::AppendAllText($csvPath, "$line`r`n")
+
+                    Write-Host "[USAGE] Logged usage for user '$username' (model: $model, tokens: $promptTokens/$completionTokens, status: $status)" -ForegroundColor Cyan
+                    $response.StatusCode = 200
+                } catch {
+                    $response.StatusCode = 400
+                }
+            } else {
+                $response.StatusCode = 405
+            }
+        }
         else {
             $response.StatusCode = 404
         }

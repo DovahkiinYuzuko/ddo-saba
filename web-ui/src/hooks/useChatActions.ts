@@ -3,6 +3,7 @@ import type { Message, ChatSession, DdoSettings, DdoParameters, MessageMetrics, 
 import { broadcastMessage, broadcastModel } from '../api/broadcast';
 import { fetchQueue, joinQueue, cancelQueue, completeQueue } from '../api/queue';
 import { formatTimestamp } from '../utils/format';
+import { logUsage } from '../api/usage';
 
 export interface UseChatActionsProps {
   chats: ChatSession[];
@@ -129,6 +130,9 @@ export function useChatActions({
 
     abortControllerRef.current = new AbortController();
 
+    const startTime = performance.now();
+    let tokenCount = 0;
+
     try {
       const optionsPayload: Record<string, unknown> = { ...parameters };
       if (!numPredictEnabled) {
@@ -136,8 +140,8 @@ export function useChatActions({
       }
 
       let res: Response | undefined = undefined;
-      let retries = 3;
-      let delay = 1000;
+      const retries = 3;
+      const delay = 1000;
 
       for (let attempt = 1; attempt <= retries + 1; attempt++) {
         try {
@@ -230,6 +234,7 @@ export function useChatActions({
                   accumulatedContent += '<think>\n';
                 }
                 accumulatedContent += parsed.message.thinking;
+                tokenCount++;
               } else if (parsed.message?.content) {
                 if (isThinkingState && !hasThoughtEndedState) {
                   accumulatedContent += '\n</think>\n';
@@ -237,6 +242,7 @@ export function useChatActions({
                   thinkEndTime = performance.now();
                 }
                 accumulatedContent += parsed.message.content;
+                tokenCount++;
               }
 
               if (accumulatedContent) {
@@ -305,6 +311,16 @@ export function useChatActions({
                   }
                   return c;
                 }));
+
+                void logUsage(settings.connectionUrl, settings.accessToken, {
+                  model: activeModel,
+                  promptTokens: parsed.prompt_eval_count || 0,
+                  completionTokens: parsed.eval_count || 0,
+                  totalDurationSec: parseFloat(totalDurationSec.toFixed(2)),
+                  loadDurationSec: parsed.load_duration ? parseFloat((parsed.load_duration / 1e9).toFixed(2)) : 0,
+                  evalDurationSec: parseFloat(evalDurationSec.toFixed(2)),
+                  status: 'success'
+                });
               }
             } catch {
               // Ignore partial JSON line parse errors
@@ -334,7 +350,20 @@ export function useChatActions({
 
     } catch (e) {
       const err = e as Error;
-      if (err.name === 'AbortError') {
+      const elapsedSec = parseFloat(((performance.now() - startTime) / 1000).toFixed(2));
+      const isAbort = err.name === 'AbortError';
+
+      void logUsage(settings.connectionUrl, settings.accessToken, {
+        model: activeModel,
+        promptTokens: 0,
+        completionTokens: tokenCount,
+        totalDurationSec: elapsedSec,
+        loadDurationSec: 0,
+        evalDurationSec: elapsedSec,
+        status: isAbort ? 'cancelled' : 'error'
+      });
+
+      if (isAbort) {
         console.log("Inference stream aborted.");
       } else {
         console.error("Inference request failed.", e);

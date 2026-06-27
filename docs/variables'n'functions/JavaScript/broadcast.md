@@ -82,6 +82,17 @@ This document specifies the variables and functions used in `nginx/conf/broadcas
   - `r` (`Object`): The Nginx HTTP request object.
 - **Behavior:** Handles `GET` to list queue (with 120s timeout cleanup) and `POST` to `join`, `cancel`, and `complete` jobs.
 
+### `handle_usage` (L275-325)
+- **Description:** Receives a HTTP `POST` request containing token usage and inference duration statistics and appends the record to a local CSV file `../data/token_usage.csv`.
+- **Arguments:**
+  - `r` (`Object`): The Nginx HTTP request object.
+- **Behavior:**
+  1. Parses `r.requestBody` to extract `model`, `promptTokens`, `completionTokens`, `totalDurationSec`, `loadDurationSec`, `evalDurationSec`, and `status`.
+  2. Extracts token and username from headers.
+  3. Uses the `fs` module to check for/create the `../data` directory and `token_usage.csv` file.
+  4. Appends a comma-separated, escaped string representing the usage event to the CSV.
+  5. Returns HTTP `200` on success, or `500` on internal write error.
+
 ### `update_active_users` (L1-37)
 - **Description:** On every API endpoint request, this function reads the client's `username` from headers or query parameters, updates their last active timestamp in a JSON string stored in `ngx.shared.broadcast_zone` under the `"active_users"` key, cleans up entries older than 10 seconds, and includes the active count in the response.
 
@@ -99,10 +110,12 @@ graph TD
     handle_queue --> ngx
     update_active_users --> ngx
     auth_check --> process
+    handle_usage --> fs["require('fs')"]
 ```
 
 ---
 
 ## 4. Impact Scope
-- **`nginx.conf`:** Relies on this file to be imported via `js_import conf/broadcast.js` and maps locations `/api/poll`, `/api/broadcast`, `/api/history`, `/api/model`, and `/api/queue` to the exported functions.
-- **`app.tsx`:** Client-side React app executes HTTP requests targeting `/api/poll`, `/api/broadcast`, `/api/history`, `/api/model`, and `/api/queue`.
+- **`nginx.conf`:** Relies on this file to be imported via `js_import conf/broadcast.js` and maps locations `/api/poll`, `/api/broadcast`, `/api/history`, `/api/model`, `/api/queue`, and `/api/usage` to the exported functions.
+- **`app.tsx` / `useChatActions.ts`:** Client-side React app executes HTTP requests targeting `/api/poll`, `/api/broadcast`, `/api/history`, `/api/model`, `/api/queue`, and `/api/usage`.
+- **`data/token_usage.csv`:** Output log file that records the metrics on host machine disk.

@@ -289,4 +289,64 @@ function auth_check(r) {
     }
 }
 
-export default { post_message, get_message, get_history, handle_model, handle_queue, auth_check };
+function handle_usage(r) {
+    if (r.method !== 'POST') {
+        r.return(405, "Method Not Allowed");
+        return;
+    }
+
+    update_active_users(r);
+
+    try {
+        var body = JSON.parse(r.requestBody);
+        var token = r.headersIn['X-DDO-Token'] || 'unknown';
+        var username = r.headersIn['X-DDO-Username'] || 'anonymous';
+        var timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
+
+        var model = body.model || 'unknown';
+        var promptTokens = body.promptTokens || 0;
+        var completionTokens = body.completionTokens || 0;
+        var totalDurationSec = body.totalDurationSec || 0;
+        var loadDurationSec = body.loadDurationSec || 0;
+        var evalDurationSec = body.evalDurationSec || 0;
+        var status = body.status || 'success';
+
+        // Escape CSV values
+        var escapedToken = token.replace(/"/g, '""');
+        var escapedUsername = username.replace(/"/g, '""');
+        var escapedModel = model.replace(/"/g, '""');
+        var escapedStatus = status.replace(/"/g, '""');
+
+        var line = '"' + timestamp + '","' + escapedToken + '","' + escapedUsername + '","' + escapedModel + '",' + promptTokens + ',' + completionTokens + ',' + totalDurationSec + ',' + loadDurationSec + ',' + evalDurationSec + ',"' + escapedStatus + '"\n';
+
+        var fs = require('fs');
+        var csvPath = '../data/token_usage.csv'; // Relative to nginx/ prefix
+
+        // Ensure data directory exists
+        try {
+            fs.mkdirSync('../data');
+        } catch (e) {
+            // Already exists or permission error (will be caught on write)
+        }
+
+        var fileExists = false;
+        try {
+            fs.statSync(csvPath);
+            fileExists = true;
+        } catch (e) {
+            fileExists = false;
+        }
+
+        if (!fileExists) {
+            var headers = "Timestamp,Token,Username,Model,PromptTokens,CompletionTokens,TotalDurationSec,LoadDurationSec,EvalDurationSec,Status\n";
+            fs.writeFileSync(csvPath, headers);
+        }
+
+        fs.appendFileSync(csvPath, line);
+        r.return(200, JSON.stringify({ status: "success" }));
+    } catch (e) {
+        r.return(500, "Internal Server Error: " + e.message);
+    }
+}
+
+export default { post_message, get_message, get_history, handle_model, handle_queue, auth_check, handle_usage };

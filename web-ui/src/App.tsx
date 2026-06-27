@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import type { ChatSession, LocaleStrings } from './types';
+import type { ChatSession } from './types';
 import { useChatMachineState } from './hooks/useChatMachineState';
 import { 
   loadModelOnSelection as apiLoadModelOnSelection, 

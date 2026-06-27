@@ -60,11 +60,13 @@ This script runs a lightweight in-memory broadcast relay server for Windows envi
   - `GET /api/model`: Returns the active model cache JSON, updates `$activeUsers`.
   - `GET /api/queue`: Returns the current `$jobQueue` array. Automatically ejects expired running jobs (120s limit, or customizable via `X-DDO-Queue-Timeout` request header). Updates `$activeUsers`.
   - `POST /api/queue`: Accepts a JSON payload `{ action, id, username }` and updates `$jobQueue` accordingly. Automatically ejects expired running jobs before processing the payload (uses `X-DDO-Queue-Timeout` header if provided). Updates `$activeUsers`.
-  - `OPTIONS /api/poll` & `OPTIONS /api/broadcast` & `OPTIONS /api/history` & `OPTIONS /api/model` & `OPTIONS /api/queue`: Handles CORS preflight by returning CORS headers with `200 OK` or `204 No Content`.
+  - `POST /api/usage`: Accepts a JSON payload containing Ollama token counts and durations, and appends the usage record to a local CSV file `../data/token_usage.csv`.
+  - `OPTIONS /api/poll` & `OPTIONS /api/broadcast` & `OPTIONS /api/history` & `OPTIONS /api/model` & `OPTIONS /api/queue` & `OPTIONS /api/usage`: Handles CORS preflight by returning CORS headers with `200 OK` or `204 No Content`.
 
 ## Impact Scope
-- **`bin/broadcast_server.ps1`:** `/api/poll` (GET) のレスポンスを差分履歴（配列）で返す形式に修正。また、デバッグ効率向上のため、各エンドポイント（`/api/poll`, `/api/broadcast`, `/api/model`, `/api/queue`）のアクセス時に、ユーザー名やリクエストボディ、生成ID等をコンソールへ詳細に出力（Write-Host）するログ出力を追加。
-- **`web-ui`:** `/api/poll` から返る配列を正しくパース・受信できるようになり、複数端末間のリアルタイムチャット同期が正常に機能する。また、コンソールログからリクエストの流れを追跡可能になる。
+- **`bin/broadcast_server.ps1`:** Handles `/api/usage` requests to log token counts and execution times into `data/token_usage.csv`. Also provides detailed `Write-Host` logs in PowerShell terminal.
+- **`web-ui`:** Submits API usage metrics upon prompt completion or cancellation.
+- **`data/token_usage.csv`:** Output file for performance and token auditing.
 
 ## Dependency Map
 
@@ -78,6 +80,7 @@ graph TD
     loop --> history[GET /api/history]
     loop --> model[GET/POST /api/model]
     loop --> queue[GET/POST /api/queue]
+    loop --> usage[POST /api/usage]
     poll --> cacheMsg[$cachedMessage]
     poll --> cacheId[$cachedId]
     poll --> cacheTime[$cachedTime]
@@ -90,4 +93,5 @@ graph TD
     model --> cacheModelSender[$cachedModelSender]
     model --> cacheModelTime[$cachedModelTime]
     queue --> jobQueue[$jobQueue]
+    usage --> csvFile["../data/token_usage.csv"]
 ```

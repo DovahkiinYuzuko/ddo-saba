@@ -1,3 +1,10 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const connectionUrl = 'http://127.0.0.1:8089';
 const accessToken = '1234567890abcdef1234567890abcdef';
 
@@ -169,6 +176,36 @@ async function runTests() {
 
     await request('/api/queue', 'POST', { action: 'complete', id: timeoutBobJobId, username: 'Bob' });
     console.log('\x1b[32m%s\x1b[0m', '✓ Test 5 Passed: Queue Timeout Ejection and Auto-Promotion Success');
+
+    // ----------------------------------------------------
+    // TEST 6: Usage Logging Sync (CSV)
+    // ----------------------------------------------------
+    console.log('\nRunning Test 6: Usage Logging Sync (CSV)...');
+    const testUsagePayload = {
+      model: 'deepseek-r1:1.5b',
+      promptTokens: 15,
+      completionTokens: 25,
+      totalDurationSec: 3.5,
+      loadDurationSec: 0.5,
+      evalDurationSec: 3.0,
+      status: 'success'
+    };
+    await request('/api/usage', 'POST', testUsagePayload);
+
+    // Verify CSV file exists and contains the values
+    const csvPath = path.join(__dirname, '../../data/token_usage.csv');
+    if (!fs.existsSync(csvPath)) {
+      throw new Error(`CSV file not found at ${csvPath}`);
+    }
+
+    const csvContent = fs.readFileSync(csvPath, 'utf8');
+    const lines = csvContent.trim().split('\n');
+    const lastLine = lines[lines.length - 1];
+
+    if (!lastLine.includes('"deepseek-r1:1.5b"') || !lastLine.includes('15,25,3.5,0.5,3,"success"')) {
+      throw new Error(`CSV content mismatch. Last line: ${lastLine}`);
+    }
+    console.log('\x1b[32m%s\x1b[0m', '✓ Test 6 Passed: Usage Logging Success and CSV Verified');
 
     console.log('\n\x1b[32;1m%s\x1b[0m', '======================================');
     console.log('\x1b[32;1m%s\x1b[0m', '  ALL API SYNC TESTS PASSED SUCCESSFULLY!  ');
