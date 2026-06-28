@@ -61,6 +61,7 @@ export default function ChatHeader({
             onClick={onUnloadModel} 
             className="unload-btn" 
             title="Unload from VRAM"
+            disabled={isEffectivelyLoading}
           >
             <LogOut size={16} />
           </button>

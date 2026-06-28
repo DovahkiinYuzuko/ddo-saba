@@ -207,7 +207,7 @@ while ($listener.IsListening) {
             $hasChanges = $false
             
             # Find the running job and see if it timed out (120 seconds limit by default, dynamic via header)
-            $timeoutLimit = 300
+            $timeoutLimit = 120
             $clientTimeoutHeader = $request.Headers["X-DDO-Queue-Timeout"]
             if ($clientTimeoutHeader) {
                 try {

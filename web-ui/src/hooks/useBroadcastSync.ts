@@ -124,7 +124,11 @@ export function useBroadcastSync({
                 if (!resolvedId) return prev;
                 return prev.map(c => {
                   if (c.id === resolvedId) {
-                    if (data.id && c.messages.some(m => m.id === data.id)) {
+                    if (data.id && c.messages.some(m => 
+                      m.id === data.id ||
+                      // Bug#5修正: fallback timer経由メッセージとbroadcast経由メッセージのid差異による重複表示を防ぐ
+                      (data.role === 'assistant' && m.role === 'assistant' && m.content === data.content && m.content !== '')
+                    )) {
                       return c;
                     }
                     if (data.role === 'assistant' && fallbackTimerRef.current) {

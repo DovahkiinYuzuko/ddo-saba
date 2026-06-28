@@ -573,6 +573,8 @@ export default function App() {
       await apiUnloadModel(psInfo.name, settings.connectionUrl, settings.accessToken);
     } catch (e) {
       console.error("Failed to unload model", e);
+      // Bug#6修正: エラーをサイレントに吸収せずユーザーに表示する
+      setModelLoadError(e instanceof Error ? e.message : "Failed to unload model");
     } finally {
       setPsInfo(null);
       setActiveModel('');
@@ -679,6 +681,7 @@ export default function App() {
         />
 
         <ChatMessages 
+          key={activeChatId || 'empty'}
           ref={messagesContainerRef}
           messages={displayMessages}
           onImportCassette={importCassette}

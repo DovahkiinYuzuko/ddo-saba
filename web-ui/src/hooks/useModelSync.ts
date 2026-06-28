@@ -133,7 +133,7 @@ export function useModelSync({
 
     const interval = setInterval(() => {
       void fetchModelsAndPs();
-    }, 5000);
+    }, 3000); // Bug#4修正: 5000ms→3000msに短縮して同期の遅さを改善
 
     return () => {
       clearInterval(interval);
@@ -229,7 +229,7 @@ export function useModelSync({
                 return c;
               }));
               setRemoteGeneratingText('');
-            }, 5000);
+            }, 8000); // Bug#5修正: 5000ms→8000msに延長しbroadcast pollが先に届く時間を確保
           } else {
             setRemoteGeneratingText('');
           }
@@ -249,7 +249,7 @@ export function useModelSync({
         console.error("Model poll failed", e);
       }
       if (active) {
-        timerId = setTimeout(startModelPolling, 1500);
+        timerId = setTimeout(startModelPolling, 1000); // Bug#4修正: 1500ms→1000msに短縮
       }
     };
 

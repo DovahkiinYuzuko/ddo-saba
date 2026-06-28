@@ -102,6 +102,7 @@ h1, h2, h3, h4, h5, h6 {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0; /* Bug#2修正: グリッド内での高さ伝播問題を防ぐ */
 }
 
 .sidebar-header {
@@ -281,6 +282,12 @@ input[disabled], select[disabled], textarea[disabled] {
 }
 
 /* Mobile responsive layout */
+/* Mobile overlay styling */
+/* Bug#2修正: PCでdisplay:noneにしてレイアウト干渉・クリック阻害を防ぐ */
+.mobile-overlay {
+  display: none;
+}
+
 @media (max-width: 1024px) {
   .app-container {
     display: flex;
@@ -320,6 +327,7 @@ input[disabled], select[disabled], textarea[disabled] {
 
   /* Mobile overlay styling */
   .mobile-overlay {
+    display: block; /* PCのdisplay:noneを上書き */
     position: fixed;
     top: 0;
     left: 0;

@@ -403,8 +403,8 @@ export function useChatActions({
       abortGenerate();
       const err = e as Error;
       const elapsedSec = parseFloat(((performance.now() - startTime) / 1000).toFixed(2));
-      const isAbort = err.name === 'AbortError';
-      if (isAbort) {
+      const isUserAbort = err.name === 'AbortError';
+      if (isUserAbort) {
         isAborted = true;
       }
 
@@ -415,11 +415,11 @@ export function useChatActions({
         totalDurationSec: elapsedSec,
         loadDurationSec: 0,
         evalDurationSec: elapsedSec,
-        status: isAbort ? 'cancelled' : 'error'
+        status: isUserAbort ? 'cancelled' : 'error'
       });
 
-      if (isAbort) {
-        console.log("Inference stream aborted.");
+      if (isUserAbort) {
+        console.log("Inference stream aborted by user.");
       } else {
         console.error("Inference request failed.", e);
         let displayError = err.message;
@@ -471,6 +471,7 @@ export function useChatActions({
         let success = false;
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
           try {
+            // ユーザーが明示的にキャンセルした場合のみ cancelQueue、それ以外(エラー含む)は completeQueue
             if (isAborted) {
               await cancelQueue(settings.connectionUrl, settings.accessToken, jobId);
             } else {
@@ -546,7 +547,9 @@ export function useChatActions({
   const handleCancelQueue = async () => {
     if (!myJobId || !settings.isSharedMode) return;
     const targetJobId = myJobId;
+    const restoredText = pendingMessage; // キャンセル前にプロンプトを保存
     setMyJobId(null);
+    setInputText(restoredText);          // テキストエリアにプロンプトを返却
     setPendingMessage('');
     
     setChats(prev => prev.map(c => {
