@@ -61,6 +61,8 @@ export function useModelSync({
   const lastModelSenderRef = useRef(lastModelSender);
   const activeChatIdRef = useRef(activeChatId);
   const remoteGeneratingTextRef = useRef(remoteGeneratingText);
+  // Counter for consecutive null psInfo responses to avoid false-positive model clear
+  const consecutiveNullPsRef = useRef(0);
 
   useEffect(() => {
     activeModelRef.current = activeModel;
@@ -83,8 +85,27 @@ export function useModelSync({
       const fetchedPs = await fetchPs(settings.connectionUrl, settings.accessToken);
       setPsInfo(fetchedPs);
 
+      if (fetchedPs) {
+        // psInfo is valid: reset the consecutive null counter
+        consecutiveNullPsRef.current = 0;
+        // Auto-recover activeModel from psInfo when activeModel is empty but model is actually loaded
+        // This fixes the desync where UI shows blank model name but Ollama still has a model in VRAM
+        if (!activeModelRef.current && !isModelLoadingRef.current && fetchedPs.name) {
+          setActiveModel(fetchedPs.name);
+          setLastModelSender(settings.username);
+          const now = Date.now();
+          setLastModelChangeTime(now);
+        }
+      } else {
+        consecutiveNullPsRef.current++;
+      }
+
       const isGracePeriodOver = (Date.now() - lastModelChangeTimeRef.current) > 15000;
-      if (!fetchedPs && activeModelRef.current && !isModelLoadingRef.current && isGracePeriodOver && !isGeneratingRef.current && !isRemoteGeneratingRef.current) {
+      // Only clear activeModel if psInfo has been null for 2+ consecutive polls (approx 10+ seconds)
+      // This prevents a transient Ollama hiccup from wiping the displayed model name
+      const isPersistentlyNull = consecutiveNullPsRef.current >= 2;
+      if (!fetchedPs && isPersistentlyNull && activeModelRef.current && !isModelLoadingRef.current && isGracePeriodOver && !isGeneratingRef.current && !isRemoteGeneratingRef.current) {
+        consecutiveNullPsRef.current = 0;
         setActiveModel('');
         setLastModelSender(settings.username);
         const now = Date.now();
