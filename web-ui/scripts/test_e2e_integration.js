@@ -101,8 +101,8 @@ async function req(endpoint, opts = {}, withToken = true) {
     'Content-Type': 'application/json',
     ...(withToken ? { 
       'X-DDO-Token': ACCESS_TOKEN,
-      'X-DDO-Client-Id': `e2e-test-client-id_${activeUsername}`,
-      'X-DDO-Username': activeUsername
+      'X-DDO-Client-Id': `e2e-test-client-id_${encodeURIComponent(activeUsername)}`,
+      'X-DDO-Username': encodeURIComponent(activeUsername)
     } : {}),
     ...(opts.headers || {}),
   };

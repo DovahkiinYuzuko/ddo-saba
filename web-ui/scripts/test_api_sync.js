@@ -17,11 +17,11 @@ async function runTests() {
     const headers = {
       'Content-Type': 'application/json',
       'X-DDO-Token': accessToken,
-      'X-DDO-Client-Id': 'test-api-sync-client-id_' + activeUsername,
+      'X-DDO-Client-Id': 'test-api-sync-client-id_' + encodeURIComponent(activeUsername),
       ...extraHeaders
     };
     if (activeUsername) {
-      headers['X-DDO-Username'] = activeUsername;
+      headers['X-DDO-Username'] = encodeURIComponent(activeUsername);
     }
     const res = await fetch(`${connectionUrl}${path}`, {
       method,

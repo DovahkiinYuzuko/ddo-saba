@@ -26,6 +26,9 @@ nginx/logs/
 !web-ui/
 !web-ui/package.json
 !web-ui/package-lock.json
+!web-ui/playwright.config.ts
+!web-ui/tests/
+!web-ui/tests/**
 !web-ui/scripts/
 !web-ui/scripts/**
 !web-ui/src/

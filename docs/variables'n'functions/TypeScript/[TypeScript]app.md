@@ -29,6 +29,7 @@ Refer to `chatMachine.md` for the core state variables (e.g., `chats`, `activeCh
 ## 1.1 API Poll Guards & Lifecycles
 
 To prevent premature HTTP 403 Forbidden race conditions (sending requests with an empty token before the URL parser completes), all critical API polling loops are guarded inside the respective sync hooks by checking `isInitialized` and `settings.accessToken`.
+To prevent browser `fetch` exceptions on non-ASCII characters, the `X-DDO-Username` HTTP header is URL-encoded using `encodeURIComponent` before transmission.
 - **`beforeunload`**: When the window is closed, calls `/api/chat` with `keep_alive: '0s'` to immediately release Ollama VRAM if the client is the last active user.
 
 ---

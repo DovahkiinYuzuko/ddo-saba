@@ -39,10 +39,12 @@ while ($listener.IsListening) {
         $response = $context.Response
 
         # Get client unique ID from header and update active users
-        $clientId = $request.Headers["X-DDO-Client-Id"]
+        $rawClientId = $request.Headers["X-DDO-Client-Id"]
+        $clientId = if ($rawClientId) { [System.Uri]::UnescapeDataString($rawClientId) } else { $null }
         if (-not $clientId) {
             $token = $request.Headers["X-DDO-Token"]
-            $username = $request.Headers["X-DDO-Username"]
+            $rawUsername = $request.Headers["X-DDO-Username"]
+            $username = if ($rawUsername) { [System.Uri]::UnescapeDataString($rawUsername) } else { $null }
             if (-not $token) { $token = "anonymous" }
             if (-not $username) { $username = "guest" }
             $clientId = $token + "_" + $username
@@ -338,7 +340,8 @@ while ($listener.IsListening) {
 
                     $timestamp = [DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
                     $token = $request.Headers["X-DDO-Token"]
-                    $username = $request.Headers["X-DDO-Username"]
+                    $rawUsername = $request.Headers["X-DDO-Username"]
+                    $username = if ($rawUsername) { [System.Uri]::UnescapeDataString($rawUsername) } else { $null }
                     if (-not $username) { $username = "anonymous" }
 
                     $model = $data.model

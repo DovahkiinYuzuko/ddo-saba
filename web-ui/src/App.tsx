@@ -311,7 +311,7 @@ export default function App() {
         headers['X-DDO-Token'] = settings.accessToken;
       }
       if (settings.username) {
-        headers['X-DDO-Username'] = settings.username;
+        headers['X-DDO-Username'] = encodeURIComponent(settings.username);
       }
       
       // Use fetch with keepalive: true to ensure the request completes after tab close

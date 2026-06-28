@@ -6,7 +6,7 @@ const getHeaders = (token: string, username?: string): HeadersInit => {
     headers['X-DDO-Token'] = token;
   }
   if (username) {
-    headers['X-DDO-Username'] = username;
+    headers['X-DDO-Username'] = encodeURIComponent(username);
   }
   return headers;
 };
