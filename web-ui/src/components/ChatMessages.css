@@ -262,6 +262,7 @@
   padding: 16px 24px;
   border-top: 1px solid hsl(var(--border));
   background-color: hsl(var(--bg-panel) / 0.2);
+  flex-shrink: 0;
 }
 
 .input-wrap {

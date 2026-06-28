@@ -68,6 +68,7 @@ export function useChatActions({
     isGeneratingRef.current = true;
     startGenerate();
     setModelLoadError('');
+    let isAborted = false;
 
     if (settings.isSharedMode) {
       void broadcastModel(settings.connectionUrl, settings.accessToken, settings.username, activeModel, Date.now(), true, '');
@@ -403,6 +404,9 @@ export function useChatActions({
       const err = e as Error;
       const elapsedSec = parseFloat(((performance.now() - startTime) / 1000).toFixed(2));
       const isAbort = err.name === 'AbortError';
+      if (isAbort) {
+        isAborted = true;
+      }
 
       void logUsage(settings.connectionUrl, settings.accessToken, {
         model: activeModel,
@@ -463,11 +467,15 @@ export function useChatActions({
 
       if (settings.isSharedMode && jobId) {
         try {
-          await completeQueue(settings.connectionUrl, settings.accessToken, jobId);
+          if (isAborted) {
+            await cancelQueue(settings.connectionUrl, settings.accessToken, jobId);
+          } else {
+            await completeQueue(settings.connectionUrl, settings.accessToken, jobId);
+          }
           const q = await fetchQueue(settings.connectionUrl, settings.accessToken);
           setJobQueue(q);
         } catch (err) {
-          console.error("Failed to complete queue job", err);
+          console.error("Failed to update queue job in finally block", err);
         }
       }
     }
@@ -549,18 +557,6 @@ export function useChatActions({
   const stopGeneration = async () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
-    }
-    if (myJobId && settings.isSharedMode) {
-      const targetJobId = myJobId;
-      setMyJobId(null);
-      setPendingMessage('');
-      try {
-        await cancelQueue(settings.connectionUrl, settings.accessToken, targetJobId);
-        const q = await fetchQueue(settings.connectionUrl, settings.accessToken);
-        setJobQueue(q);
-      } catch (err) {
-        console.error("Failed to cancel running job on stop", err);
-      }
     }
   };
 

@@ -34,7 +34,7 @@ import { locales } from './i18n';
 
 
 export default function App() {
-  const [lang] = useState<'en' | 'ja'>(
+  const [lang, setLang] = useState<'en' | 'ja'>(
     navigator.language.startsWith('ja') ? 'ja' : 'en'
   );
   const t = locales[lang];
@@ -205,6 +205,7 @@ export default function App() {
 
   // Separate model fallback logic
   useEffect(() => {
+    if (isModelLoading || models.length === 0) return; // Guard loading and empty list
     if (activeModel && models.length > 0) {
       const modelNames = models.map(m => m.name);
       if (!modelNames.includes(activeModel)) {
@@ -214,7 +215,7 @@ export default function App() {
         }, 0);
       }
     }
-  }, [models, activeModel]);
+  }, [models, activeModel, isModelLoading]);
 
 
   const broadcastSettings = async () => {
@@ -565,6 +566,9 @@ export default function App() {
     if (!psInfo) return;
     try {
       await apiUnloadModel(psInfo.name, settings.connectionUrl, settings.accessToken);
+    } catch (e) {
+      console.error("Failed to unload model", e);
+    } finally {
       setPsInfo(null);
       setActiveModel('');
       setLastModelSender(settings.username);
@@ -574,8 +578,6 @@ export default function App() {
         void broadcastModel(settings.connectionUrl, settings.accessToken, settings.username, '', now);
       }
       fetchModelsAndPs();
-    } catch (e) {
-      console.error("Failed to unload model", e);
     }
   };
 
@@ -734,6 +736,8 @@ export default function App() {
         onExportCassette={exportCassette}
         onImportCassette={importCassette}
         t={t}
+        lang={lang}
+        onChangeLang={setLang}
       />
 
       {/* 5. Synchronize Request Modal */}

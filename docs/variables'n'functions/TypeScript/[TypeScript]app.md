@@ -11,6 +11,9 @@ Most state is managed via `useChatMachineState`. `App.tsx` extracts these states
 ### Shared States
 Refer to `chatMachine.md` for the core state variables (e.g., `chats`, `activeChatId`, `settings`, `models`, `activeModel`, `systemPrompt`, `parameters`, `thinkMode`, `isGenerating`, `isRemoteGenerating`, `jobQueue`, `myJobId`).
 
+### Local States
+- **`lang`**, **`setLang`**: React `useState` tracking the active language locale (`'en' | 'ja'`). Defaults to client browser language, but can be updated interactively via the settings modal.
+
 ### Local Refs
 - **`isGeneratingRef`**, **`isRemoteGeneratingRef`**: React `useRef` holding active boolean values to prevent keep-alive resetting during generation.
 - **`abortControllerRef`**: Ref holding the `AbortController` instance to cancel ongoing fetch requests.
@@ -42,7 +45,7 @@ To prevent premature HTTP 403 Forbidden race conditions (sending requests with a
 - **`useFileIO`**: Provides `exportCassette`, `importCassette`, `exportPreset`, `importPreset`, `handleDropCassette`, `handleDragOver`.
 
 ### `handleUnloadModel`
-- **Description:** Unloads the currently active model from Ollama VRAM by hitting the API, updates `psInfo`, and clears `activeModel`.
+- **Description:** Unloads the currently active model from Ollama VRAM by hitting the API, and updates local state. The local state cleanup (clearing `activeModel` and `psInfo`) is placed in a `finally` block to ensure UI recovery even if the API call throws an error.
 - **Arguments:** None.
 - **Return Value:** `Promise<void>`
 

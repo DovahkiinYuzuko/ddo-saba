@@ -13,6 +13,8 @@ interface SettingsModalProps {
   onExportCassette: () => void;
   onImportCassette: (e: React.ChangeEvent<HTMLInputElement>) => void;
   t: LocaleStrings;
+  lang: 'en' | 'ja';
+  onChangeLang: (val: 'en' | 'ja') => void;
 }
 
 export default function SettingsModal({
@@ -24,7 +26,9 @@ export default function SettingsModal({
   onClose,
   onExportCassette,
   onImportCassette,
-  t
+  t,
+  lang,
+  onChangeLang
 }: SettingsModalProps) {
   if (!show) return null;
 
@@ -97,6 +101,19 @@ export default function SettingsModal({
               />
               <label htmlFor="send-toggle"></label>
             </div>
+          </div>
+
+          <div className="form-group inline-group">
+            <label>{isJa ? '表示言語' : 'UI Language'}</label>
+            <select
+              value={lang}
+              onChange={(e) => onChangeLang(e.target.value as 'en' | 'ja')}
+              className="model-select"
+              style={{ minWidth: '120px', padding: '6px 10px', background: 'hsl(var(--bg-input))', border: '1px solid hsl(var(--border))', color: 'hsl(var(--text-primary))', borderRadius: 'var(--radius-md)' }}
+            >
+              <option value="ja">日本語</option>
+              <option value="en">English</option>
+            </select>
           </div>
 
           <div className="qr-code-section-wrap">
