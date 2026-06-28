@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect, vi } from 'vitest';
 import { useInitializeSettings } from './useInitializeSettings';
 
@@ -6,13 +7,11 @@ vi.mock('react', async () => {
   const actual = await vi.importActual('react') as any;
   return {
     ...actual,
-    useState: (initial: any) => {
-      // Return true for isInitialized to simulate post-effect state
-      const val = typeof initial === 'function' ? initial() : initial;
+    useState: () => {
       const setVal = vi.fn();
       return [true, setVal];
     },
-    useEffect: (fn: any, deps: any) => {
+    useEffect: (fn: any, _deps: any) => {
       fn(); // execute effect immediately
       return () => {};
     }
@@ -21,10 +20,10 @@ vi.mock('react', async () => {
 
 describe('useInitializeSettings', () => {
   it('should parse URL parameters and update settings', () => {
-    const originalWindow = (global as any).window;
+    const originalWindow = (globalThis as any).window;
 
     // Define global window object for Node environment
-    (global as any).window = {
+    (globalThis as any).window = {
       location: {
         search: '?token=test-token&sharedMode=true',
         origin: 'http://localhost:3000'
@@ -51,9 +50,9 @@ describe('useInitializeSettings', () => {
 
     // Restore global window
     if (originalWindow) {
-      (global as any).window = originalWindow;
+      (globalThis as any).window = originalWindow;
     } else {
-      delete (global as any).window;
+      delete (globalThis as any).window;
     }
   });
 });
