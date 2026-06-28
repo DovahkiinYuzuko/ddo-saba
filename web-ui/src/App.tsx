@@ -138,6 +138,7 @@ export default function App() {
   const abortControllerRef = useRef<AbortController | null>(null);
   const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevIsSharedModeRef = useRef<boolean>(settings.isSharedMode);
+  const triggeredJobIdRef = useRef<string | null>(null);
 
   const handleActiveCount = useCallback((count: number) => {
     setActiveUserCount(count);
@@ -187,11 +188,20 @@ export default function App() {
     if (!settings.isSharedMode || !myJobId || jobQueue.length === 0) return;
     
     const firstJob = jobQueue[0];
-    if (firstJob.id === myJobId && firstJob.status === 'running' && !isGeneratingRef.current) {
-      // It is our turn! Run the inference.
-      void runInferenceStream(myJobId);
+    if (firstJob.id === myJobId && firstJob.status === 'running') {
+      if (!isGeneratingRef.current && triggeredJobIdRef.current !== myJobId) {
+        triggeredJobIdRef.current = myJobId;
+        void runInferenceStream(myJobId);
+      }
     }
   }, [jobQueue, myJobId, pendingMessage, settings.isSharedMode]);
+
+  // Reset triggered job lock when myJobId changes or becomes null
+  useEffect(() => {
+    if (!myJobId) {
+      triggeredJobIdRef.current = null;
+    }
+  }, [myJobId]);
 
   // Separate model fallback logic
   useEffect(() => {
@@ -324,14 +334,43 @@ export default function App() {
 
 
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const isAutoScrollRef = useRef<boolean>(true);
+  const scrollTimeoutRef = useRef<number | null>(null);
+
+  // Handle scroll to detect if user has scrolled up
+  const handleScroll = useCallback(() => {
+    if (scrollTimeoutRef.current) return;
+    
+    // Throttled scroll checks via requestAnimationFrame
+    scrollTimeoutRef.current = window.requestAnimationFrame(() => {
+      scrollTimeoutRef.current = null;
+      const el = messagesContainerRef.current;
+      if (!el) return;
+      
+      // Handle zoom fractional pixel rounding with Math.ceil
+      const isAtBottom = Math.ceil(el.scrollTop + el.clientHeight) >= el.scrollHeight - 30;
+      isAutoScrollRef.current = isAtBottom;
+    });
+  }, []);
 
   // Sync scroll on new messages
   useEffect(() => {
     const el = messagesContainerRef.current;
-    if (el) {
+    if (el && isAutoScrollRef.current) {
       el.scrollTop = el.scrollHeight;
     }
   }, [chats, activeChatId]);
+
+  // Force auto scroll on when generation starts (either local or remote)
+  useEffect(() => {
+    if (isGenerating || isRemoteGenerating) {
+      isAutoScrollRef.current = true;
+      const el = messagesContainerRef.current;
+      if (el) {
+        el.scrollTop = el.scrollHeight;
+      }
+    }
+  }, [isGenerating, isRemoteGenerating]);
 
   const { addNewTab, deleteTab } = useTabManagement({
     chats,
@@ -638,6 +677,7 @@ export default function App() {
           onToggleThinking={handleThinkingToggle}
           collapseThinking={collapseThinking}
           t={t}
+          onScroll={handleScroll}
         />
 
         <ChatInputArea 

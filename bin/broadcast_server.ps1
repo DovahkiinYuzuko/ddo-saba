@@ -47,11 +47,11 @@ while ($listener.IsListening) {
             if (-not $username) { $username = "guest" }
             $clientId = $token + "_" + $username
         }
-        $currentTime = [double]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
+        $currentTime = [double]([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) / 1000.0
         $activeUsers[$clientId] = $currentTime
 
         # Clean up users inactive for more than 10 seconds
-        $now = [double]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
+        $now = [double]([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) / 1000.0
         $keysToRemove = @()
         foreach ($key in $activeUsers.Keys) {
             if ($now - $activeUsers[$key] -gt 10) {
@@ -200,12 +200,12 @@ while ($listener.IsListening) {
         }
         elseif ($url -eq "/api/queue") {
             # Check for expired running jobs
-            $nowEpoch = [double]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
+            $nowEpoch = [double]([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) / 1000.0
             $newQueue = @()
             $hasChanges = $false
             
             # Find the running job and see if it timed out (120 seconds limit by default, dynamic via header)
-            $timeoutLimit = 120
+            $timeoutLimit = 300
             $clientTimeoutHeader = $request.Headers["X-DDO-Queue-Timeout"]
             if ($clientTimeoutHeader) {
                 try {
@@ -258,7 +258,7 @@ while ($listener.IsListening) {
                     $action = $data.action
                     $id = $data.id
                     $username = $data.username
-                    $nowEpoch = [double]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
+                    $nowEpoch = [double]([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) / 1000.0
 
                     if ($action -eq "join") {
                         # Avoid duplicates

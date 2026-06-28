@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// Run in pure Node environment
 import { describe, it, expect, vi } from 'vitest';
 import { useInitializeSettings } from './useInitializeSettings';
 

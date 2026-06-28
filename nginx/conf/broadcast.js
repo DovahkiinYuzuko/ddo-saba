@@ -178,7 +178,7 @@ function handle_queue(r) {
     for (var i = 0; i < queue.length; i++) {
         var job = queue[i];
         if (job.status === "running") {
-            if (nowEpoch - job.timestamp > 120) {
+            if (nowEpoch - job.timestamp > 300) {
                 hasChanges = true;
                 continue;
             }

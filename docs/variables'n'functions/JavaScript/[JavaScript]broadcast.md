@@ -82,7 +82,7 @@ This document specifies the variables and functions used in `nginx/conf/broadcas
 - **Description:** Manages the shared inference queue in Mac/Linux environments using `ngx.shared.broadcast_zone` with `"queue"` key.
 - **Arguments:**
   - `r` (`Object`): The Nginx HTTP request object.
-- **Behavior:** Handles `GET` to list queue (with 120s timeout cleanup) and `POST` to `join`, `cancel`, and `complete` jobs.
+- **Behavior:** Handles `GET` to list queue (with 300s timeout cleanup) and `POST` to `join`, `cancel`, and `complete` jobs.
 
 ### `handle_usage` (L275-325)
 - **Description:** Receives a HTTP `POST` request containing token usage and inference duration statistics and appends the record to a local CSV file `../data/token_usage.csv`.

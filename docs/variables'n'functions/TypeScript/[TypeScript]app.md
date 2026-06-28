@@ -17,6 +17,9 @@ Refer to `chatMachine.md` for the core state variables (e.g., `chats`, `activeCh
 - **`fallbackTimerRef`**: Ref holding the `NodeJS.Timeout` instance for the remote completion fallback timer (delaying remote text commit by 5 seconds to allow broadcast message receipt).
 - **`prevIsSharedModeRef`**: Tracks the previous shared mode state to detect toggle transitions.
 - **`messagesContainerRef`**: Tracks the scroll container to synchronize scrolling.
+- **`triggeredJobIdRef`**: Tracks the currently running queue job ID to prevent duplicate `runInferenceStream` triggers.
+- **`isAutoScrollRef`**: Boolean ref indicating whether the container should automatically scroll down on new token messages.
+- **`scrollTimeoutRef`**: Stores the requestAnimationFrame request ID to throttle scroll events and optimize rendering performance.
 
 ---
 
@@ -50,6 +53,11 @@ To prevent premature HTTP 403 Forbidden race conditions (sending requests with a
 
 ### `handleAcceptSyncRequest`
 - **Description:** Approves the pending sync request, updates local settings/parameters state, and initiates model loading if the synchronized model differs from active.
+- **Arguments:** None.
+- **Return Value:** `void`
+
+### `handleScroll`
+- **Description:** Scroll event listener handler attached to the chat messages scroll element. Utilizes `requestAnimationFrame` throttling and fractional rounding checks (`Math.ceil`) to toggles `isAutoScrollRef.current` state depending on whether the user is scrolled near the bottom.
 - **Arguments:** None.
 - **Return Value:** `void`
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sliders, Cpu } from 'lucide-react';
 import type { DdoParameters, PsModelInfo, LocaleStrings } from '../types';
 import './ParameterPanel.css';
@@ -49,11 +49,82 @@ export default function ParameterPanel({
   onBroadcastSettings
 }: ParameterPanelProps) {
 
+  const PARAMETER_SPECS = {
+    temperature: { min: 0.0, max: 2.0, step: 0.1 },
+    min_p: { min: 0.0, max: 1.0, step: 0.01 },
+    top_p: { min: 0.0, max: 1.0, step: 0.01 },
+    top_k: { min: 0, max: 100, step: 1 },
+    num_predict: { min: 128, max: 16384, step: 128 },
+    num_ctx: { min: 1024, max: 32768, step: 1024 },
+    repeat_penalty: { min: 0.5, max: 2.0, step: 0.05 }
+  };
+
+  const [tempValues, setTempValues] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const nextTemp: Record<string, string> = {};
+    Object.keys(parameters).forEach((key) => {
+      const k = key as keyof DdoParameters;
+      const activeEl = document.activeElement;
+      const isCurrentFocus = activeEl && activeEl.id === `param-input-${k}`;
+      if (!isCurrentFocus) {
+        nextTemp[k] = parameters[k].toString();
+      } else {
+        nextTemp[k] = tempValues[k] ?? parameters[k].toString();
+      }
+    });
+    setTempValues(nextTemp);
+  }, [parameters]);
+
   const handleSliderChange = (key: keyof DdoParameters, value: number) => {
     onChangeParameters({
       ...parameters,
       [key]: value
     });
+    setTempValues(prev => ({
+      ...prev,
+      [key]: value.toString()
+    }));
+  };
+
+  const handleInputChange = (key: keyof DdoParameters, valStr: string) => {
+    setTempValues(prev => ({
+      ...prev,
+      [key]: valStr
+    }));
+  };
+
+  const handleInputConfirm = (key: keyof DdoParameters) => {
+    const spec = PARAMETER_SPECS[key];
+    const rawVal = tempValues[key];
+    let val = parseFloat(rawVal);
+    
+    if (isNaN(val)) {
+      val = parameters[key];
+    } else {
+      val = Math.min(spec.max, Math.max(spec.min, val));
+    }
+
+    if (key === 'top_k' || key === 'num_predict' || key === 'num_ctx') {
+      val = Math.round(val);
+    }
+
+    const nextParams = {
+      ...parameters,
+      [key]: val
+    };
+    onChangeParameters(nextParams);
+    setTempValues(prev => ({
+      ...prev,
+      [key]: val.toString()
+    }));
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, key: keyof DdoParameters) => {
+    if (e.key === 'Enter') {
+      handleInputConfirm(key);
+      (e.target as HTMLInputElement).blur();
+    }
   };
 
   return (
@@ -112,7 +183,18 @@ export default function ParameterPanel({
         <div className="slider-group">
           <div className="slider-header">
             <label>{t.temperature}</label>
-            <span>{parameters.temperature}</span>
+            <input
+              type="number"
+              id="param-input-temperature"
+              className="param-number-input"
+              min="0.0"
+              max="2.0"
+              step="0.1"
+              value={tempValues.temperature ?? ''}
+              onChange={(e) => handleInputChange('temperature', e.target.value)}
+              onBlur={() => handleInputConfirm('temperature')}
+              onKeyDown={(e) => handleKeyDown(e, 'temperature')}
+            />
           </div>
           <input 
             type="range" min="0.0" max="2.0" step="0.1" 
@@ -125,7 +207,18 @@ export default function ParameterPanel({
         <div className="slider-group">
           <div className="slider-header">
             <label>{t.minP}</label>
-            <span>{parameters.min_p}</span>
+            <input
+              type="number"
+              id="param-input-min_p"
+              className="param-number-input"
+              min="0.0"
+              max="1.0"
+              step="0.01"
+              value={tempValues.min_p ?? ''}
+              onChange={(e) => handleInputChange('min_p', e.target.value)}
+              onBlur={() => handleInputConfirm('min_p')}
+              onKeyDown={(e) => handleKeyDown(e, 'min_p')}
+            />
           </div>
           <input 
             type="range" min="0.0" max="1.0" step="0.01" 
@@ -138,7 +231,18 @@ export default function ParameterPanel({
         <div className="slider-group">
           <div className="slider-header">
             <label>{t.topP}</label>
-            <span>{parameters.top_p}</span>
+            <input
+              type="number"
+              id="param-input-top_p"
+              className="param-number-input"
+              min="0.0"
+              max="1.0"
+              step="0.01"
+              value={tempValues.top_p ?? ''}
+              onChange={(e) => handleInputChange('top_p', e.target.value)}
+              onBlur={() => handleInputConfirm('top_p')}
+              onKeyDown={(e) => handleKeyDown(e, 'top_p')}
+            />
           </div>
           <input 
             type="range" min="0.0" max="1.0" step="0.01" 
@@ -151,7 +255,18 @@ export default function ParameterPanel({
         <div className="slider-group">
           <div className="slider-header">
             <label>{t.topK}</label>
-            <span>{parameters.top_k}</span>
+            <input
+              type="number"
+              id="param-input-top_k"
+              className="param-number-input"
+              min="0"
+              max="100"
+              step="1"
+              value={tempValues.top_k ?? ''}
+              onChange={(e) => handleInputChange('top_k', e.target.value)}
+              onBlur={() => handleInputConfirm('top_k')}
+              onKeyDown={(e) => handleKeyDown(e, 'top_k')}
+            />
           </div>
           <input 
             type="range" min="0" max="100" step="1" 
@@ -171,7 +286,22 @@ export default function ParameterPanel({
               />
               {t.maxTokens}
             </label>
-            <span>{numPredictEnabled ? parameters.num_predict : (lang === 'ja' ? '無制限' : 'Unlimited')}</span>
+            {numPredictEnabled ? (
+              <input
+                type="number"
+                id="param-input-num_predict"
+                className="param-number-input"
+                min="128"
+                max="16384"
+                step="128"
+                value={tempValues.num_predict ?? ''}
+                onChange={(e) => handleInputChange('num_predict', e.target.value)}
+                onBlur={() => handleInputConfirm('num_predict')}
+                onKeyDown={(e) => handleKeyDown(e, 'num_predict')}
+              />
+            ) : (
+              <span className="unlimited-label">{lang === 'ja' ? '無制限' : 'Unlimited'}</span>
+            )}
           </div>
           <input 
             type="range" min="128" max="16384" step="128" 
@@ -185,7 +315,18 @@ export default function ParameterPanel({
         <div className="slider-group">
           <div className="slider-header">
             <label>{t.contextLimit || "Context Limit (num_ctx)"}</label>
-            <span>{parameters.num_ctx}</span>
+            <input
+              type="number"
+              id="param-input-num_ctx"
+              className="param-number-input"
+              min="1024"
+              max="32768"
+              step="1024"
+              value={tempValues.num_ctx ?? ''}
+              onChange={(e) => handleInputChange('num_ctx', e.target.value)}
+              onBlur={() => handleInputConfirm('num_ctx')}
+              onKeyDown={(e) => handleKeyDown(e, 'num_ctx')}
+            />
           </div>
           <input 
             type="range" min="1024" max="32768" step="1024" 
@@ -198,7 +339,18 @@ export default function ParameterPanel({
         <div className="slider-group">
           <div className="slider-header">
             <label>{t.repeatPenalty}</label>
-            <span>{parameters.repeat_penalty}</span>
+            <input
+              type="number"
+              id="param-input-repeat_penalty"
+              className="param-number-input"
+              min="0.5"
+              max="2.0"
+              step="0.05"
+              value={tempValues.repeat_penalty ?? ''}
+              onChange={(e) => handleInputChange('repeat_penalty', e.target.value)}
+              onBlur={() => handleInputConfirm('repeat_penalty')}
+              onKeyDown={(e) => handleKeyDown(e, 'repeat_penalty')}
+            />
           </div>
           <input 
             type="range" min="0.5" max="2.0" step="0.05" 

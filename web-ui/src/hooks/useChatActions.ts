@@ -446,21 +446,28 @@ export function useChatActions({
         }));
       }
     } finally {
+      if (settings.isSharedMode) {
+        void broadcastModel(settings.connectionUrl, settings.accessToken, settings.username, activeModel, Date.now(), false, '');
+      }
+
+      // Clear the local job ID immediately to prevent re-triggering inference
+      const jobId = jobIdToComplete;
+      if (settings.isSharedMode && jobId) {
+        setMyJobId(null);
+        setPendingMessage('');
+      }
+
       completeGenerate();
       isGeneratingRef.current = false;
       abortControllerRef.current = null;
-      if (settings.isSharedMode) {
-        void broadcastModel(settings.connectionUrl, settings.accessToken, settings.username, activeModel, Date.now(), false, '');
-        if (jobIdToComplete) {
-          setMyJobId(null);
-          setPendingMessage('');
-          try {
-            await completeQueue(settings.connectionUrl, settings.accessToken, jobIdToComplete);
-            const q = await fetchQueue(settings.connectionUrl, settings.accessToken);
-            setJobQueue(q);
-          } catch (err) {
-            console.error("Failed to complete queue job", err);
-          }
+
+      if (settings.isSharedMode && jobId) {
+        try {
+          await completeQueue(settings.connectionUrl, settings.accessToken, jobId);
+          const q = await fetchQueue(settings.connectionUrl, settings.accessToken);
+          setJobQueue(q);
+        } catch (err) {
+          console.error("Failed to complete queue job", err);
         }
       }
     }

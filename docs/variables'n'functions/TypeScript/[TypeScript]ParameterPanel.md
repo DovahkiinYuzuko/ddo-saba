@@ -30,3 +30,41 @@ This document specifies the properties, configurations, and callbacks governing 
 - `onImportPreset` (`(e: React.ChangeEvent<HTMLInputElement>) => void`): Handler loading saved JSON settings profiles.
 - `t` (`LocaleStrings`): Target localization mapping dictionary.
 - `lang` (`'en' | 'ja'`): Active UI locale string.
+
+---
+
+## 2. Configurations & Constant Variables
+
+### `PARAMETER_SPECS`
+- **Description:** A metadata config object defining `min`, `max`, and `step` values for each inference parameter (`temperature`, `min_p`, `top_p`, `top_k`, `num_predict`, `num_ctx`, `repeat_penalty`). Used to perform validation and clamping.
+
+---
+
+## 3. State Variables
+
+### `tempValues`
+- **Description:** Local React state (`Record<string, string>`) holding temporary string representations of manual input values. It prevents cursor jump issues during text entry, syncing from `parameters` only when the target input field does not have focus.
+
+---
+
+## 4. Functions
+
+### `handleInputChange`
+- **Description:** Handler for editing events on numerical parameter input fields. Updates the `tempValues` state buffer.
+- **Arguments:**
+  - `key` (`keyof DdoParameters`)
+  - `valStr` (`string`)
+- **Return Value:** `void`
+
+### `handleInputConfirm`
+- **Description:** Performs numeric validation and clamping on `tempValues[key]` based on bounds defined in `PARAMETER_SPECS`. Resolves `NaN` values, rounds integer fields (`top_k`, `num_predict`, `num_ctx`), updates parent context using `onChangeParameters`, and updates local `tempValues` state.
+- **Arguments:**
+  - `key` (`keyof DdoParameters`)
+- **Return Value:** `void`
+
+### `handleKeyDown`
+- **Description:** Listens to `KeyDown` events on number input components. Triggers `handleInputConfirm` and blurs focus if the `Enter` key is pressed.
+- **Arguments:**
+  - `e` (`React.KeyboardEvent<HTMLInputElement>`)
+  - `key` (`keyof DdoParameters`)
+- **Return Value:** `void`

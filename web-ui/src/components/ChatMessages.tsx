@@ -13,7 +13,6 @@ import {
 } from 'lucide-react';
 import type { Message, LocaleStrings } from '../types';
 import './ChatMessages.css';
-
 interface ChatMessagesProps {
   messages: Message[];
   onImportCassette: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -21,6 +20,7 @@ interface ChatMessagesProps {
   onToggleThinking: (msgKey: string, isOpen: boolean) => void;
   collapseThinking: boolean;
   t: LocaleStrings;
+  onScroll?: React.UIEventHandler<HTMLDivElement>;
 }
 
 function CopyButton({ text }: { text: string }) {
@@ -49,7 +49,8 @@ export default React.forwardRef<HTMLDivElement, ChatMessagesProps>(function Chat
   expandedThinking,
   onToggleThinking,
   collapseThinking,
-  t
+  t,
+  onScroll
 }: ChatMessagesProps, ref) {
 
   // Helper parser to extract <think> blocks and render Markdown / LaTeX with Syntax Highlighting
@@ -141,7 +142,7 @@ export default React.forwardRef<HTMLDivElement, ChatMessagesProps>(function Chat
   };
 
   return (
-    <div className="chat-messages-scroll" ref={ref}>
+    <div className="chat-messages-scroll" ref={ref} onScroll={onScroll}>
       {messages.length === 0 && (
         <div className="empty-state">
           <FolderOpen size={48} className="empty-icon" />
