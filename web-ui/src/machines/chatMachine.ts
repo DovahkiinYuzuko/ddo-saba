@@ -175,7 +175,6 @@ export const chatMachine = createMachine(
             on: {
               PEER_START_GENERATE: {
                 target: 'remoteGenerating',
-                guard: ({ context }) => !context.isGenerating,
                 actions: assign({ isRemoteGenerating: true })
               },
               STOP_POLLING: 'idle'
@@ -186,6 +185,10 @@ export const chatMachine = createMachine(
               PEER_COMPLETE_GENERATE: {
                 target: 'polling',
                 actions: assign({ isRemoteGenerating: false, remoteGeneratingText: '' })
+              },
+              PEER_START_GENERATE: {
+                // Peer re-started generation while already in remoteGenerating (e.g., re-trigger)
+                actions: assign({ isRemoteGenerating: true })
               },
               START_GENERATE: {
                 target: 'polling',

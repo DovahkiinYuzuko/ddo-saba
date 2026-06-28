@@ -146,8 +146,12 @@ export function useModelSync({
         // 1. Update remote generating state only when NOT from myself
         if (data.isGenerating !== undefined && !isFromMe) {
           if (!wasRemoteGenerating && isNowGenerating) {
+            // Manually update ref BEFORE calling XState event to prevent stale value in next poll loop
+            isRemoteGeneratingRef.current = true;
             peerStartGenerate();
           } else if (wasRemoteGenerating && !isNowGenerating) {
+            // Manually update ref BEFORE calling XState event to prevent stale value in next poll loop
+            isRemoteGeneratingRef.current = false;
             peerCompleteGenerate();
           }
           setIsRemoteGenerating(data.isGenerating);

@@ -294,7 +294,7 @@ input[disabled], select[disabled], textarea[disabled] {
 
   .chat-column {
     flex: 1;
-    height: 100%;
+    min-height: 0;
   }
 
   .sidebar-column {

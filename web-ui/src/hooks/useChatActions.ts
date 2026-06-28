@@ -466,16 +466,33 @@ export function useChatActions({
       abortControllerRef.current = null;
 
       if (settings.isSharedMode && jobId) {
-        try {
-          if (isAborted) {
-            await cancelQueue(settings.connectionUrl, settings.accessToken, jobId);
-          } else {
-            await completeQueue(settings.connectionUrl, settings.accessToken, jobId);
+        const maxRetries = 3;
+        const retryDelay = 1000;
+        let success = false;
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          try {
+            if (isAborted) {
+              await cancelQueue(settings.connectionUrl, settings.accessToken, jobId);
+            } else {
+              await completeQueue(settings.connectionUrl, settings.accessToken, jobId);
+            }
+            success = true;
+            break;
+          } catch (err) {
+            console.error(`Queue ${isAborted ? 'cancel' : 'complete'} failed (attempt ${attempt}/${maxRetries})`, err);
+            if (attempt < maxRetries) {
+              await new Promise(resolve => setTimeout(resolve, retryDelay));
+            }
           }
+        }
+        if (!success) {
+          console.error(`Failed to ${isAborted ? 'cancel' : 'complete'} queue job after ${maxRetries} attempts. Job may remain stuck on server.`);
+        }
+        try {
           const q = await fetchQueue(settings.connectionUrl, settings.accessToken);
           setJobQueue(q);
         } catch (err) {
-          console.error("Failed to update queue job in finally block", err);
+          console.error("Failed to fetch updated queue after job completion", err);
         }
       }
     }

@@ -422,13 +422,17 @@ export default function App() {
   });
 
   // Trigger model pre-loading when activeModel changes and it's not matching VRAM
+  // Skip if model was changed by a peer (lastModelSender !== username): peer-initiated changes
+  // should NOT trigger a local load request. The UI update is enough; psInfo polling will reflect VRAM state.
   useEffect(() => {
     if (!isInitialized || !activeModel || isModelLoading) return;
+    const isLoadedByPeer = lastModelSender !== '' && lastModelSender !== settings.username;
+    if (isLoadedByPeer) return; // Do not send load request for peer-triggered model changes
     const isLoaded = psInfo && psInfo.name === activeModel;
     if (!isLoaded && !isGeneratingRef.current && !isRemoteGeneratingRef.current) {
       void loadModelOnSelection(activeModel);
     }
-  }, [activeModel, isInitialized, psInfo, isModelLoading, loadModelOnSelection]);
+  }, [activeModel, isInitialized, psInfo, isModelLoading, loadModelOnSelection, lastModelSender, settings.username]);
 
   useQueueSync({
     isInitialized,
@@ -440,6 +444,7 @@ export default function App() {
   useBroadcastSync({
     isInitialized,
     settings,
+    chats,
     activeChatId,
     lastPolledMsgId: state.context.lastPolledMsgId,
     updateLastPolledMsgId: (id) => send({ type: 'UPDATE_CONTEXT', payload: { lastPolledMsgId: id } }),

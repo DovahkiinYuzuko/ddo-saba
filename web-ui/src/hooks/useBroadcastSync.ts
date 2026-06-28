@@ -6,6 +6,7 @@ import { formatTimestamp } from '../utils/format';
 interface UseBroadcastSyncProps {
   isInitialized: boolean;
   settings: DdoSettings;
+  chats: ChatSession[];
   activeChatId: string | null;
   lastPolledMsgId: string;
   updateLastPolledMsgId: (id: string) => void;
@@ -22,6 +23,7 @@ interface UseBroadcastSyncProps {
 export function useBroadcastSync({
   isInitialized,
   settings,
+  chats,
   activeChatId,
   lastPolledMsgId,
   updateLastPolledMsgId,
@@ -114,31 +116,37 @@ export function useBroadcastSync({
             }
 
             // Append shared message to currently active chat session
-            if (activeChatIdRef.current) {
-              setChats(prev => prev.map(c => {
-                if (c.id === activeChatIdRef.current) {
-                  if (data.id && c.messages.some(m => m.id === data.id)) {
-                    return c;
+            // Fallback: if activeChatId is null (race with syncHistory), append to last available tab
+            const targetChatId = activeChatIdRef.current;
+            if (targetChatId || chats.length > 0) {
+              setChats(prev => {
+                const resolvedId = targetChatId || (prev.length > 0 ? prev[prev.length - 1].id : null);
+                if (!resolvedId) return prev;
+                return prev.map(c => {
+                  if (c.id === resolvedId) {
+                    if (data.id && c.messages.some(m => m.id === data.id)) {
+                      return c;
+                    }
+                    if (data.role === 'assistant' && fallbackTimerRef.current) {
+                      clearTimeout(fallbackTimerRef.current);
+                      fallbackTimerRef.current = null;
+                      setRemoteGeneratingText('');
+                    }
+                    return {
+                      ...c,
+                      messages: [...c.messages, {
+                        id: data.id,
+                        role: data.role || 'user',
+                        content: data.content || '',
+                        sender: data.sender,
+                        broadcaster: data.broadcaster,
+                        timestamp: data.timestamp ? formatTimestamp(data.timestamp) : undefined
+                      }]
+                    };
                   }
-                  if (data.role === 'assistant' && fallbackTimerRef.current) {
-                    clearTimeout(fallbackTimerRef.current);
-                    fallbackTimerRef.current = null;
-                    setRemoteGeneratingText('');
-                  }
-                  return {
-                    ...c,
-                    messages: [...c.messages, {
-                      id: data.id,
-                      role: data.role || 'user',
-                      content: data.content || '',
-                      sender: data.sender,
-                      broadcaster: data.broadcaster,
-                      timestamp: data.timestamp ? formatTimestamp(data.timestamp) : undefined
-                    }]
-                  };
-                }
-                return c;
-              }));
+                  return c;
+                });
+              });
             }
           }
         }
@@ -146,7 +154,7 @@ export function useBroadcastSync({
     } catch (e) {
       console.error("Broadcasting poll failed", e);
     }
-  }, [settings.connectionUrl, settings.accessToken, settings.username, addNewTab, deleteTab, handleActiveCount, updateLastPolledMsgId, setChats, fallbackTimerRef, setRemoteGeneratingText, setSyncRequestPending, setActiveChatId]);
+  }, [settings.connectionUrl, settings.accessToken, settings.username, chats, addNewTab, deleteTab, handleActiveCount, updateLastPolledMsgId, setChats, fallbackTimerRef, setRemoteGeneratingText, setSyncRequestPending, setActiveChatId]);
 
   useEffect(() => {
     if (!isInitialized || !settings.accessToken || !settings.isSharedMode) return;
