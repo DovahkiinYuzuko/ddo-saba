@@ -97,7 +97,7 @@ This document specifies the variables and functions used in `nginx/conf/broadcas
 
 ### `update_active_users` (L1-40)
 - **Description:** On every API endpoint request, this function reads the client's unique session identifier (`X-DDO-Client-Id`) from headers. If not present, it falls back to a concatenated ID using `X-DDO-Token` and `X-DDO-Username` headers (formatted as `token + "_" + username`). It updates their last active timestamp in a JSON string stored in `ngx.shared.broadcast_zone` under the `"active_users"` key (using this client ID as the key to prevent duplicates when multiple users share the same token), cleans up entries older than 10 seconds, and includes the active count in the response.
-- **Active Timeout & Cache Reset:** Performs a sweep of active users. If the user who selected the current active model (tracked in `"model"` key of `ngx.shared.broadcast_zone`) is no longer present in the active user list, the `"model"` cache is automatically reset to `"{}"` to prevent newly connecting users from misinterpreting the model as a peer change and triggering unnecessary auto-loads.
+- **Active Timeout:** Performs a sweep of active users. (Note: Automatic reset of `"model"` cache when the sender becomes inactive has been removed to prevent state synchronization loss across peers).
 - **Active Count Header:** The response header `X-DDO-Active-Count` returns the exact number of active users, removing any minimum value constraints (which previously forced it to `1`).
 
 ---

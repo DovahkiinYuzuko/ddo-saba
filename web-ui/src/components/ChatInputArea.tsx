@@ -68,7 +68,7 @@ export default function ChatInputArea({
       <div className="input-wrap">
         <textarea 
           value={inputText}
-          disabled={isGenerating || isModelLoading || isRemoteGenerating || !activeChatId || myJobId !== null}
+          disabled={isGenerating || isModelLoading || (!isSharedMode && isRemoteGenerating) || !activeChatId || myJobId !== null}
           onChange={(e) => onChangeInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholderText}
@@ -92,7 +92,7 @@ export default function ChatInputArea({
           <button 
             className="action-btn send-btn" 
             onClick={onSend} 
-            disabled={!inputText.trim() || isModelLoading || isRemoteGenerating || !activeChatId}
+            disabled={!inputText.trim() || isModelLoading || (!isSharedMode && isRemoteGenerating) || !activeChatId}
           >
             <Send size={16} />
           </button>

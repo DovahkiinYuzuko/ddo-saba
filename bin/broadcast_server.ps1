@@ -61,22 +61,6 @@ while ($listener.IsListening) {
         foreach ($key in $keysToRemove) {
             $activeUsers.Remove($key)
         }
-
-        # Clear model cache if the sender is no longer active
-        if ($cachedModelData) {
-            $senderActive = $false
-            foreach ($activeKey in $activeUsers.Keys) {
-                if ($activeKey -like "*_$($cachedModelData.sender)") {
-                    $senderActive = $true
-                    break
-                }
-            }
-            if (-not $senderActive) {
-                Write-Host "[MODEL] Clear model cache because sender '$($cachedModelData.sender)' is inactive." -ForegroundColor Gray
-                $cachedModelData = $null
-            }
-        }
-
         $activeCount = $activeUsers.Count
 
         # CORS Headers

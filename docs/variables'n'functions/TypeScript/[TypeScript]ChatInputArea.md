@@ -4,7 +4,7 @@
 # プロパティ (Props)
 - `inputText`: `string` - 入力中のテキスト。
 - `isGenerating`: `boolean` - 自身のクライアントで推論が実行中かどうかのフラグ。
-- `isRemoteGenerating`: `boolean` - 共有モード時に他クライアントで推論が実行中かどうかのフラグ。
+- `isRemoteGenerating`: `boolean` - 共有モード時に他クライアントで推論が実行中かどうかのフラグ。共有モード時は、自身がキューで順番待ち、または生成中でない限り、他人が推論中であっても入力エリアはブロックされず、並行してキューに送信可能。
 - `sendOnEnter`: `boolean` - Enterキーで送信するかのフラグ。
 - `isSharedMode`: `boolean` - 共有ルームモードかどうかのフラグ。
 - `thinkMode`: `boolean` - 思考モードが有効かどうかのフラグ。

@@ -76,7 +76,7 @@ To prevent premature HTTP 403 Forbidden race conditions (sending requests with a
 - **Description:** Fetches tags and ps info from Ollama. Automatically clears `activeModel` if the model has vanished from VRAM (psInfo is null), but implements a **15 seconds grace period** since the last model change (tracked via `lastModelChangeTime`) to prevent premature reset during the initial load lag.
 
 ### `pollModel` (polling loop)
-- **Description:** Runs on a recursive `setTimeout` loop. Polls the broadcast model and generation state. Sets `isRemoteGenerating` and `remoteGeneratingText` from peer state. On remote generation end, triggers `peerCompleteGenerate` and schedules a 5-second fallback timer (`fallbackTimerRef`) to append the remote text into chat history if the corresponding broadcast message doesn't arrive in time (guarded against duplicate entries by verifying the last 5 messages). Clears `activeModel` globally if the broadcast model payload is empty.
+- **Description:** Runs on a recursive `setTimeout` loop. Polls the broadcast model and generation state. Sets `isRemoteGenerating` and `remoteGeneratingText` from peer state. If the broadcast model payload is sent by the local client itself (`data.sender === settings.username`), updates to `isRemoteGenerating` and `remoteGeneratingText` are skipped to prevent duplicate AI response windows. On remote generation end, triggers `peerCompleteGenerate` and schedules a 5-second fallback timer (`fallbackTimerRef`) to append the remote text into chat history if the corresponding broadcast message doesn't arrive in time (guarded against duplicate entries by verifying the last 5 messages). Clears `activeModel` globally if the broadcast model payload is empty.
 
 ---
 

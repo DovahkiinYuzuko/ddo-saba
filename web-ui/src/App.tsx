@@ -768,9 +768,10 @@ export default function App() {
 
         const wasRemoteGenerating = isRemoteGeneratingRef.current;
         const isNowGenerating = data.isGenerating === true;
+        const isFromMe = data.sender === settings.username;
 
-        // 1. Update remote generating state regardless of who the sender is
-        if (data.isGenerating !== undefined) {
+        // 1. Update remote generating state only when NOT from myself
+        if (data.isGenerating !== undefined && !isFromMe) {
           if (!wasRemoteGenerating && isNowGenerating) {
             peerStartGenerate();
           } else if (wasRemoteGenerating && !isNowGenerating) {

@@ -35,7 +35,7 @@ This script runs a lightweight in-memory broadcast relay server for Windows envi
 ### `$activeUsers`
 - **Type:** `System.Collections.Hashtable`
 - **Description:** Keeps track of each client's session ID (`X-DDO-Client-Id`) and their last active Unix epoch timestamp. If the client ID is missing from headers, it falls back to a concatenated ID using `X-DDO-Token` and `X-DDO-Username` headers (formatted as `$token + "_" + $username`) to count concurrent users without duplicates or omissions.
-- **Active Timeout & Cache Reset:** Clean up users inactive for more than 10 seconds. If the user who selected the current active model (tracked in `$cachedModelData.sender`) becomes inactive, the model cache `$cachedModelData` is automatically reset to `$null` to prevent new users from misinterpreting the model as a peer change and triggering unnecessary auto-loads.
+- **Active Timeout:** Clean up users inactive for more than 10 seconds. (Note: Automatic reset of `$cachedModelData` when the sender becomes inactive has been removed to prevent state synchronization loss across peers).
 - **Active Count Header:** The response header `X-DDO-Active-Count` returns the exact number of active users, removing any minimum value constraints (which previously forced it to `1`).
 
 ## Functions
