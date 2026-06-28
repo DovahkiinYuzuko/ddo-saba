@@ -1,21 +1,21 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import type { ChatSession } from './types';
 import { useChatMachineState } from './hooks/useChatMachineState';
 import { 
   loadModelOnSelection as apiLoadModelOnSelection, 
-  fetchModels, 
-  fetchPs, 
   keepAliveModel, 
   unloadModel as apiUnloadModel 
 } from './api/ollama';
 import { 
-  pollMessage, 
   broadcastMessage,
   fetchHistory,
-  broadcastModel,
-  pollModel
+  broadcastModel
 } from './api/broadcast';
-import { fetchQueue } from './api/queue';
+import { useInitializeSettings } from './hooks/useInitializeSettings';
+import { useModelSync } from './hooks/useModelSync';
+import { useQueueSync } from './hooks/useQueueSync';
+import { useBroadcastSync } from './hooks/useBroadcastSync';
+import { useTabManagement } from './hooks/useTabManagement';
 import SettingsModal from './components/SettingsModal';
 import ParameterPanel from './components/ParameterPanel';
 import ChatMessages from './components/ChatMessages';
@@ -38,7 +38,7 @@ export default function App() {
     navigator.language.startsWith('ja') ? 'ja' : 'en'
   );
   const t = locales[lang];
-  const [isInitialized, setIsInitialized] = useState(false);
+
 
   // --- XState Machine Integration ---
   const { state, send, adapters } = useChatMachineState();
@@ -115,22 +115,7 @@ export default function App() {
     expandedThinking
   } = state.context;
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const tokenFromUrl = params.get('token') || params.get('accessToken') || '';
-    const isSharedModeFromUrl = params.get('sharedMode') === 'true' || params.get('isSharedMode') === 'true';
-    
-    setSettings(prev => ({
-      ...prev,
-      connectionUrl: window.location.origin.includes('localhost:3000')
-        ? 'http://localhost:8088'
-        : window.location.origin,
-      accessToken: tokenFromUrl || prev.accessToken,
-      isSharedMode: isSharedModeFromUrl || prev.isSharedMode,
-      username: 'Guest_' + Math.floor(Math.random() * 1000)
-    }));
-    setIsInitialized(true);
-  }, []); // Run once on mount
+  const isInitialized = useInitializeSettings(setSettings);
 
   const handleThinkingToggle = (msgKey: string, isOpen: boolean) => {
 
@@ -348,35 +333,15 @@ export default function App() {
     }
   }, [chats, activeChatId]);
 
-  const addNewTab = useCallback((isRemote = false, remoteId?: string, remoteTitle?: string) => {
-    const newId = remoteId || Date.now().toString();
-    const title = remoteTitle || `${t.newChat} ${chats.length + 1}`;
-    const newChat: ChatSession = {
-      id: newId,
-      title: title,
-      messages: []
-    };
-    setChats(prev => {
-      if (prev.some(c => c.id === newId)) return prev;
-      return [...prev, newChat];
-    });
-    setActiveChatId(newId);
-
-    if (settings.isSharedMode && !isRemote) {
-      void broadcastMessage(
-        settings.connectionUrl,
-        settings.accessToken,
-        settings.username,
-        settings.username,
-        'system',
-        `tab_create:${newId}:${title}`
-      ).then(result => {
-        if (result && result.id) {
-          send({ type: 'UPDATE_CONTEXT', payload: { lastPolledMsgId: result.id } });
-        }
-      }).catch(e => console.error("Failed to broadcast tab_create", e));
-    }
-  }, [t.newChat, chats.length, settings.isSharedMode, settings.connectionUrl, settings.accessToken, settings.username]);
+  const { addNewTab, deleteTab } = useTabManagement({
+    chats,
+    activeChatId,
+    settings,
+    t,
+    setChats,
+    setActiveChatId,
+    updateLastPolledMsgId: (id) => send({ type: 'UPDATE_CONTEXT', payload: { lastPolledMsgId: id } })
+  });
 
   // Create default tab if none exists (Private Mode only)
   useEffect(() => {
@@ -388,253 +353,65 @@ export default function App() {
     }
   }, [isInitialized, chats.length, addNewTab, settings.isSharedMode]);
 
-  const deleteTab = useCallback((id: string, e?: React.MouseEvent, isRemote = false) => {
-    if (e) e.stopPropagation();
-    setChats(prev => prev.filter(c => c.id !== id));
-    setActiveChatId(prevActiveId => {
-      if (prevActiveId === id) {
-        const remaining = chats.filter(c => c.id !== id);
-        const nextActiveId = remaining.length > 0 ? remaining[remaining.length - 1].id : null;
-        if (settings.isSharedMode && !isRemote && nextActiveId) {
-          void broadcastMessage(
-            settings.connectionUrl,
-            settings.accessToken,
-            settings.username,
-            settings.username,
-            'system',
-            `tab_switch:${nextActiveId}`
-          ).then(result => {
-            if (result && result.id) {
-              send({ type: 'UPDATE_CONTEXT', payload: { lastPolledMsgId: result.id } });
-            }
-          }).catch(e => console.error("Failed to broadcast tab_switch", e));
-        }
-        return nextActiveId;
-      }
-      return prevActiveId;
-    });
 
-    if (settings.isSharedMode && !isRemote) {
-      void broadcastMessage(
-        settings.connectionUrl,
-        settings.accessToken,
-        settings.username,
-        settings.username,
-        'system',
-        `tab_delete:${id}`
-      ).then(result => {
-        if (result && result.id) {
-          send({ type: 'UPDATE_CONTEXT', payload: { lastPolledMsgId: result.id } });
-        }
-      }).catch(e => console.error("Failed to broadcast tab_delete", e));
-    }
-  }, [chats, settings.isSharedMode, settings.connectionUrl, settings.accessToken, settings.username]);
 
   // Initial tags/ps fetch and interval polling
-  const fetchModelsAndPs = useCallback(async () => {
-    try {
-      const fetchedModels = await fetchModels(settings.connectionUrl, settings.accessToken);
-      setModels(prev => {
-        if (JSON.stringify(prev) === JSON.stringify(fetchedModels)) return prev;
-        return fetchedModels;
-      });
+  const { fetchModelsAndPs } = useModelSync({
+    isInitialized,
+    settings,
+    activeModel,
+    isModelLoading,
+    lastModelChangeTime,
+    lastModelSender,
+    isGeneratingRef,
+    isRemoteGeneratingRef,
+    remoteGeneratingText,
+    activeChatId,
+    fallbackTimerRef,
+    setModels,
+    setPsInfo,
+    setActiveModel,
+    setLastModelSender,
+    setLastModelChangeTime,
+    setIsRemoteGenerating,
+    setRemoteGeneratingText,
+    setChats,
+    peerStartGenerate,
+    peerCompleteGenerate,
+    handleActiveCount
+  });
 
-      const fetchedPs = await fetchPs(settings.connectionUrl, settings.accessToken);
-      setPsInfo(fetchedPs);
-
-      // Automatically clear active model selection if it was unloaded from VRAM (psInfo is null)
-      // Bypassed if local or remote generation is active to prevent VRAM load fluctuation resets.
-      // Implement 15 seconds grace period from lastModelChangeTime to prevent clearing right after load.
-      const isGracePeriodOver = (Date.now() - lastModelChangeTime) > 15000;
-      if (!fetchedPs && activeModel && !isModelLoading && isGracePeriodOver && !isGeneratingRef.current && !isRemoteGeneratingRef.current) {
-        setActiveModel('');
-        setLastModelSender(settings.username);
-        const now = Date.now();
-        setLastModelChangeTime(now);
-        if (settings.isSharedMode) {
-          void broadcastModel(settings.connectionUrl, settings.accessToken, settings.username, '', now);
-        }
-      }
-    } catch (e) {
-      console.error("Failed to connect to Ollama Server status endpoints.", e);
+  // Trigger model pre-loading when activeModel changes and it's not matching VRAM
+  useEffect(() => {
+    if (!isInitialized || !activeModel || isModelLoading) return;
+    const isLoaded = psInfo && psInfo.name === activeModel;
+    if (!isLoaded && !isGeneratingRef.current && !isRemoteGeneratingRef.current) {
+      void loadModelOnSelection(activeModel);
     }
-  }, [settings.connectionUrl, settings.accessToken, activeModel, isModelLoading, lastModelSender, settings.username, lastModelChangeTime]);
+  }, [activeModel, isInitialized, psInfo, isModelLoading, loadModelOnSelection]);
 
-  useEffect(() => {
-    if (!isInitialized || !settings.accessToken) return;
-    const timer = setTimeout(() => {
-      void fetchModelsAndPs();
-    }, 0);
-    const interval = setInterval(() => {
-      void fetchModelsAndPs();
-    }, 5000);
-    return () => {
-      clearTimeout(timer);
-      clearInterval(interval);
-    };
-  }, [fetchModelsAndPs, isInitialized, settings.accessToken]);
+  useQueueSync({
+    isInitialized,
+    settings,
+    setJobQueue,
+    handleActiveCount
+  });
 
-  const lastPolledMsgIdRef = useRef(state.context.lastPolledMsgId);
-  useEffect(() => {
-    lastPolledMsgIdRef.current = state.context.lastPolledMsgId;
-  }, [state.context.lastPolledMsgId]);
-
-  // Polling for shared room mode
-  const startBroadcastPolling = useCallback(async () => {
-    try {
-      const messages = (await pollMessage(
-        settings.connectionUrl,
-        settings.accessToken,
-        lastPolledMsgIdRef.current,
-        settings.username,
-        handleActiveCount
-      )) as Array<{
-        id?: string;
-        sender?: string;
-        broadcaster?: string;
-        role?: 'user' | 'assistant' | 'system';
-        content?: string;
-        timestamp?: string;
-      }>;
-
-      if (!Array.isArray(messages) || messages.length === 0) return;
-
-      for (const data of messages) {
-        const isMyMessage = data.sender === settings.username || data.broadcaster === settings.username;
-        if (data.id && data.id !== lastPolledMsgIdRef.current) {
-          // Update cursor immediately to prevent duplicate processing in the same loop
-          lastPolledMsgIdRef.current = data.id;
-          send({ type: 'UPDATE_CONTEXT', payload: { lastPolledMsgId: data.id } });
-          
-          if (!isMyMessage) {
-            // Handle system sync events
-            if (data.role === 'system' && data.content) {
-              if (data.content.startsWith('sync_request:')) {
-                const parts = data.content.split(':');
-                const sender = parts[1];
-                const payloadStr = parts.slice(2).join(':');
-                if (sender !== settings.username && payloadStr) {
-                  try {
-                    const payload = JSON.parse(payloadStr);
-                    setSyncRequestPending({
-                      ...payload,
-                      sender
-                    });
-                  } catch (e) {
-                    console.error("Failed to parse settings sync payload", e);
-                  }
-                }
-                continue;
-              } else if (data.content.startsWith('tab_create:')) {
-                const parts = data.content.split(':');
-                const tabId = parts[1];
-                const tabTitle = parts.slice(2).join(':');
-                if (tabId) {
-                  addNewTab(true, tabId, tabTitle);
-                }
-                continue;
-              } else if (data.content.startsWith('tab_delete:')) {
-                const tabId = data.content.substring('tab_delete:'.length);
-                if (tabId) {
-                  deleteTab(tabId, undefined, true);
-                }
-                continue;
-              } else if (data.content.startsWith('tab_switch:')) {
-                const tabId = data.content.substring('tab_switch:'.length);
-                if (tabId) {
-                  setActiveChatId(tabId);
-                }
-                continue;
-              }
-            }
-
-            // Append shared message to currently active chat session
-            if (activeChatId) {
-              setChats(prev => prev.map(c => {
-                if (c.id === activeChatId) {
-                  if (data.id && c.messages.some(m => m.id === data.id)) {
-                    return c;
-                  }
-                  if (data.role === 'assistant' && fallbackTimerRef.current) {
-                    clearTimeout(fallbackTimerRef.current);
-                    fallbackTimerRef.current = null;
-                    setRemoteGeneratingText('');
-                  }
-                  return {
-                    ...c,
-                    messages: [...c.messages, {
-                      id: data.id,
-                      role: data.role || 'user',
-                      content: data.content || '',
-                      sender: data.sender,
-                      broadcaster: data.broadcaster,
-                      timestamp: data.timestamp ? formatTimestamp(data.timestamp) : undefined
-                    }]
-                  };
-                }
-                return c;
-              }));
-            }
-          }
-        }
-      }
-    } catch (e) {
-      console.error("Broadcasting poll failed", e);
-    }
-  }, [settings.connectionUrl, settings.accessToken, settings.username, activeChatId, addNewTab, deleteTab, handleActiveCount, send]);
-
-  useEffect(() => {
-    if (!isInitialized || !settings.accessToken || !settings.isSharedMode) return;
-    let active = true;
-    let timerId: ReturnType<typeof setTimeout> | null = null;
-
-    const poll = async () => {
-      if (!active) return;
-      await startBroadcastPolling();
-      if (active) {
-        timerId = setTimeout(poll, 1500);
-      }
-    };
-
-    poll();
-
-    return () => {
-      active = false;
-      if (timerId) clearTimeout(timerId);
-    };
-  }, [isInitialized, settings.accessToken, settings.isSharedMode, startBroadcastPolling]);
-
-  // Polling for queue status in shared room mode
-  useEffect(() => {
-    if (!isInitialized || !settings.accessToken || !settings.isSharedMode) return;
-    let active = true;
-    let timerId: ReturnType<typeof setTimeout> | null = null;
-
-    const pollQueue = async () => {
-      if (!active) return;
-      try {
-        const q = await fetchQueue(
-          settings.connectionUrl,
-          settings.accessToken,
-          settings.username,
-          handleActiveCount
-        );
-        if (active) setJobQueue(q);
-      } catch (e) {
-        console.error("Queue poll failed", e);
-      }
-      if (active) {
-        timerId = setTimeout(pollQueue, 1500);
-      }
-    };
-
-    pollQueue();
-
-    return () => {
-      active = false;
-      if (timerId) clearTimeout(timerId);
-    };
-  }, [isInitialized, settings.accessToken, settings.isSharedMode, settings.connectionUrl, settings.username, handleActiveCount]);
+  useBroadcastSync({
+    isInitialized,
+    settings,
+    activeChatId,
+    lastPolledMsgId: state.context.lastPolledMsgId,
+    updateLastPolledMsgId: (id) => send({ type: 'UPDATE_CONTEXT', payload: { lastPolledMsgId: id } }),
+    fallbackTimerRef,
+    setChats,
+    setRemoteGeneratingText,
+    setSyncRequestPending,
+    addNewTab,
+    deleteTab,
+    setActiveChatId,
+    handleActiveCount
+  });
 
   // Fetch initial history when Shared Room mode is enabled
   useEffect(() => {
@@ -742,122 +519,7 @@ export default function App() {
     void syncHistory();
   }, [settings.isSharedMode, settings.connectionUrl, settings.accessToken]);
 
-  // Polling for shared model selection and generation status
-  useEffect(() => {
-    if (!settings.isSharedMode) return;
-    let active = true;
-    let timerId: ReturnType<typeof setTimeout> | null = null;
-    
-    const startModelPolling = async () => {
-      if (!active) return;
-      try {
-        const data = await pollModel(
-          settings.connectionUrl,
-          settings.accessToken,
-          settings.username,
-          handleActiveCount
-        ) as {
-          model?: string;
-          sender?: string;
-          timestamp?: number;
-          isGenerating?: boolean;
-          generatingText?: string;
-        };
 
-        if (!active) return;
-
-        const wasRemoteGenerating = isRemoteGeneratingRef.current;
-        const isNowGenerating = data.isGenerating === true;
-        const isFromMe = data.sender === settings.username;
-
-        // 1. Update remote generating state only when NOT from myself
-        if (data.isGenerating !== undefined && !isFromMe) {
-          if (!wasRemoteGenerating && isNowGenerating) {
-            peerStartGenerate();
-          } else if (wasRemoteGenerating && !isNowGenerating) {
-            peerCompleteGenerate();
-          }
-          setIsRemoteGenerating(data.isGenerating);
-          if (data.generatingText !== undefined) {
-            setRemoteGeneratingText(data.generatingText || '');
-          }
-        }
-
-        // 2. Handle remote model changes (only when from a peer user)
-        if (data.sender && data.sender !== settings.username) {
-          if (data.model !== undefined && data.model !== activeModel) {
-            setActiveModel(data.model);
-            setLastModelSender(data.sender);
-            setLastModelChangeTime(Date.now());
-            if (data.model) {
-              void loadModelOnSelection(data.model);
-            }
-          }
-        }
-
-        // 3. Commit final text when remote generation ends (with fallback delay)
-        if (wasRemoteGenerating && !isNowGenerating) {
-          const textToCommit = data.generatingText || remoteGeneratingText;
-          if (fallbackTimerRef.current) {
-            clearTimeout(fallbackTimerRef.current);
-          }
-          if (textToCommit && activeChatId) {
-            fallbackTimerRef.current = setTimeout(() => {
-              if (!active) return;
-              setChats(prev => prev.map(c => {
-                if (c.id === activeChatId) {
-                  // Avoid duplication (check last 5 messages)
-                  const lastMessages = c.messages.slice(-5);
-                  const hasDuplicate = lastMessages.some(m => 
-                    m.role === 'assistant' && 
-                    (m.content === textToCommit || m.content.includes(textToCommit) || textToCommit.includes(m.content))
-                  );
-                  if (hasDuplicate) return c;
-                  return {
-                    ...c,
-                    messages: [...c.messages, {
-                      id: Date.now().toString() + "_remote_ai_fallback",
-                      role: 'assistant',
-                      content: textToCommit,
-                      sender: data.model || activeModel || 'AI',
-                      timestamp: formatTimestamp(new Date())
-                    }]
-                  };
-                }
-                return c;
-              }));
-              setRemoteGeneratingText('');
-            }, 5000);
-          } else {
-            setRemoteGeneratingText('');
-          }
-        }
-
-        // 4. If there is no sender and model status is empty, clear local activeModel
-        if (!data.sender && (data.model === undefined || data.model === '')) {
-          if (wasRemoteGenerating) {
-            setIsRemoteGenerating(false);
-            setRemoteGeneratingText('');
-          }
-          if (activeModel !== '') {
-            setActiveModel('');
-          }
-        }
-      } catch (e) {
-        console.error("Model poll failed", e);
-      }
-      if (active) {
-        timerId = setTimeout(startModelPolling, 1500);
-      }
-    };
-    
-    startModelPolling();
-
-    return () => {
-      active = false;
-      if (timerId) clearTimeout(timerId);
-    };
-  }, [settings.isSharedMode, settings.connectionUrl, settings.accessToken, settings.username, activeModel, lastModelChangeTime, handleActiveCount, activeChatId, remoteGeneratingText, peerStartGenerate, peerCompleteGenerate]);
 
   // Unload model from VRAM by calling API with keep_alive: 0
   const handleUnloadModel = async () => {
