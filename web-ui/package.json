@@ -12,7 +12,8 @@
     "test:api": "node scripts/test_api_sync.js",
     "test:api:watch": "node --watch scripts/test_api_sync.js",
     "test:unit": "vitest run",
-    "test:e2e": "node scripts/test_e2e_integration.js"
+    "test:e2e": "node scripts/test_e2e_integration.js",
+    "test:e2e:browser": "playwright test"
   },
   "dependencies": {
     "@xstate/react": "^6.1.0",
@@ -28,6 +29,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.50.0",
     "@types/node": "^24.12.3",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",

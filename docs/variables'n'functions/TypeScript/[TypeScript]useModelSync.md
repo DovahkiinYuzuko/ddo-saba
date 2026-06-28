@@ -67,7 +67,7 @@ graph TD
 ## 主要な処理
 1. **Ollamaサーバーポーリング (5秒毎)**:
    - `fetchModels` と `fetchPs` を定期実行し、モデル一覧と VRAM 上のロードモデル状態を更新。
-   - VRAM からモデルが消えた際、一定の猶予時間（15秒）経過後にローカルの `activeModel` を自動でアンロードクリアする。
+   - VRAM からモデルが消えた際、最後にアクティブモデルを設定したユーザー（`lastModelSender`）が自クライアント自身（`settings.username`）である場合（大文字小文字・空白をトリムして正規化比較）に限り、一定の猶予時間（15秒）経過後にローカルの `activeModel` を自動でアンロードクリア（および共有モード時はクリアをブロードキャスト）する。自分以外のユーザーが設定したモデルは、自端末のVRAMに存在しなくてもクリアを要求しない。
 2. **共有モード時の他端末モデル・生成同期ポーリング (1.5秒毎)**:
    - `pollModel` を用いて他端末のモデル選択状態や、リモート生成状態（`isGenerating`, `generatingText`）を受信・同期。
    - 他人が推論中である場合は、`setIsRemoteGenerating(true)` や `setRemoteGeneratingText` を更新。

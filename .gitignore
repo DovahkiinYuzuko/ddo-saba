@@ -8,10 +8,8 @@
 !docs/variables'n'functions/**
 
 # Start scripts
-!start_server.bat
-!start_server.sh
-!stop_server.bat
-!stop_server.sh
+!init_server.bat
+!init_server.sh
 !bin/
 !bin/**
 bin/*.pid

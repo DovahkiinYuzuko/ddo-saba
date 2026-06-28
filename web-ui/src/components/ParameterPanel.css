@@ -277,6 +277,7 @@ input[type="range"][disabled]::-webkit-slider-thumb {
 
 .param-number-input {
   -moz-appearance: textfield;
+  appearance: textfield;
 }
 
 .unlimited-label {

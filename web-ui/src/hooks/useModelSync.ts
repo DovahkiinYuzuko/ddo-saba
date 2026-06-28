@@ -104,7 +104,12 @@ export function useModelSync({
       // Only clear activeModel if psInfo has been null for 2+ consecutive polls (approx 10+ seconds)
       // This prevents a transient Ollama hiccup from wiping the displayed model name
       const isPersistentlyNull = consecutiveNullPsRef.current >= 2;
-      if (!fetchedPs && isPersistentlyNull && activeModelRef.current && !isModelLoadingRef.current && isGracePeriodOver && !isGeneratingRef.current && !isRemoteGeneratingRef.current) {
+
+      const currentSender = lastModelSenderRef.current?.trim().toLowerCase();
+      const myUsername = settings.username.trim().toLowerCase();
+      const canClearModel = currentSender && currentSender === myUsername;
+
+      if (canClearModel && !fetchedPs && isPersistentlyNull && activeModelRef.current && !isModelLoadingRef.current && isGracePeriodOver && !isGeneratingRef.current && !isRemoteGeneratingRef.current) {
         consecutiveNullPsRef.current = 0;
         setActiveModel('');
         setLastModelSender(settings.username);
