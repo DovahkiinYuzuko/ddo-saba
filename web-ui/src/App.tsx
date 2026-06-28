@@ -576,11 +576,13 @@ export default function App() {
     } finally {
       setPsInfo(null);
       setActiveModel('');
-      setLastModelSender(settings.username);
+      // Use '' as lastModelSender to signal all clients (including self) to reset activeModel
+      setLastModelSender('');
       const now = Date.now();
       setLastModelChangeTime(now);
       if (settings.isSharedMode) {
-        void broadcastModel(settings.connectionUrl, settings.accessToken, settings.username, '', now);
+        // Explicitly broadcast isGenerating: false so peers can correctly update their state
+        void broadcastModel(settings.connectionUrl, settings.accessToken, settings.username, '', now, false, '');
       }
       fetchModelsAndPs();
     }

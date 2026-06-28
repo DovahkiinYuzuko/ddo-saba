@@ -105,6 +105,7 @@ function get_message(r) {
         if (foundIndex !== -1) {
             newMessages = history.slice(foundIndex + 1);
         } else {
+            // sinceId not found: return full history (same behavior as broadcast_server.ps1)
             newMessages = history;
         }
     } else {
@@ -112,7 +113,11 @@ function get_message(r) {
     }
     
     r.headersOut['Content-Type'] = 'application/json';
-    r.return(200, JSON.stringify(newMessages));
+    if (newMessages.length === 0) {
+        r.return(204);
+    } else {
+        r.return(200, JSON.stringify(newMessages));
+    }
 }
 
 function get_history(r) {
@@ -196,7 +201,12 @@ function handle_queue(r) {
     }
     
     if (r.method === 'GET') {
-        r.return(200, JSON.stringify(queue));
+        r.headersOut['Content-Type'] = 'application/json';
+        if (queue.length === 0) {
+            r.return(204);
+        } else {
+            r.return(200, JSON.stringify(queue));
+        }
     } 
     else if (r.method === 'POST') {
         try {

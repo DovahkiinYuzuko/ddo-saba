@@ -51,8 +51,14 @@ export default function ChatInputArea({
         ? (lang === 'ja' ? '他のユーザーが推論中です...' : 'Another user is thinking...')
         : t.placeholder;
 
+  // On touch devices (smartphones), Enter key always inserts a newline regardless of sendOnEnter setting,
+  // because there is no physical Shift key to distinguish Shift+Enter from Enter.
+  const isTouchDevice = typeof window !== 'undefined' && ('ontouchstart' in window);
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter') {
+      // On touch/mobile devices, never intercept Enter – let it insert a newline naturally
+      if (isTouchDevice) return;
       if (sendOnEnter && !e.shiftKey) {
         e.preventDefault();
         onSend();
