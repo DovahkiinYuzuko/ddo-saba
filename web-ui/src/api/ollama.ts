@@ -11,6 +11,22 @@ const getHeaders = (accessToken: string): HeadersInit => {
   return headers;
 };
 
+const fetchWithTimeout = async (url: string, options: RequestInit, timeoutMs: number): Promise<Response> => {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    return response;
+  } catch (error: any) {
+    if (error.name === 'AbortError') {
+      throw new Error(`Request timed out after ${timeoutMs}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(id);
+  }
+};
+
 export const loadModelOnSelection = async (
   modelName: string,
   settings: DdoSettings,
@@ -25,7 +41,8 @@ export const loadModelOnSelection = async (
     delete optionsPayload.num_predict;
   }
 
-  const res = await fetch(`${settings.connectionUrl}/api/generate`, {
+  // 60s timeout since model loading into VRAM can take time
+  const res = await fetchWithTimeout(`${settings.connectionUrl}/api/generate`, {
     method: 'POST',
     headers,
     body: JSON.stringify({
@@ -34,7 +51,7 @@ export const loadModelOnSelection = async (
       keep_alive: 300,
       stream: false
     })
-  });
+  }, 60000);
 
   if (!res.ok) {
     throw new Error(`HTTP ${res.status}: ${res.statusText}`);
@@ -48,7 +65,7 @@ export const fetchModels = async (
   accessToken: string
 ): Promise<OllamaModelInfo[]> => {
   const headers = getHeaders(accessToken);
-  const tagsRes = await fetch(`${connectionUrl}/api/tags`, { headers });
+  const tagsRes = await fetchWithTimeout(`${connectionUrl}/api/tags`, { headers }, 10000);
   if (!tagsRes.ok) {
     throw new Error(`HTTP ${tagsRes.status}`);
   }
@@ -64,7 +81,7 @@ export const fetchPs = async (
   accessToken: string
 ): Promise<PsModelInfo | null> => {
   const headers = getHeaders(accessToken);
-  const psRes = await fetch(`${connectionUrl}/api/ps`, { headers });
+  const psRes = await fetchWithTimeout(`${connectionUrl}/api/ps`, { headers }, 10000);
   if (!psRes.ok) {
     throw new Error(`HTTP ${psRes.status}`);
   }
@@ -87,7 +104,7 @@ export const keepAliveModel = async (
   accessToken: string
 ): Promise<void> => {
   const headers = getHeaders(accessToken);
-  await fetch(`${connectionUrl}/api/chat`, {
+  await fetchWithTimeout(`${connectionUrl}/api/chat`, {
     method: 'POST',
     headers,
     body: JSON.stringify({
@@ -95,7 +112,7 @@ export const keepAliveModel = async (
       messages: [],
       keep_alive: 300
     })
-  });
+  }, 10000);
 };
 
 export const unloadModel = async (
@@ -111,7 +128,7 @@ export const unloadModel = async (
 
   for (let attempt = 1; attempt <= retries + 1; attempt++) {
     try {
-      const fetchRes = await fetch(`${connectionUrl}/api/chat`, {
+      const fetchRes = await fetchWithTimeout(`${connectionUrl}/api/chat`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -120,7 +137,7 @@ export const unloadModel = async (
           keep_alive: '0s',
           stream: false
         })
-      });
+      }, 15000);
 
       res = fetchRes;
 

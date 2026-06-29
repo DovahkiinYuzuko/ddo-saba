@@ -38,9 +38,12 @@ test.describe('DDO Saba - Shared Mode Chaos E2E Test with Visual Evidence', () =
     pageAlice.on('console', msg => console.log(`[Alice Browser LOG] ${msg.type()}: ${msg.text()}`));
     await pageAlice.goto(ALICE_URL);
 
+    // Wait for any initial model loading overlay to disappear (can take ~30s)
+    console.log('Alice waiting for initial loading overlay to clear...');
+    await expect(pageAlice.locator('.modal-backdrop.loading-overlay')).toBeHidden({ timeout: 60000 });
+
     // Set Alice's username -> Alice(PC)
-    // In sharedMode with a default name, the modal auto-opens, so a backdrop might cover the button. Use force: true.
-    await pageAlice.getByRole('button', { name: /^(設定|Settings)$/i }).click({ force: true });
+    await pageAlice.getByRole('button', { name: /^(設定|Settings)$/i }).click();
     await pageAlice.getByLabel(/ユーザー名|username/i).fill('Alice(PC)');
     await pageAlice.getByRole('button', { name: /^(閉じる|Close)$/i }).click();
 
@@ -85,8 +88,9 @@ test.describe('DDO Saba - Shared Mode Chaos E2E Test with Visual Evidence', () =
       console.log(`Selected model: ${labelText}`);
       await modelSelect.selectOption({ label: labelText.trim() });
 
-      // Wait a brief moment to ensure model load state has initiated
-      await pageAlice.waitForTimeout(3000);
+      // Wait for the model loading network request to complete
+      await pageAlice.waitForResponse(res => res.url().includes('/api/generate') && res.status() === 200, { timeout: 60000 });
+      await expect(pageAlice.locator('.modal-backdrop.loading-overlay')).toBeHidden({ timeout: 60000 });
     } else {
       console.log(`Model is already auto-selected: ${selectedText}. Proceeding...`);
     }
@@ -123,7 +127,7 @@ test.describe('DDO Saba - Shared Mode Chaos E2E Test with Visual Evidence', () =
     await pageAlice.getByRole('button', { name: /Accept|承認/i }).click();
 
     // Wait to sync, and check if Alice (PC) reflects this change
-    await pageAlice.waitForTimeout(1500);
+    // toHaveValue auto-retries, so we don't need a static timeout
     const aliceTempInput = pageAlice.getByLabel(/Temperature|温度/i);
     await expect(aliceTempInput).toHaveValue('1.25');
 
@@ -141,8 +145,8 @@ test.describe('DDO Saba - Shared Mode Chaos E2E Test with Visual Evidence', () =
     // The "New Chat" button is usually in the sidebar or header.
     await pageAlice.getByRole('button', { name: /New Chat|新規チャット/i }).first().click({ force: true });
 
-    // Wait a brief moment for the chat to be active
-    await pageAlice.waitForTimeout(1000);
+    // Wait for the prompt input to be enabled, meaning the new chat is ready
+    await expect(pageAlice.getByPlaceholder(/message|メッセージ/i)).toBeEnabled();
 
     // 6. Alice sends a query to trigger inference
     console.log('Alice sends query to start inference...');
@@ -150,8 +154,8 @@ test.describe('DDO Saba - Shared Mode Chaos E2E Test with Visual Evidence', () =
     await pageAlice.getByPlaceholder(/message|メッセージ/i).fill(alicePrompt);
     await pageAlice.getByRole('button', { name: /^(Send|送信)$/i }).click();
 
-    // Wait 1.5 seconds to ensure inference has started and loader is visible
-    await pageAlice.waitForTimeout(1500);
+    // Wait for inference to start (typing indicator or stop button appears)
+    await expect(pageAlice.locator('.typing-indicator, .icon-btn-accent[title="Stop Generation"]')).toBeVisible({ timeout: 10000 });
     
     // Take screenshot: Alice is generating (or model loading)
     console.log('Saving screenshot: step3_alice_generating.png...');
@@ -165,8 +169,8 @@ test.describe('DDO Saba - Shared Mode Chaos E2E Test with Visual Evidence', () =
     await pageBob.getByPlaceholder(/message|メッセージ/i).fill(bobPrompt);
     await pageBob.getByRole('button', { name: /^(Send|送信)$/i }).click();
 
-    // Wait 1.5 seconds for Bob to join the queue and get blocked/waiting status
-    await pageBob.waitForTimeout(1500);
+    // Wait for Bob's queued message to appear in the UI
+    await expect(pageBob.locator('.message.user').last()).toBeVisible({ timeout: 10000 });
 
     // Take screenshot: Bob is waiting in queue
     console.log('Saving screenshot: step4_bob_waiting_queue.png...');
@@ -190,8 +194,8 @@ test.describe('DDO Saba - Shared Mode Chaos E2E Test with Visual Evidence', () =
     const newTabButton = pageAlice.getByRole('button', { name: /New Chat|新規チャット/i }).first();
     await newTabButton.click();
 
-    // Wait for tab sync to propagate
-    await pageAlice.waitForTimeout(2000);
+    // Wait for tab sync to propagate by checking Bob's UI for a new tab (or just wait for Alice's chat to be created)
+    await expect(pageAlice.getByPlaceholder(/message|メッセージ/i)).toBeEnabled();
 
     // Take screenshot: Tab list sync
     console.log('Saving screenshot: step6_tab_sync.png...');
