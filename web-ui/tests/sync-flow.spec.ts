@@ -5,7 +5,6 @@ import fs from 'fs';
 
 declare const process: any;
 
-const MODEL_NAME = process.env.TEST_MODEL || 'Gemma4-E4B-QAT-abliterated-Q4_K:latest';
 const SCREENSHOTS_DIR = path.resolve(process.cwd(), '../screenshots');
 
 test.describe('DDO Saba - Shared Mode Chaos E2E Test with Visual Evidence', () => {
@@ -31,7 +30,6 @@ test.describe('DDO Saba - Shared Mode Chaos E2E Test with Visual Evidence', () =
 
     console.log('Resolved Alice URL:', ALICE_URL);
     console.log('Resolved Bob Tunnel URL:', BOB_URL);
-    console.log('Using model name:', MODEL_NAME);
 
     // 2. Setup Alice (PC Context)
     console.log('Setting up Alice (PC)...');
@@ -41,9 +39,10 @@ test.describe('DDO Saba - Shared Mode Chaos E2E Test with Visual Evidence', () =
     await pageAlice.goto(ALICE_URL);
 
     // Set Alice's username -> Alice(PC)
-    await pageAlice.locator('button.icon-btn').last().click();
-    await pageAlice.locator('.form-group').filter({ hasText: /ユーザー名|username/i }).locator('input[type="text"]').fill('Alice(PC)');
-    await pageAlice.locator('.settings-modal button.btn-accent, .settings-modal button.close-btn').first().click();
+    // In sharedMode with a default name, the modal auto-opens, so a backdrop might cover the button. Use force: true.
+    await pageAlice.getByRole('button', { name: /^(設定|Settings)$/i }).click({ force: true });
+    await pageAlice.getByLabel(/ユーザー名|username/i).fill('Alice(PC)');
+    await pageAlice.getByRole('button', { name: /^(閉じる|Close)$/i }).click();
 
     // Take screenshot: Initial connection
     console.log('Saving screenshot: step1_initial_state.png...');
@@ -51,23 +50,46 @@ test.describe('DDO Saba - Shared Mode Chaos E2E Test with Visual Evidence', () =
     await pageAlice.screenshot({ path: path1 });
     console.log('step1 exists:', fs.existsSync(path1));
 
-    // 3. Alice selects model and starts loading (imitating PC starting model load first)
-    console.log(`Alice selects model: ${MODEL_NAME}...`);
-    const modelSelect = pageAlice.locator('.chat-header select.model-select');
-    // Create case-insensitive regex to handle Ollama's lowercase model naming convention
-    const modelRegex = new RegExp(MODEL_NAME, 'i');
-    // Wait for the option to be populated in the dropdown (Ollama list loading)
-    const matchingOption = modelSelect.locator('option', { hasText: modelRegex });
-    await expect(matchingOption).toBeAttached({ timeout: 15000 });
-    // Extract the text content to bypass Playwright's string validation on label selection
-    const labelText = await matchingOption.textContent();
-    if (!labelText) {
-      throw new Error(`Model option matching "${MODEL_NAME}" not found in dropdown`);
-    }
-    await modelSelect.selectOption({ label: labelText.trim() });
+    // 3. Alice waits for model loading and selects model if necessary
+    console.log(`Alice waiting for model loading to complete (can take ~30s if model is being pre-loaded)...`);
+    const modelSelect = pageAlice.getByRole('combobox');
+    
+    // Wait for the combobox to be enabled (meaning isEffectivelyLoading is false)
+    // Note: We use 60000ms because Ollama's empty generate call for keep_alive can take ~28s.
+    await expect(modelSelect).toBeEnabled({ timeout: 60000 });
 
-    // Wait a brief moment to ensure model load state has initiated
-    await pageAlice.waitForTimeout(3000);
+    // Check currently selected option
+    // We need to evaluate the selected text label to determine if it's already a valid model
+    const selectedText = await modelSelect.evaluate((sel: HTMLSelectElement) => sel.options[sel.selectedIndex]?.text || '');
+    
+    const isPlaceholder = selectedText.trim() === '' || 
+        selectedText.includes('モデルを選択') || 
+        selectedText.includes('Select a model') ||
+        selectedText.includes('Loading Model...') ||
+        selectedText.includes('No models detected');
+
+    if (isPlaceholder) {
+      console.log(`No model auto-selected. Dynamically picking the first available one...`);
+      const options = await modelSelect.locator('option').allTextContents();
+      const validOptions = options.filter(opt => 
+          opt.trim() !== '' && 
+          !opt.includes('モデルを選択') && 
+          !opt.includes('Select a model') &&
+          !opt.includes('Loading Model...') &&
+          !opt.includes('No models detected')
+      );
+      if (validOptions.length === 0) {
+        throw new Error(`No models found in dropdown`);
+      }
+      const labelText = validOptions[0];
+      console.log(`Selected model: ${labelText}`);
+      await modelSelect.selectOption({ label: labelText.trim() });
+
+      // Wait a brief moment to ensure model load state has initiated
+      await pageAlice.waitForTimeout(3000);
+    } else {
+      console.log(`Model is already auto-selected: ${selectedText}. Proceeding...`);
+    }
 
     // 4. Setup Bob (Mobile Context with iPhone 12 Emulation)
     console.log('Setting up Bob (Mobile: iPhone 12 Emulated)...');
@@ -81,22 +103,28 @@ test.describe('DDO Saba - Shared Mode Chaos E2E Test with Visual Evidence', () =
     await pageBob.goto(BOB_URL);
 
     // Set Bob's username -> Bob(スマホ版)
-    await pageBob.locator('button.icon-btn').last().click();
-    await pageBob.locator('.form-group').filter({ hasText: /ユーザー名|username/i }).locator('input[type="text"]').fill('Bob(スマホ版)');
-    await pageBob.locator('.settings-modal button.btn-accent, .settings-modal button.close-btn').first().click();
+    await pageBob.getByRole('button', { name: /^(設定|Settings)$/i }).click();
+    await pageBob.getByLabel(/ユーザー名|username/i).fill('Bob(スマホ版)');
+    await pageBob.getByRole('button', { name: /^(閉じる|Close)$/i }).click();
 
     // 5. Bob changes parameters (requires opening parameters drawer on mobile layout)
     console.log('Bob changes parameters on the mobile interface...');
-    await pageBob.locator('button[title*="Parameter"], button[title*="パラメータ"]').click();
+    await pageBob.getByRole('button', { name: /Parameter|パラメータ/i }).click();
     
     // Change temperature slider (or input field)
-    const tempInput = pageBob.locator('.parameter-row').filter({ hasText: /temperature/i }).locator('input[type="number"]');
+    const tempInput = pageBob.getByLabel(/Temperature|温度/i);
     await tempInput.fill('1.25');
     await tempInput.press('Enter');
 
+    // Bob explicitly clicks "Sync Settings to Room"
+    await pageBob.getByRole('button', { name: /Sync Settings to Room|現在の設定を全員に同期/i }).click();
+
+    // Alice receives the sync request and accepts it
+    await pageAlice.getByRole('button', { name: /Accept|承認/i }).click();
+
     // Wait to sync, and check if Alice (PC) reflects this change
     await pageAlice.waitForTimeout(1500);
-    const aliceTempInput = pageAlice.locator('.parameter-row').filter({ hasText: /temperature/i }).locator('input[type="number"]');
+    const aliceTempInput = pageAlice.getByLabel(/Temperature|温度/i);
     await expect(aliceTempInput).toHaveValue('1.25');
 
     // Take screenshot: Parameter sync successful
@@ -105,14 +133,22 @@ test.describe('DDO Saba - Shared Mode Chaos E2E Test with Visual Evidence', () =
     await pageAlice.screenshot({ path: path2 });
     console.log('step2 exists:', fs.existsSync(path2));
 
-    // Close Bob's parameters panel
-    await pageBob.locator('button[title*="Parameter"], button[title*="パラメータ"]').click();
+    // Close Bob's parameters panel by clicking the mobile overlay
+    await pageBob.locator('.mobile-overlay').click({ position: { x: 10, y: 10 } });
+
+    // 5.5 Alice must create a New Chat to type a message (if none exists)
+    console.log('Alice creates a New Chat...');
+    // The "New Chat" button is usually in the sidebar or header.
+    await pageAlice.getByRole('button', { name: /New Chat|新規チャット/i }).first().click({ force: true });
+
+    // Wait a brief moment for the chat to be active
+    await pageAlice.waitForTimeout(1000);
 
     // 6. Alice sends a query to trigger inference
     console.log('Alice sends query to start inference...');
     const alicePrompt = 'Hi, please say hello in a single sentence.';
-    await pageAlice.locator('textarea[placeholder*="message"], textarea[placeholder*="メッセージ"]').fill(alicePrompt);
-    await pageAlice.locator('button[title*="Send"], button[title*="送信"]').click();
+    await pageAlice.getByPlaceholder(/message|メッセージ/i).fill(alicePrompt);
+    await pageAlice.getByRole('button', { name: /^(Send|送信)$/i }).click();
 
     // Wait 1.5 seconds to ensure inference has started and loader is visible
     await pageAlice.waitForTimeout(1500);
@@ -126,8 +162,8 @@ test.describe('DDO Saba - Shared Mode Chaos E2E Test with Visual Evidence', () =
     // 7. Bob interrupts by sending a message while Alice is busy
     console.log('Bob interrupts by sending another message...');
     const bobPrompt = 'Hello Alice, this is an interrupted message from Bob.';
-    await pageBob.locator('textarea[placeholder*="message"], textarea[placeholder*="メッセージ"]').fill(bobPrompt);
-    await pageBob.locator('button[title*="Send"], button[title*="送信"]').click();
+    await pageBob.getByPlaceholder(/message|メッセージ/i).fill(bobPrompt);
+    await pageBob.getByRole('button', { name: /^(Send|送信)$/i }).click();
 
     // Wait 1.5 seconds for Bob to join the queue and get blocked/waiting status
     await pageBob.waitForTimeout(1500);
@@ -140,7 +176,7 @@ test.describe('DDO Saba - Shared Mode Chaos E2E Test with Visual Evidence', () =
 
     // 8. Wait for Alice to finish generation so Bob gets auto-promoted and starts generation
     console.log('Waiting for Alice to finish and Bob to get promoted...');
-    const bobSendButton = pageBob.locator('button[title*="Send"], button[title*="送信"]');
+    const bobSendButton = pageBob.getByRole('button', { name: /^(Send|送信)$/i });
     await expect(bobSendButton).toBeEnabled({ timeout: 120000 });
 
     // Take screenshot: Bob has completed his promoted generation
@@ -151,7 +187,7 @@ test.describe('DDO Saba - Shared Mode Chaos E2E Test with Visual Evidence', () =
 
     // 9. Alice creates a new chat tab to verify tab sync
     console.log('Alice creates a new chat tab...');
-    const newTabButton = pageAlice.locator('button[title*="New Chat"], button[title*="新規チャット"], .new-chat-btn').first();
+    const newTabButton = pageAlice.getByRole('button', { name: /New Chat|新規チャット/i }).first();
     await newTabButton.click();
 
     // Wait for tab sync to propagate

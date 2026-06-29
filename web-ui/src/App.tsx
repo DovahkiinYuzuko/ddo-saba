@@ -376,18 +376,16 @@ export default function App() {
   const { addNewTab, deleteTab } = useTabManagement({
     chats,
     activeChatId,
-    settings,
     t,
     setChats,
-    setActiveChatId,
-    updateLastPolledMsgId: (id) => send({ type: 'UPDATE_CONTEXT', payload: { lastPolledMsgId: id } })
+    setActiveChatId
   });
 
   // Create default tab if none exists (Private Mode only)
   useEffect(() => {
     if (isInitialized && !settings.isSharedMode && chats.length === 0) {
       const timer = setTimeout(() => {
-        addNewTab(false);
+        addNewTab();
       }, 0);
       return () => clearTimeout(timer);
     }

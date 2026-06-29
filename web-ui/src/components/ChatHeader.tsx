@@ -76,7 +76,7 @@ export default function ChatHeader({
         >
           <SlidersHorizontal size={20} />
         </button>
-        <button className="icon-btn" onClick={onOpenSettings}>
+        <button className="icon-btn" onClick={onOpenSettings} title={t.settings}>
           <Settings size={20} />
         </button>
       </div>

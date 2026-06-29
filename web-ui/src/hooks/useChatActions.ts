@@ -454,12 +454,7 @@ export function useChatActions({
         void broadcastModel(settings.connectionUrl, settings.accessToken, settings.username, activeModel, Date.now(), false, '');
       }
 
-      // Clear the local job ID immediately to prevent re-triggering inference
       const jobId = jobIdToComplete;
-      if (settings.isSharedMode && jobId) {
-        setMyJobId(null);
-        setPendingMessage('');
-      }
 
       completeGenerate();
       isGeneratingRef.current = false;
@@ -495,6 +490,10 @@ export function useChatActions({
         } catch (err) {
           console.error("Failed to fetch updated queue after job completion", err);
         }
+
+        // Finally clear the local job ID
+        setMyJobId(null);
+        setPendingMessage('');
       }
     }
   };
@@ -547,26 +546,28 @@ export function useChatActions({
   const handleCancelQueue = async () => {
     if (!myJobId || !settings.isSharedMode) return;
     const targetJobId = myJobId;
-    const restoredText = pendingMessage; // キャンセル前にプロンプトを保存
-    setMyJobId(null);
-    setInputText(restoredText);          // テキストエリアにプロンプトを返却
-    setPendingMessage('');
-    
-    setChats(prev => prev.map(c => {
-      if (c.id === activeChatId) {
-        const lastMsg = c.messages[c.messages.length - 1];
-        if (lastMsg && lastMsg.role === 'user' && lastMsg.sender === settings.username) {
-          return {
-            ...c,
-            messages: c.messages.slice(0, -1)
-          };
-        }
-      }
-      return c;
-    }));
+    const restoredText = pendingMessage;
 
     try {
       await cancelQueue(settings.connectionUrl, settings.accessToken, targetJobId);
+      
+      setMyJobId(null);
+      setInputText(restoredText);
+      setPendingMessage('');
+      
+      setChats(prev => prev.map(c => {
+        if (c.id === activeChatId) {
+          const lastMsg = c.messages[c.messages.length - 1];
+          if (lastMsg && lastMsg.role === 'user' && lastMsg.sender === settings.username) {
+            return {
+              ...c,
+              messages: c.messages.slice(0, -1)
+            };
+          }
+        }
+        return c;
+      }));
+
       const q = await fetchQueue(settings.connectionUrl, settings.accessToken);
       setJobQueue(q);
     } catch (err) {

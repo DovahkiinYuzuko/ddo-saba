@@ -1,30 +1,25 @@
 import { useCallback } from 'react';
-import type { ChatSession, DdoSettings, LocaleStrings } from '../types';
-import { broadcastMessage } from '../api/broadcast';
+import type { ChatSession, LocaleStrings } from '../types';
 
 interface UseTabManagementProps {
   chats: ChatSession[];
   activeChatId: string | null;
-  settings: DdoSettings;
   t: LocaleStrings;
   setChats: React.Dispatch<React.SetStateAction<ChatSession[]>>;
   setActiveChatId: (id: string | null) => void;
-  updateLastPolledMsgId: (id: string) => void;
 }
 
 export function useTabManagement({
   chats,
   activeChatId,
-  settings,
   t,
   setChats,
-  setActiveChatId,
-  updateLastPolledMsgId
+  setActiveChatId
 }: UseTabManagementProps) {
   
-  const addNewTab = useCallback((isRemote = false, remoteId?: string, remoteTitle?: string) => {
-    const newId = remoteId || Date.now().toString();
-    const title = remoteTitle || `${t.newChat} ${chats.length + 1}`;
+  const addNewTab = useCallback(() => {
+    const newId = Date.now().toString();
+    const title = `${t.newChat} ${chats.length + 1}`;
     const newChat: ChatSession = {
       id: newId,
       title: title,
@@ -37,24 +32,9 @@ export function useTabManagement({
     });
     setActiveChatId(newId);
 
-    if (settings.isSharedMode && !isRemote) {
-      void broadcastMessage(
-        settings.connectionUrl,
-        settings.accessToken,
-        settings.username,
-        settings.username,
-        'system',
-        `tab_create:${newId}:${title}`
-      ).then(result => {
-        if (result && result.id) {
-          updateLastPolledMsgId(result.id);
-        }
-      }).catch(e => console.error("Failed to broadcast tab_create", e));
-    }
-  }, [t.newChat, chats.length, settings.isSharedMode, settings.connectionUrl, settings.accessToken, settings.username, setChats, setActiveChatId, updateLastPolledMsgId]);
+  }, [t.newChat, chats.length, setChats, setActiveChatId]);
 
-  const deleteTab = useCallback((id: string, e?: React.MouseEvent, isRemote = false) => {
-    if (e) e.stopPropagation();
+  const deleteTab = useCallback((id: string) => {
     
     let nextActiveId: string | null = activeChatId;
     if (activeChatId === id) {
@@ -62,39 +42,11 @@ export function useTabManagement({
       nextActiveId = remaining.length > 0 ? remaining[remaining.length - 1].id : null;
       setActiveChatId(nextActiveId);
 
-      if (settings.isSharedMode && !isRemote && nextActiveId) {
-        void broadcastMessage(
-          settings.connectionUrl,
-          settings.accessToken,
-          settings.username,
-          settings.username,
-          'system',
-          `tab_switch:${nextActiveId}`
-        ).then(result => {
-          if (result && result.id) {
-            updateLastPolledMsgId(result.id);
-          }
-        }).catch(e => console.error("Failed to broadcast tab_switch", e));
-      }
     }
 
     setChats(prev => prev.filter(c => c.id !== id));
 
-    if (settings.isSharedMode && !isRemote) {
-      void broadcastMessage(
-        settings.connectionUrl,
-        settings.accessToken,
-        settings.username,
-        settings.username,
-        'system',
-        `tab_delete:${id}`
-      ).then(result => {
-        if (result && result.id) {
-          updateLastPolledMsgId(result.id);
-        }
-      }).catch(e => console.error("Failed to broadcast tab_delete", e));
-    }
-  }, [chats, activeChatId, settings.isSharedMode, settings.connectionUrl, settings.accessToken, settings.username, setChats, setActiveChatId, updateLastPolledMsgId]);
+  }, [chats, activeChatId, setChats, setActiveChatId]);
 
   return {
     addNewTab,

@@ -20,6 +20,7 @@ export default defineConfig({
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
     headless: false, // 画面を表示して目視確認できるようにする
+    actionTimeout: 15000, // Find exact line where it hangs
     launchOptions: {
       slowMo: 1000, // 操作を目視しやすくするためスローモーションを設定
     },
@@ -32,14 +33,14 @@ export default defineConfig({
     },
   ],
 
-  // Playwright automatically spins up the Vite dev server and backend servers
-  webServer: {
-    command: `cmd /c "..\\init_server.bat stop && init_server.bat start && cd web-ui && npm run dev"`,
-    url: 'http://localhost:3000',
-    env: {
-      DDO_SABA_TOKEN: token,
-    },
-    reuseExistingServer: false,
-    timeout: 120000,
-  },
+  // webServer is commented out to test the real, already-running environment.
+  // webServer: {
+  //   command: `cmd /c "..\\init_server.bat stop && init_server.bat start && cd web-ui && npm run dev"`,
+  //   url: 'http://localhost:3000',
+  //   env: {
+  //     DDO_SABA_TOKEN: token,
+  //   },
+  //   reuseExistingServer: false,
+  //   timeout: 120000,
+  // },
 });

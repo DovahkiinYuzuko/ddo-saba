@@ -182,7 +182,7 @@ export default function ParameterPanel({
         {/* Temperature Slider */}
         <div className="slider-group">
           <div className="slider-header">
-            <label>{t.temperature}</label>
+            <label htmlFor="param-input-temperature">{t.temperature}</label>
             <input
               type="number"
               id="param-input-temperature"

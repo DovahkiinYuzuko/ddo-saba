@@ -135,9 +135,21 @@ while ($listener.IsListening) {
                         $data = $data | Add-Member -NotePropertyName "timestamp" -NotePropertyValue $autoTime -Force -PassThru
                     }
                     
-                    $messageHistory += $data
-                    if ($messageHistory.Count -gt 100) {
-                        $messageHistory = @($messageHistory | Select-Object -Last 100)
+                    $foundIndex = -1
+                    for ($i = 0; $i -lt $messageHistory.Count; $i++) {
+                        if ($messageHistory[$i].id -eq $data.id) {
+                            $foundIndex = $i
+                            break
+                        }
+                    }
+
+                    if ($foundIndex -ne -1) {
+                        $messageHistory[$foundIndex] = $data
+                    } else {
+                        $messageHistory += $data
+                        if ($messageHistory.Count -gt 100) {
+                            $messageHistory = @($messageHistory | Select-Object -Last 100)
+                        }
                     }
                     
                     Write-Host "[BROADCAST] Received msg from '$($data.sender)' (broadcaster: '$($data.broadcaster)', role: '$($data.role)', id: '$($data.id)')" -ForegroundColor Yellow

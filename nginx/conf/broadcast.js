@@ -66,10 +66,23 @@ function post_message(r) {
                 history = [];
             }
         }
-        history.push(msgData);
-        if (history.length > 100) {
-            history = history.slice(history.length - 100);
+        var foundIndex = -1;
+        for (var i = 0; i < history.length; i++) {
+            if (history[i].id === msgData.id) {
+                foundIndex = i;
+                break;
+            }
         }
+
+        if (foundIndex !== -1) {
+            history[foundIndex] = msgData;
+        } else {
+            history.push(msgData);
+            if (history.length > 100) {
+                history = history.slice(history.length - 100);
+            }
+        }
+        
         dict.set("history", JSON.stringify(history));
 
         r.return(200, JSON.stringify({ status: "success", id: msgId }));
@@ -296,6 +309,13 @@ function auth_check(r) {
     }
     
     var clientToken = r.headersIn['X-DDO-Token'];
+    if (!clientToken) {
+        var authHeader = r.headersIn['Authorization'];
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+            clientToken = authHeader.substring(7);
+        }
+    }
+
     if (clientToken === expectedToken) {
         r.return(200);
     } else {

@@ -69,8 +69,9 @@ export default function SettingsModal({
           </div>
 
           <div className="form-group">
-            <label>{t.username}</label>
+            <label htmlFor="settings-username">{t.username}</label>
             <input 
+              id="settings-username"
               type="text" 
               value={settings.username} 
               onChange={(e) => handleFieldChange('username', e.target.value)}

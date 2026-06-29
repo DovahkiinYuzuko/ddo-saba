@@ -27,7 +27,7 @@ if (Test-Path $logFile) {
 }
 
 # Start cloudflared
-$process = Start-Process -FilePath $cloudflaredPath -ArgumentList "tunnel", "--url", "http://localhost:$localPort" -NoNewWindow -RedirectStandardError $logFile -PassThru
+$process = Start-Process -FilePath $cloudflaredPath -ArgumentList "tunnel", "--url", "http://127.0.0.1:$localPort" -NoNewWindow -RedirectStandardError $logFile -PassThru
 
 # Save PID for targeted shutdown
 $pidFile = Join-Path $binDir "cloudflared.pid"

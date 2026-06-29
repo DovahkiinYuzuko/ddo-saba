@@ -92,29 +92,8 @@ export function useBroadcastSync({
                   }
                 }
                 continue;
-              } else if (data.content.startsWith('tab_create:')) {
-                const parts = data.content.split(':');
-                const tabId = parts[1];
-                const tabTitle = parts.slice(2).join(':');
-                if (tabId) {
-                  addNewTab(true, tabId, tabTitle);
-                }
-                continue;
-              } else if (data.content.startsWith('tab_delete:')) {
-                const tabId = data.content.substring('tab_delete:'.length);
-                if (tabId) {
-                  deleteTab(tabId, undefined, true);
-                }
-                continue;
-              } else if (data.content.startsWith('tab_switch:')) {
-                const tabId = data.content.substring('tab_switch:'.length);
-                if (tabId) {
-                  setActiveChatId(tabId);
-                }
-                continue;
               }
             }
-
             // Append shared message to currently active chat session
             // Fallback: if activeChatId is null (race with syncHistory), append to last available tab
             const targetChatId = activeChatIdRef.current;

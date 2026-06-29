@@ -37,7 +37,7 @@ http {
             try_files $uri $uri/ /index.html;
 
             # Strict CSP for static assets (API endpoints use wildcard CORS instead)
-            add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' http: https: ws: wss:;" always;
+            add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net data:; img-src 'self' data: blob: https://api.qrserver.com; connect-src 'self' http://127.0.0.1:* ws://127.0.0.1:* wss://127.0.0.1:* http://localhost:* ws://localhost:* wss://localhost:* https://*.trycloudflare.com wss://*.trycloudflare.com; frame-src 'none'; object-src 'none';" always;
         }
 
         # Nginx JS (njs) Poll endpoint
@@ -156,6 +156,34 @@ http {
         location = /auth_check {
             internal;
             js_content broadcast.auth_check;
+        }
+
+        # OpenAI Compatible API (Continue etc.)
+        location /v1/ {
+            add_header Access-Control-Allow-Origin * always;
+            add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
+            add_header Access-Control-Allow-Headers "Content-Type, Authorization, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
+
+            if ($request_method = OPTIONS) {
+                add_header Access-Control-Allow-Origin * always;
+                add_header Access-Control-Allow-Methods "POST, GET, OPTIONS" always;
+                add_header Access-Control-Allow-Headers "Content-Type, Authorization, X-DDO-Token, X-DDO-Username, X-DDO-Client-Id, X-DDO-Since-Id, x-ddo-client-id, x-ddo-since-id" always;
+                return 204;
+            }
+
+            auth_request /auth_check;
+            limit_conn ollama_limit 3;
+            proxy_pass http://127.0.0.1:11434/v1/;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+
+            proxy_buffering off;
+            proxy_http_version 1.1;
+            proxy_set_header Connection "";
+
+            proxy_read_timeout 86400s;
+            proxy_connect_timeout 86400s;
+            proxy_send_timeout 86400s;
         }
 
         # Ollama API Proxy (inference: chat)
