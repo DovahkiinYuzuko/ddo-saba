@@ -469,7 +469,8 @@ export default function App() {
     isInitialized,
     settings,
     setJobQueue,
-    handleActiveCount
+    handleActiveCount,
+    send
   });
 
   useBroadcastSync({

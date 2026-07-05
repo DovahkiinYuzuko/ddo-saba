@@ -19,6 +19,8 @@ graph TD
   取得したキューリストを状態反映するための更新関数。
 - `handleActiveCount`: `(count: number) => void`
   現在のアクティブユーザー数を同期するための関数。
+- `send`: `(event: ChatMachineEvent) => void`
+  状態マシンにイベントを送信するための関数。
 
 ## 戻り値 (Returns)
 - なし。
@@ -27,5 +29,6 @@ graph TD
 1. **キューポーリング (1.5秒毎)**:
    - 共有モード時かつ初期化完了時に、中継サーバーから `fetchQueue` を用いて現在のキューに並んでいるジョブリスト（`QueueJob`）を取得。
    - 取得結果を `setJobQueue` を介してローカル状態に適用。
+   - もし `fetchQueue` が連続して3回失敗した場合、中継サーバーとの切断と判断し、`send` を介して `CANCEL_QUEUE` イベントを送信。待機状態（`waiting`）から `idle` へ自動的にロールバックさせます。
 2. **クリーンアップ**:
    - アンマウント時にポーリングタイマーを `clearTimeout` で確実にクリーンアップする。

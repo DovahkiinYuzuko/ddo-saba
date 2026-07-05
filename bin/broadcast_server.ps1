@@ -194,6 +194,18 @@ while ($listener.IsListening) {
                     }
                     $cachedModelData = $data
                     Write-Host "[MODEL] Sync selected model: '$($data.model)' (sender: '$($data.sender)', isGenerating: $($data.isGenerating))" -ForegroundColor Green
+                    
+                    # Refresh job timestamp if this sender is actively generating
+                    if ($data.isGenerating -eq $true) {
+                        $nowEpoch = [double]([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()) / 1000.0
+                        foreach ($job in $jobQueue) {
+                            if ($job.status -eq "running" -and $job.username -eq $data.sender) {
+                                $job.timestamp = $nowEpoch
+                                Write-Host "[QUEUE] Extended running job timestamp for user '$($data.sender)' due to active generation." -ForegroundColor Magenta
+                            }
+                        }
+                    }
+
                     $response.StatusCode = 200
                 } catch {
                     $response.StatusCode = 400

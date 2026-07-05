@@ -144,11 +144,21 @@ export function useChatActions({
       const delay = 1000;
 
       for (let attempt = 1; attempt <= retries + 1; attempt++) {
+        let timeoutId: ReturnType<typeof setTimeout> | null = null;
         try {
+          if (abortControllerRef.current) {
+            timeoutId = setTimeout(() => {
+              if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+                console.warn("Connection timeout during inference request.");
+              }
+            }, 30000); // 30 seconds connection timeout
+          }
+
           const fetchRes = await fetch(`${settings.connectionUrl}/api/chat`, {
             method: 'POST',
             headers,
-            signal: abortControllerRef.current.signal,
+            signal: abortControllerRef.current?.signal,
             body: JSON.stringify({
               model: activeModel,
               messages: requestMessages,
@@ -158,6 +168,7 @@ export function useChatActions({
             })
           });
 
+          if (timeoutId) clearTimeout(timeoutId);
           res = fetchRes;
 
           if (fetchRes.status === 503 && attempt <= retries) {
@@ -167,7 +178,9 @@ export function useChatActions({
           }
           break;
         } catch (err) {
-          if (attempt <= retries) {
+          if (timeoutId) clearTimeout(timeoutId);
+          const isAbort = (err as Error).name === 'AbortError';
+          if (!isAbort && attempt <= retries) {
             console.log(`Fetch failed, retrying in ${delay}ms... (Attempt ${attempt}/${retries})`, err);
             await new Promise(resolve => setTimeout(resolve, delay));
             continue;
@@ -508,6 +521,7 @@ export function useChatActions({
         setJobQueue(q);
       } catch (err) {
         console.error("Failed to join queue", err);
+        send({ type: 'CANCEL_QUEUE' });
       }
     } else {
       const nowStr = formatTimestamp(new Date());
