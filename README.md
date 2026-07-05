@@ -33,6 +33,9 @@ DDO Sabaは、ローカル環境で動作するOllamaの推論サーバーを、
   - **タブ同期**: 共有されている部屋の中で、新しく作成されたタブ、削除されたタブ、および現在選択されているアクティブタブの情報をリアルタイムに同期します。
 - **詳細な推論ログ収集**:
   - 推論の完了時に、使用されたモデル名、プロンプトトークン数、出力トークン数、総推論時間、モデルロード時間、評価時間などをCSV形式（`data/token_usage.csv`）でローカルに自動記録します。
+  > [!NOTE]
+  > 推論使用ログはローカルの `data/token_usage.csv` に自動生成され保存されます。この `data` フォルダはログデータ保護のため、デフォルトで `.gitignore` の追跡対象外（無視リスト）に設定されています。
+
 - **エラーハンドリング**:
   - 認証エラー（403 Forbidden）発生時でも、クライアント側でCORSエラーによるハングアップが発生しないよう、Nginxレベルで確実にCORSヘッダーを保証する設計となっています。
 - **リッチなWebUI**:
@@ -136,6 +139,9 @@ DDO Saba is a Web client UI and reverse proxy system designed to securely publis
   - **Tab Sync**: Synchronizes newly created tabs, deleted tabs, and the currently active tab selection in real-time across the shared room.
 - **Detailed Inference Usage Logging**:
   - Automatically records the utilized model name, prompt tokens, completion tokens, total duration, model load duration, and evaluation duration in a CSV format (`data/token_usage.csv`) upon inference completion.
+  > [!NOTE]
+  > Inference usage logs are automatically generated and saved in the local `data/token_usage.csv` file. The `data` folder is excluded from Git tracking (ignored by default) to protect potentially sensitive usage logs.
+
 - **Error Handling**:
   - Designed to guarantee CORS headers at the Nginx level even on authentication errors (403 Forbidden), preventing client-side application hangs due to CORS issues.
 - **Rich Web UI**:

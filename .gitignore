@@ -43,3 +43,11 @@ web-ui/src/assets
 # GitHub Actions AutoPackage
 !.github/
 !.github/**
+
+# Web UI config files
+!web-ui/tsconfig.json
+!web-ui/tsconfig.app.json
+!web-ui/tsconfig.node.json
+!web-ui/vite.config.ts
+!web-ui/eslint.config.js
+
