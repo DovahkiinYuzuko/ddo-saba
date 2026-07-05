@@ -344,10 +344,9 @@ while ($listener.IsListening) {
                 $body = $reader.ReadToEnd()
                 try {
                     $data = ConvertFrom-Json $body
-                    $csvPath = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "../data/token_usage.csv"
-                    $csvDir = Split-Path $csvPath
-                    if (-not (Test-Path $csvDir)) {
-                        $null = New-Item -ItemType Directory -Path $csvDir -Force
+                    $baseDir = Join-Path (Split-Path -Parent $MyInvocation.MyCommand.Path) "../data"
+                    if (-not (Test-Path $baseDir)) {
+                        $null = New-Item -ItemType Directory -Path $baseDir -Force
                     }
 
                     $timestamp = [DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
@@ -371,12 +370,41 @@ while ($listener.IsListening) {
                     $escapedStatus = $status -replace '"', '""'
 
                     $line = """$timestamp"",""$escapedToken"",""$escapedUsername"",""$escapedModel"",$promptTokens,$completionTokens,$totalDurationSec,$loadDurationSec,$evalDurationSec,""$escapedStatus"""
-
                     $headers = "Timestamp,Token,Username,Model,PromptTokens,CompletionTokens,TotalDurationSec,LoadDurationSec,EvalDurationSec,Status"
+
+                    # 1. Main CSV File
+                    $csvPath = Join-Path $baseDir "token_usage.csv"
                     if (-not (Test-Path $csvPath)) {
                         [System.IO.File]::WriteAllText($csvPath, "$headers`r`n")
                     }
                     [System.IO.File]::AppendAllText($csvPath, "$line`r`n")
+
+                    # Sanitization regex for filenames (Windows/Linux invalid characters)
+                    $sanitizeRegex = '[\/\\:\*\?"<>\|]'
+                    $safeModelName = $model -replace $sanitizeRegex, '_'
+                    $safeUserName = $username -replace $sanitizeRegex, '_'
+
+                    # 2. Monthly CSV File
+                    $monthStr = [DateTime]::UtcNow.ToString("yyyy_MM")
+                    $monthlyPath = Join-Path $baseDir "token_usage_$monthStr.csv"
+                    if (-not (Test-Path $monthlyPath)) {
+                        [System.IO.File]::WriteAllText($monthlyPath, "$headers`r`n")
+                    }
+                    [System.IO.File]::AppendAllText($monthlyPath, "$line`r`n")
+
+                    # 3. Model-specific CSV File
+                    $modelPath = Join-Path $baseDir "token_usage_model_$safeModelName.csv"
+                    if (-not (Test-Path $modelPath)) {
+                        [System.IO.File]::WriteAllText($modelPath, "$headers`r`n")
+                    }
+                    [System.IO.File]::AppendAllText($modelPath, "$line`r`n")
+
+                    # 4. User-specific CSV File
+                    $userPath = Join-Path $baseDir "token_usage_user_$safeUserName.csv"
+                    if (-not (Test-Path $userPath)) {
+                        [System.IO.File]::WriteAllText($userPath, "$headers`r`n")
+                    }
+                    [System.IO.File]::AppendAllText($userPath, "$line`r`n")
 
                     Write-Host "[USAGE] Logged usage for user '$username' (model: $model, tokens: $promptTokens/$completionTokens, status: $status)" -ForegroundColor Cyan
                     $response.StatusCode = 200

@@ -50,13 +50,13 @@ This script runs a lightweight in-memory broadcast relay server for Windows envi
   - `GET /api/model`: Returns the active model cache JSON, updates `$activeUsers`.
   - `GET /api/queue`: Returns the current `$jobQueue` array. Automatically ejects expired running jobs (300s limit by default, or customizable via `X-DDO-Queue-Timeout` request header). Updates `$activeUsers`. Timestamps are managed with millisecond precision (fractions of seconds).
   - `POST /api/queue`: Accepts a JSON payload `{ action, id, username }` and updates `$jobQueue` accordingly. Automatically ejects expired running jobs before processing the payload (uses `X-DDO-Queue-Timeout` header if provided, default is 300s). Updates `$activeUsers`.
-  - `POST /api/usage`: Accepts a JSON payload containing Ollama token counts and durations, and appends the usage record to a local CSV file `../data/token_usage.csv`.
+  - `POST /api/usage`: Accepts a JSON payload containing Ollama token counts and durations, and appends the usage record to the main local CSV file `../data/token_usage.csv` as well as three split CSV files (monthly, per-model, and per-user) for simplified metrics management. Sanitizes model names and usernames to prevent forbidden file characters.
   - `OPTIONS /api/poll` & `OPTIONS /api/broadcast` & `OPTIONS /api/history` & `OPTIONS /api/model` & `OPTIONS /api/queue` & `OPTIONS /api/usage`: Handles CORS preflight by returning CORS headers with `200 OK` or `204 No Content`.
 
 ## Impact Scope
-- **`bin/broadcast_server.ps1`:** Handles `/api/usage` requests to log token counts and execution times into `data/token_usage.csv`. Also provides detailed `Write-Host` logs in PowerShell terminal. Incoming `X-DDO-Username` and `X-DDO-Client-Id` headers are URL-decoded using `[System.Uri]::UnescapeDataString` to support non-ASCII characters (e.g. Japanese).
+- **`bin/broadcast_server.ps1`:** Handles `/api/usage` requests to log token counts and execution times into `data/token_usage.csv` and three split CSV files. Also provides detailed `Write-Host` logs in PowerShell terminal. Incoming `X-DDO-Username` and `X-DDO-Client-Id` headers are URL-decoded using `[System.Uri]::UnescapeDataString` to support non-ASCII characters (e.g. Japanese).
 - **`web-ui`:** Submits API usage metrics upon prompt completion or cancellation.
-- **`data/token_usage.csv`:** Output file for performance and token auditing.
+- **`data/token_usage.csv`:** Output file for performance and token auditing, along with monthly, per-model, and per-user split CSVs.
 
 ## Dependency Map
 

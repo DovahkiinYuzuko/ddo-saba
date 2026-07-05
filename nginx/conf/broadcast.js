@@ -352,31 +352,52 @@ function handle_usage(r) {
         var escapedStatus = status.replace(/"/g, '""');
 
         var line = '"' + timestamp + '","' + escapedToken + '","' + escapedUsername + '","' + escapedModel + '",' + promptTokens + ',' + completionTokens + ',' + totalDurationSec + ',' + loadDurationSec + ',' + evalDurationSec + ',"' + escapedStatus + '"\n';
+        var headers = "Timestamp,Token,Username,Model,PromptTokens,CompletionTokens,TotalDurationSec,LoadDurationSec,EvalDurationSec,Status\n";
 
         var fs = require('fs');
-        var csvPath = '../data/token_usage.csv'; // Relative to nginx/ prefix
+        var baseDir = '../data';
 
         // Ensure data directory exists
         try {
-            fs.mkdirSync('../data');
+            fs.mkdirSync(baseDir);
         } catch (e) {
-            // Already exists or permission error (will be caught on write)
+            // Already exists or permission error
         }
 
-        var fileExists = false;
-        try {
-            fs.statSync(csvPath);
-            fileExists = true;
-        } catch (e) {
-            fileExists = false;
+        // Helper to append and write headers if needed
+        function appendToCsv(filePath) {
+            var exists = false;
+            try {
+                fs.statSync(filePath);
+                exists = true;
+            } catch (e) {
+                exists = false;
+            }
+            if (!exists) {
+                fs.writeFileSync(filePath, headers);
+            }
+            fs.appendFileSync(filePath, line);
         }
 
-        if (!fileExists) {
-            var headers = "Timestamp,Token,Username,Model,PromptTokens,CompletionTokens,TotalDurationSec,LoadDurationSec,EvalDurationSec,Status\n";
-            fs.writeFileSync(csvPath, headers);
-        }
+        // 1. Main CSV File
+        appendToCsv(baseDir + '/token_usage.csv');
 
-        fs.appendFileSync(csvPath, line);
+        // Sanitization for filenames (Windows/Linux invalid characters)
+        var sanitizeRegex = /[\/\\:\*\?"<>\|]/g;
+        var safeModelName = model.replace(sanitizeRegex, '_');
+        var safeUserName = username.replace(sanitizeRegex, '_');
+
+        // 2. Monthly CSV File
+        // timestamp is formatted as "yyyy-MM-dd HH:mm:ss"
+        var yearMonth = timestamp.substring(0, 7).replace('-', '_'); // "yyyy_MM"
+        appendToCsv(baseDir + '/token_usage_' + yearMonth + '.csv');
+
+        // 3. Model-specific CSV File
+        appendToCsv(baseDir + '/token_usage_model_' + safeModelName + '.csv');
+
+        // 4. User-specific CSV File
+        appendToCsv(baseDir + '/token_usage_user_' + safeUserName + '.csv');
+
         r.return(200, JSON.stringify({ status: "success" }));
     } catch (e) {
         r.return(500, "Internal Server Error: " + e.message);

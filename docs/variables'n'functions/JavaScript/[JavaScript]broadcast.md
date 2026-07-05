@@ -85,15 +85,21 @@ This document specifies the variables and functions used in `nginx/conf/broadcas
 - **Behavior:** Handles `GET` to list queue (with 300s timeout cleanup) and `POST` to `join`, `cancel`, and `complete` jobs.
 
 ### `handle_usage` (L275-325)
-- **Description:** Receives a HTTP `POST` request containing token usage and inference duration statistics and appends the record to a local CSV file `../data/token_usage.csv`.
+- **Description:** Receives a HTTP `POST` request containing token usage and inference duration statistics and appends the record to the main local CSV file `../data/token_usage.csv` as well as three split CSV files (monthly, per-model, and per-user) for simplified metrics management.
 - **Arguments:**
   - `r` (`Object`): The Nginx HTTP request object.
 - **Behavior:**
   1. Parses `r.requestBody` to extract `model`, `promptTokens`, `completionTokens`, `totalDurationSec`, `loadDurationSec`, `evalDurationSec`, and `status`.
   2. Extracts token and username from headers.
-  3. Uses the `fs` module to check for/create the `../data` directory and `token_usage.csv` file.
-  4. Appends a comma-separated, escaped string representing the usage event to the CSV.
-  5. Returns HTTP `200` on success, or `500` on internal write error.
+  3. Uses the `fs` module to check for/create the `../data` directory.
+  4. Appends a comma-separated, escaped string representing the usage event to `../data/token_usage.csv` (generating headers if new).
+  5. Generates three split file paths:
+     - Monthly: `../data/token_usage_YYYY_MM.csv`
+     - Per-Model: `../data/token_usage_model_modelName.csv`
+     - Per-User: `../data/token_usage_user_userName.csv`
+     - *Note: `modelName` and `userName` are sanitized to replace forbidden OS filename characters (like `:` or `/`) with `_`.*
+  6. Appends the same record to these three split CSV files (generating headers if new).
+  7. Returns HTTP `200` on success, or `500` on internal write error.
 
 ### `update_active_users` (L1-40)
 - **Description:** On every API endpoint request, this function reads the client's unique session identifier (`X-DDO-Client-Id`) from headers. If not present, it falls back to a concatenated ID using `X-DDO-Token` and `X-DDO-Username` headers (formatted as `token + "_" + username`). It updates their last active timestamp in a JSON string stored in `ngx.shared.broadcast_zone` under the `"active_users"` key (using this client ID as the key to prevent duplicates when multiple users share the same token), cleans up entries older than 10 seconds, and includes the active count in the response.
