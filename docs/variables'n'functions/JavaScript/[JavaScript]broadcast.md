@@ -56,7 +56,7 @@ This document specifies the variables and functions used in `nginx/conf/broadcas
   3. Returns the payload or `[]` with status `200`.
 
 ### `post_model` (L122-135)
-- **Description:** Receives a HTTP `POST` request containing model details and real-time generation/sync status, and stores the raw JSON object string under the `"model"` key.
+- **Description:** Receives a HTTP `POST` request containing model details and real-time generation/sync status, and stores the raw JSON object string under the `"model"` key. If `isGenerating` is `true`, it also updates the `timestamp` of the currently running job for the same sender in the `"queue"` JSON to the current time, preventing false timeout ejections.
 - **Arguments:**
   - `r` (`Object`): The Nginx HTTP request object.
 - **Return Value:** None (Sends HTTP `200` or `400`).

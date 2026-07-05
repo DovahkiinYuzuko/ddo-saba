@@ -150,6 +150,31 @@ function post_model(r) {
             body.timestamp = Date.now();
         }
         dict.set("model", JSON.stringify(body));
+
+        // Refresh job timestamp if this sender is actively generating
+        if (body.isGenerating === true) {
+            var queueStr = dict.get("queue");
+            if (queueStr) {
+                var queue = [];
+                try {
+                    queue = JSON.parse(queueStr);
+                } catch (e) {
+                    queue = [];
+                }
+                var changed = false;
+                var nowEpoch = Math.floor(Date.now() / 1000);
+                for (var i = 0; i < queue.length; i++) {
+                    if (queue[i].status === "running" && queue[i].username === body.sender) {
+                        queue[i].timestamp = nowEpoch;
+                        changed = true;
+                    }
+                }
+                if (changed) {
+                    dict.set("queue", JSON.stringify(queue));
+                }
+            }
+        }
+
         r.return(200, JSON.stringify({ status: "success" }));
     } catch (e) {
         r.return(400, "Invalid JSON body");
