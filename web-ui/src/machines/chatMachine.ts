@@ -175,6 +175,7 @@ export const chatMachine = createMachine(
             on: {
               PEER_START_GENERATE: {
                 target: 'remoteGenerating',
+                guard: ({ context }) => !context.isGenerating,
                 actions: assign({ isRemoteGenerating: true })
               },
               STOP_POLLING: 'idle'

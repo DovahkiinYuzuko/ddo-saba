@@ -87,27 +87,16 @@ export function useChatActions({
     }
 
     if (settings.isSharedMode && pendingMessage) {
-      const nowStr = formatTimestamp(new Date());
-      const userMsgId = Date.now().toString() + "_user";
-      const userMsg: Message = {
-        id: userMsgId,
-        role: 'user',
-        content: pendingMessage,
-        sender: settings.username,
-        timestamp: nowStr
-      };
+      // ponytail: Skip duplicate local render, retrieve userMsgId from already appended message for broadcast
+      const lastUserMsg = [...targetChat.messages]
+        .reverse()
+        .find(m => m.role === 'user' && m.sender === settings.username);
+      
+      const userMsgId = lastUserMsg?.id || (Date.now().toString() + "_user");
 
-      const mergedMessages = [...targetChat.messages, userMsg];
-      mergedMessages.forEach(m => {
+      targetChat.messages.forEach(m => {
         requestMessages.push({ role: m.role, content: m.content });
       });
-
-      setChats(prev => prev.map(c => {
-        if (c.id === activeChatId) {
-          return { ...c, messages: [...c.messages, userMsg] };
-        }
-        return c;
-      }));
 
       try {
         const result = await broadcastMessage(
@@ -502,14 +491,32 @@ export function useChatActions({
     if (!inputText.trim() || !activeChatId || !activeModel || isGeneratingRef.current || myJobId) return;
 
     const userMessageContent = inputText;
+    setInputText('');
+
+    const nowStr = formatTimestamp(new Date());
+    const userMsgId = Date.now().toString() + "_user";
+
+    const userMsg: Message = {
+      id: userMsgId,
+      role: 'user',
+      content: userMessageContent,
+      sender: settings.username,
+      timestamp: nowStr
+    };
+
+    // ponytail: Render user message immediately to local chats for better UX and preventing test timeouts
+    setChats(prev => prev.map(c => {
+      if (c.id === activeChatId) {
+        return { ...c, messages: [...c.messages, userMsg] };
+      }
+      return c;
+    }));
 
     if (settings.isSharedMode) {
       const jobId = "job_" + Date.now().toString() + "_" + Math.floor(Math.random() * 1000);
 
       try {
         await joinQueue(settings.connectionUrl, settings.accessToken, jobId, settings.username);
-
-        setInputText('');
         setPendingMessage(userMessageContent);
         setMyJobId(jobId);
 
@@ -519,26 +526,6 @@ export function useChatActions({
         console.error("Failed to join queue", err);
       }
     } else {
-      setInputText('');
-
-      const nowStr = formatTimestamp(new Date());
-      const userMsgId = Date.now().toString() + "_user";
-
-      const userMsg: Message = {
-        id: userMsgId,
-        role: 'user',
-        content: userMessageContent,
-        sender: settings.username,
-        timestamp: nowStr
-      };
-
-      setChats(prev => prev.map(c => {
-        if (c.id === activeChatId) {
-          return { ...c, messages: [...c.messages, userMsg] };
-        }
-        return c;
-      }));
-
       void runInferenceStream();
     }
   };
