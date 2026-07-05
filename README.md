@@ -111,6 +111,13 @@ npm run build
   node scripts/test_autoci_integration.js
   ```
 
+#### OpenAI互換APIの接続方法
+DDO SabaはNginx経由でOpenAI互換の `/v1/` エンドポイントを安全に公開します。外部のエディタ拡張機能や各種OpenAI互換クライアントから、以下のパラメータを指定して接続・利用できます。
+- **APIベースURL**: サーバー起動時にコンソールに表示されたCloudflareのパブリックURLの末尾に `/v1` を追加したURL。
+  - `https://<発行されたサブドメイン>.trycloudflare.com/v1`
+- **APIキー (アクセストークン)**: サーバー起動時にコンソールに出力された `DDO Saba Access Token` の値。
+
+
 > [!NOTE]
 > **動作環境と検証ステータス**
 > - **Windows**: Windows 11実機にて、Playwright E2Eテストを含む完全な動作検証が完了しています。
@@ -226,6 +233,13 @@ npm run build
   ```bash
   node scripts/test_autoci_integration.js
   ```
+
+#### Connecting via OpenAI-Compatible API
+DDO Saba securely exposes an OpenAI-compatible `/v1/` endpoint. You can connect it to external editor extensions and OpenAI-compatible clients using the parameters below:
+- **API Base URL**: The public Cloudflare URL displayed on startup with `/v1` appended to the end.
+  - `https://<issued-subdomain>.trycloudflare.com/v1`
+- **API Key**: The `DDO Saba Access Token` generated or specified on startup.
+
 
 > [!NOTE]
 > **Operating Environment & Verification Status**
