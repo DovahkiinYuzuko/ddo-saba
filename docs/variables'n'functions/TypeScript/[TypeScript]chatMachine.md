@@ -1,72 +1,110 @@
+---
+source_file: "web-ui/src/machines/chatMachine.ts"
+language: "TypeScript"
+description: "Hierarchical Finite State Machine (HFSM) defining states for local inference, remote sync, and queue processing."
+tags:
+  - "@FSM"
+exports:
+  - chatMachine
+  - ChatMachineContext
+  - ChatMachineEvent
+imports:
+  - "web-ui/src/types.ts"
+---
+
 # Variable and Function Specifications: `chatMachine.ts`
 
-This document specifies the states, context, and functions used in `web-ui/src/machines/chatMachine.ts`, which is a Hierarchical Finite State Machine (HFSM) implemented using XState v5. This machine governs the complex states of local generation, model loading, and remote synchronization via polling.
+This document specifies the states, context, and events used in `web-ui/src/machines/chatMachine.ts`.
 
 ---
 
 ## 1. Machine Context
 
-The `context` holds the quantitative data previously managed by multiple `useState` and `useRef` hooks in `App.tsx`.
+The `context` holds the quantitative data managed by the state machine.
 
-### `activeModel` (L7-7)
+### `activeModel`
 - **Type:** `string`
 - **Description:** The currently selected active model. Automatically cleared when unloaded successfully.
 
-### `activeUserCount` (L12-12)
+### `activeUserCount`
 - **Type:** `number`
 - **Description:** Tracks the current number of active users connected to the shared room.
 - **Default:** `1`
 
-### `jobQueue` (L8-8)
+### `jobQueue`
 - **Type:** `Array<QueueJob>`
 - **Description:** Holds the list of active jobs in the inference queue.
 
-### `myJobId` (L9-9)
+### `myJobId`
 - **Type:** `string | null`
 - **Description:** Tracks the unique ID of the user's active job in the queue.
 
-### `chats` (L10-10)
+### `chats`
 - **Type:** `Array<ChatSession>`
 - **Description:** Holds all active temporary chat tabs.
 
-### `syncRequestPending` (L13-13)
-- **Type:** `SyncRequestData | null`
+### `syncRequestPending`
+- **Type:** `any | null`
 - **Description:** Holds pending settings sync request data received from other clients.
+
+### `pendingMessage`
+- **Type:** `string`
+- **Description:** Holds the content of the user's message while it is waiting in the queue.
+
+### `inputText`
+- **Type:** `string`
+- **Description:** Holds the text currently inputted in the chat box.
 
 ---
 
 ## 2. Machine States (Parallel Architecture)
 
-The machine consists of two parallel (orthogonal) state regions: `local` and `sync`.
+The machine consists of three parallel (orthogonal) state regions: `local`, `sync`, and `queue`.
 
 ### `local` Region
-Manages user-initiated local operations.
-
-- **`idle`**: The resting state. It listens for `SELECT_MODEL`, `START_GENERATE`, and `UNLOAD_MODEL` events.
-- **`loadingModel`**: Entered when a model is selected. Transitions to `idle` on `LOAD_SUCCESS` or `LOAD_FAILURE`.
-- **`generating`**: Entered when the queue processes a prompt. On entry, automatically sets `isGenerating: true` in context. Transitions to `idle` on `GENERATE_COMPLETE` or `GENERATE_ABORT` (setting `isGenerating: false`). It rejects new `START_GENERATE` events to prevent race conditions.
-- **`unloadingModel`**: Entered when the unload action is triggered. On `UNLOAD_SUCCESS`, clears the `activeModel` in context.
+Manages local model loading and generation states.
+- **`idle`**: The resting state.
+- **`loadingModel`**: Entered when a model is being pre-loaded.
+- **`generating`**: Entered during active local inference. Sets `isGenerating: true`.
+- **`unloadingModel`**: Entered when unloading a model from VRAM.
 
 ### `sync` Region
-Manages real-time polling synchronization with the server in Shared Room Mode.
+Manages polling synchronization with the server.
+- **`idle`**: Polling inactive.
+- **`polling`**: Active polling. Listens for peer states.
+- **`remoteGenerating`**: Entered when another client is generating. Sets `isRemoteGenerating: true`. Guarded by `!isGenerating`.
 
-- **`idle`**: The polling loop is inactive (e.g., Private Mode).
-- **`polling`**: Active polling mode. Polls for `activeModel`, `jobQueue`, and `isGenerating` statuses of other clients.
-- **`remoteGenerating`**: Entered when another client broadcasts `isGenerating: true` via `PEER_START_GENERATE` (guarded to transition only if the local user is not generating). On entry, sets `isRemoteGenerating: true`. Transitions back to `polling` when the peer signals completion via `PEER_COMPLETE_GENERATE` (setting `isRemoteGenerating: false` and clearing the remote text buffer) or if the local user starts generating via `START_GENERATE` (forcing remote sync back to `polling`).
+### `queue` Region
+Manages the user's message submission and queue sequence.
+- **`idle`**: Ready to send a message.
+- **`waiting`**: Message is submitted and waiting in the queue. Input is locked.
+- **`running`**: Job is promoted to running. User's message is appended to chat and inference begins.
 
 ---
 
 ## 3. Events
 
-- **`SELECT_MODEL`**: Triggered when a user selects a model from the dropdown. payload: `{ modelName: string }`
-- **`START_GENERATE`**: Triggered when the queue is ready to execute a prompt. Sets `isGenerating: true` in context, and forces remote sync back to `polling` if it was in `remoteGenerating`.
-- **`GENERATE_COMPLETE`**: Emitted when the inference stream finishes successfully. Sets `isGenerating: false`.
-- **`GENERATE_ABORT`**: Emitted when the inference stream is cancelled or errors out. Sets `isGenerating: false`.
-- **`UNLOAD_MODEL`**: Triggered by the unload button.
-- **`UNLOAD_SUCCESS`**: Indicates the VRAM was successfully cleared.
-- **`PEER_START_GENERATE`**: Detected via polling; signals that a remote client has started generation. Sets `isRemoteGenerating: true`. Guarded by `!isGenerating`.
-- **`PEER_COMPLETE_GENERATE`**: Detected via polling; signals that a remote client has finished generation. Sets `isRemoteGenerating: false` and clears `remoteGeneratingText`.
-- **`UPDATE_CONTEXT`**: Generic event to update context fields (e.g., `chats`, `jobQueue`, `activeUserCount`). Supports functional updates: if a payload property is a function, it evaluates the function with the current context's field value as the parameter.
+### `SUBMIT_MESSAGE`
+- **Description:** Emitted when a user submits a prompt.
+- **Payload:** `{ content: string }`
+
+### `PROMOTE_QUEUE`
+- **Description:** Emitted when the user's job becomes the active job in the queue.
+
+### `CANCEL_QUEUE`
+- **Description:** Emitted when the user cancels their waiting job in the queue.
+
+### `GENERATE_COMPLETE`
+- **Description:** Emitted when local inference finishes.
+
+### `GENERATE_ABORT`
+- **Description:** Emitted when local inference is cancelled or errors out.
+
+### `PEER_START_GENERATE`
+- **Description:** Emitted when a remote client starts generation. Guarded by `!isGenerating`.
+
+### `UPDATE_CONTEXT`
+- **Description:** Generic event to update context fields.
 
 ---
 
@@ -74,34 +112,17 @@ Manages real-time polling synchronization with the server in Shared Room Mode.
 
 ```mermaid
 graph TD
-    App --> useMachine[useMachine hook]
+    App --> useMachine[useMachine]
     useMachine --> chatMachine
     
-    UPDATE_CONTEXT[UPDATE_CONTEXT Event] --> AssignAction[Assign Action]
-    AssignAction --> EvaluateVal{Is payload value a function?}
-    EvaluateVal -- Yes --> EvalFn[val(currentContextValue)]
-    EvaluateVal -- No --> DirectVal[Direct Value]
-    
-    EvalFn --> ApplyContext[Apply to context]
-    DirectVal --> ApplyContext
-
     chatMachine --> localState[Local State]
     chatMachine --> syncState[Sync State]
-
-    localState --> loadingModelAction[api/generate call]
-    localState --> generatingAction[runInferenceStream logic]
-    localState --> unloadAction[unload VRAM logic]
-
-    syncState --> pollingAction[pollModel API]
-
-    localState -.-> context[Machine Context]
-    syncState -.-> context
+    chatMachine --> queueState[Queue State]
+    
+    queueState -- SUBMIT_MESSAGE --> waiting[waiting]
+    waiting -- PROMOTE_QUEUE --> running[running]
+    running -.-> localState -- START_GENERATE --> generating[generating]
+    
+    queueState -.-> context[Machine Context]
+    localState -.-> context
 ```
-
----
-
-## 5. Impact Scope
-
-The modifications to `UPDATE_CONTEXT` affect:
-1. `useChatMachineState.ts`: Every setter function (adapter) can now dispatch values or functional state updaters without listing context fields in their React `useCallback` dependency arrays, mitigating React stale closure issues.
-2. `useChatActions.ts` and `useFileIO.ts`: Consumers of setters can invoke functions like `setChats(prev => ...)` or `setParameters(prev => ...)` reliably, ensuring updates are batched and executed sequentially on the latest state machine context.
