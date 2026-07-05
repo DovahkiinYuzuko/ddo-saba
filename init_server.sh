@@ -27,7 +27,10 @@ start_server() {
     # Check Nginx and njs installation
     if ! command -v nginx &> /dev/null; then
         echo "[ERROR] nginx is not installed."
-        echo "Please install Nginx and njs module using your package manager."
+        echo "Please install Nginx and njs module using your package manager:"
+        echo "  Ubuntu/Debian: sudo apt install nginx libnginx-mod-njs"
+        echo "  CentOS/RHEL:   sudo dnf install nginx nginx-module-njs"
+        echo "  macOS:         brew install nginx"
         exit 1
     fi
 
@@ -36,7 +39,11 @@ start_server() {
     if [ ! -f "$NJS_SO" ]; then
         NJS_SO="/usr/share/nginx/modules/ngx_http_js_module.so"
         if [ ! -f "$NJS_SO" ]; then
-            echo "[WARNING] njs module (ngx_http_js_module.so) not found in default paths."
+            NJS_SO="/usr/lib64/nginx/modules/ngx_http_js_module.so"
+            if [ ! -f "$NJS_SO" ]; then
+                echo "[WARNING] njs module (ngx_http_js_module.so) not found in default paths."
+                echo "Please make sure Nginx njs module is installed."
+            fi
         fi
     fi
 
