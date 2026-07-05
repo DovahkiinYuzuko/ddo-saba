@@ -40,3 +40,6 @@ nginx/logs/
 !web-ui/src/**
 web-ui/src/assets
 
+# GitHub Actions AutoPackage
+!.github/
+!.github/**

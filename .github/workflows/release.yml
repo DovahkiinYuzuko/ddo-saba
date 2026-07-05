@@ -1,0 +1,90 @@
+name: OS-Specific Release Packager
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+          cache-dependency-path: 'web-ui/package-lock.json'
+
+      - name: Install Web UI dependencies and Build
+        run: |
+          cd web-ui
+          npm ci
+          npm run build
+
+      - name: Create Windows Package
+        run: |
+          mkdir -p dist-windows/bin
+          mkdir -p dist-windows/nginx/conf
+          
+          # Copy core files
+          cp init_server.bat dist-windows/
+          cp bin/broadcast_server.ps1 dist-windows/bin/
+          cp bin/download_nginx.ps1 dist-windows/bin/
+          cp bin/start_tunnel.ps1 dist-windows/bin/
+          cp bin/create_debug_conf.ps1 dist-windows/bin/
+          
+          # Copy Nginx win config and HTML assets
+          cp nginx/conf/nginx_win.conf.template dist-windows/nginx/conf/
+          cp nginx/conf/broadcast.js dist-windows/nginx/conf/
+          cp -r nginx/html dist-windows/nginx/
+          
+          # Copy documents
+          cp LICENSE.MIT dist-windows/
+          cp README.md dist-windows/
+          cp NOTICE.md dist-windows/
+          cp -r docs dist-windows/
+          
+          # Compress to zip
+          cd dist-windows
+          zip -r ../ddo-saba-windows.zip .
+          cd ..
+
+      - name: Create Linux Package
+        run: |
+          mkdir -p dist-linux/nginx/conf
+          
+          # Copy core files
+          cp init_server.sh dist-linux/
+          chmod +x dist-linux/init_server.sh
+          
+          # Copy Nginx linux config and HTML assets
+          cp nginx/conf/nginx_linux.conf.template dist-linux/nginx/conf/
+          cp nginx/conf/broadcast.js dist-linux/nginx/conf/
+          cp -r nginx/html dist-linux/nginx/
+          
+          # Copy documents
+          cp LICENSE.MIT dist-linux/
+          cp README.md dist-linux/
+          cp NOTICE.md dist-linux/
+          cp -r docs dist-linux/
+          
+          # Compress to zip
+          cd dist-linux
+          zip -r ../ddo-saba-linux-macos.zip .
+          cd ..
+
+      - name: Upload Release Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ddo-saba-windows.zip
+            ddo-saba-linux-macos.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
