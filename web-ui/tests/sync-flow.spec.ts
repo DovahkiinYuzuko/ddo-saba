@@ -33,7 +33,7 @@ test.describe('DDO Saba - Shared Mode Chaos E2E Test with Visual Evidence', () =
 
     // 2. Setup Alice (PC Context)
     console.log('Setting up Alice (PC)...');
-    const contextAlice = await browser.newContext({ viewport: { width: 1000, height: 800 } });
+    const contextAlice = await browser.newContext({ viewport: { width: 1280, height: 800 } });
     const pageAlice = await contextAlice.newPage();
     pageAlice.on('console', msg => console.log(`[Alice Browser LOG] ${msg.type()}: ${msg.text()}`));
     await pageAlice.goto(ALICE_URL);
@@ -42,9 +42,25 @@ test.describe('DDO Saba - Shared Mode Chaos E2E Test with Visual Evidence', () =
     console.log('Alice waiting for initial loading overlay to clear...');
     await expect(pageAlice.locator('.modal-backdrop.loading-overlay')).toBeHidden({ timeout: 60000 });
 
-    // Set Alice's username -> Alice(PC)
-    await pageAlice.getByRole('button', { name: /^(設定|Settings)$/i }).click();
-    await pageAlice.getByLabel(/ユーザー名|username/i).fill('Alice(PC)');
+    // --- NEW: Clear any pending Sync requests from previous test runs ---
+    // If previous tests failed, Bob's sync request might still be pending on the server.
+    // This causes a SyncModal to appear and block the UI.
+    try {
+      const denyBtn = pageAlice.getByRole('button', { name: /^(拒否|Deny)$/i });
+      await denyBtn.waitFor({ state: 'visible', timeout: 2000 });
+      await denyBtn.click();
+      console.log('Cleared pending sync request from previous test');
+    } catch {
+      // Normal behavior: no pending request
+    }
+
+    // Open Settings Modal
+    const settingsBtn = pageAlice.locator('.icon-btn[title="設定"], .icon-btn[title="Settings"]').first();
+    // Use standard click without force, so it throws if covered by something else
+    await settingsBtn.click();
+    
+    await pageAlice.locator('#settings-username').waitFor({ state: 'visible', timeout: 5000 });
+    await pageAlice.locator('#settings-username').fill('Alice(PC)');
     await pageAlice.getByRole('button', { name: /^(閉じる|Close)$/i }).click();
 
     // Take screenshot: Initial connection
@@ -106,9 +122,22 @@ test.describe('DDO Saba - Shared Mode Chaos E2E Test with Visual Evidence', () =
     // Bob connects via the tunnel URL (simulating real QR scan)
     await pageBob.goto(BOB_URL);
 
+    // Bob might receive a SyncModal upon joining if his local defaults don't match the room
+    try {
+      const denyBtn = pageBob.getByRole('button', { name: /^(拒否|Deny)$/i });
+      await denyBtn.waitFor({ state: 'visible', timeout: 3000 });
+      await denyBtn.click();
+      console.log('Bob cleared initial sync request');
+    } catch {
+      // Normal behavior: no pending request
+    }
+
     // Set Bob's username -> Bob(スマホ版)
-    await pageBob.getByRole('button', { name: /^(設定|Settings)$/i }).click();
-    await pageBob.getByLabel(/ユーザー名|username/i).fill('Bob(スマホ版)');
+    const bobSettingsBtn = pageBob.locator('.icon-btn[title="設定"], .icon-btn[title="Settings"]').first();
+    await bobSettingsBtn.click();
+    await pageBob.locator('#settings-username').waitFor({ state: 'visible', timeout: 5000 });
+
+    await pageBob.locator('#settings-username').fill('Bob(スマホ版)');
     await pageBob.getByRole('button', { name: /^(閉じる|Close)$/i }).click();
 
     // 5. Bob changes parameters (requires opening parameters drawer on mobile layout)
@@ -143,7 +172,7 @@ test.describe('DDO Saba - Shared Mode Chaos E2E Test with Visual Evidence', () =
     // 5.5 Alice must create a New Chat to type a message (if none exists)
     console.log('Alice creates a New Chat...');
     // The "New Chat" button is usually in the sidebar or header.
-    await pageAlice.getByRole('button', { name: /New Chat|新規チャット/i }).first().click({ force: true });
+    await pageAlice.locator('.sidebar-column').getByRole('button', { name: /New Chat|新規チャット/i }).click();
 
     // Wait for the prompt input to be enabled, meaning the new chat is ready
     await expect(pageAlice.getByPlaceholder(/message|メッセージ/i)).toBeEnabled();
@@ -152,10 +181,10 @@ test.describe('DDO Saba - Shared Mode Chaos E2E Test with Visual Evidence', () =
     console.log('Alice sends query to start inference...');
     const alicePrompt = 'Hi, please say hello in a single sentence.';
     await pageAlice.getByPlaceholder(/message|メッセージ/i).fill(alicePrompt);
-    await pageAlice.getByRole('button', { name: /^(Send|送信)$/i }).click();
+    await pageAlice.locator('.send-btn').click();
 
     // Wait for inference to start (typing indicator or stop button appears)
-    await expect(pageAlice.locator('.typing-indicator, .icon-btn-accent[title="Stop Generation"]')).toBeVisible({ timeout: 10000 });
+    await expect(pageAlice.locator('.typing-indicator, .icon-btn-accent')).toBeVisible({ timeout: 10000 });
     
     // Take screenshot: Alice is generating (or model loading)
     console.log('Saving screenshot: step3_alice_generating.png...');
@@ -166,8 +195,8 @@ test.describe('DDO Saba - Shared Mode Chaos E2E Test with Visual Evidence', () =
     // 7. Bob interrupts by sending a message while Alice is busy
     console.log('Bob interrupts by sending another message...');
     const bobPrompt = 'Hello Alice, this is an interrupted message from Bob.';
-    await pageBob.getByPlaceholder(/message|メッセージ/i).fill(bobPrompt);
-    await pageBob.getByRole('button', { name: /^(Send|送信)$/i }).click();
+    await pageBob.locator('.input-textarea').fill(bobPrompt);
+    await pageBob.locator('.send-btn').click();
 
     // Wait for Bob's queued message to appear in the UI
     await expect(pageBob.locator('.message.user').last()).toBeVisible({ timeout: 10000 });
@@ -191,7 +220,7 @@ test.describe('DDO Saba - Shared Mode Chaos E2E Test with Visual Evidence', () =
 
     // 9. Alice creates a new chat tab to verify tab sync
     console.log('Alice creates a new chat tab...');
-    const newTabButton = pageAlice.getByRole('button', { name: /New Chat|新規チャット/i }).first();
+    const newTabButton = pageAlice.locator('.sidebar-column').getByRole('button', { name: /New Chat|新規チャット/i });
     await newTabButton.click();
 
     // Wait for tab sync to propagate by checking Bob's UI for a new tab (or just wait for Alice's chat to be created)

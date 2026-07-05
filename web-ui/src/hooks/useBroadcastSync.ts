@@ -97,6 +97,28 @@ export function useBroadcastSync({
             // Append shared message to currently active chat session
             // Fallback: if activeChatId is null (race with syncHistory), append to last available tab
             const targetChatId = activeChatIdRef.current;
+            
+            if (chats.length === 0) {
+              const newId = Date.now().toString();
+              setChats([{ 
+                id: newId, 
+                title: 'Shared Chat', 
+                messages: [{
+                  id: data.id || Date.now().toString(),
+                  role: data.role || 'user',
+                  content: data.content || '',
+                  sender: data.sender,
+                  broadcaster: data.broadcaster,
+                  timestamp: data.timestamp ? formatTimestamp(data.timestamp) : undefined
+                }] 
+              }]);
+              setActiveChatId(newId);
+              continue;
+            }
+
+            if (!targetChatId && chats.length > 0) {
+              setActiveChatId(chats[chats.length - 1].id);
+            }
             if (targetChatId || chats.length > 0) {
               setChats(prev => {
                 const resolvedId = targetChatId || (prev.length > 0 ? prev[prev.length - 1].id : null);
