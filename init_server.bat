@@ -82,6 +82,10 @@ echo Starting PowerShell Broadcast Server...
 start /B powershell -NoProfile -ExecutionPolicy Bypass -File bin\broadcast_server.ps1
 
 :: Start Nginx Server using the active config
+if not exist "nginx\nginx.exe" (
+    echo Nginx executable not found. Running download_nginx.ps1 to download Nginx...
+    powershell -NoProfile -ExecutionPolicy Bypass -File bin\download_nginx.ps1
+)
 echo Starting Nginx server...
 start /B nginx\nginx.exe -p nginx -c conf\nginx_active.conf
 

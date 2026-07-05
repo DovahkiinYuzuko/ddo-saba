@@ -23,10 +23,12 @@ graph TD
 - **処理フロー**:
   1. `DDO_SABA_TOKEN` が未定義の場合、自動生成（PowerShell RNG経由で32文字のランダムな16進数）またはユーザーに入力を求める。
   2. Ollamaがポート `11434` で待機していない場合、`ollama serve` をバックグラウンド起動。
-  3. `nginx/conf/nginx_win.conf.template` のトークンプレースホルダー（`__DDO_SABA_TOKEN__`）を現在のトークンに置換して `nginx/conf/nginx_active.conf` を生成。
-  4. PowerShellブロードキャストサーバー（`bin/broadcast_server.ps1`）をバックグラウンド起動（PIDは `bin/broadcast.pid` に保存）。
-  5. Nginxを生成された `nginx_active.conf` を用いてバックグラウンド起動。
-  6. Cloudflare Tunnel（`bin/start_tunnel.ps1`）を起動（PIDは `bin/cloudflared.pid` に保存）。
+  3. `nginx/nginx.exe` がローカル環境に存在しない場合、自動的に `bin/download_nginx.ps1` を呼び出して Nginx の公式ZIPファイルをダウンロード・配置する。
+  4. `nginx/conf/nginx_win.conf.template` のトークンプレースホルダー（`__DDO_SABA_TOKEN__`）を現在のトークンに置換して `nginx/conf/nginx_active.conf` を生成。
+  5. PowerShellブロードキャストサーバー（`bin/broadcast_server.ps1`）をバックグラウンド起動（PIDは `bin/broadcast.pid` に保存）。
+  6. Nginxを生成された `nginx_active.conf` を用いてバックグラウンド起動。
+  7. Cloudflare Tunnel（`bin/start_tunnel.ps1`）を起動（PIDは `bin/cloudflared.pid` に保存）。
+
 
 ### 2. `stop`
 起動中のすべてのプロセスをクリーンアップ停止する（冪等性を保持）。
