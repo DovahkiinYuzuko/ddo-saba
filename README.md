@@ -1,5 +1,7 @@
 # DDO Saba (誰でもOllamaオンラインサーバー) / DDO Saba (Ollama Online Server for Everyone)
 
+![ChatUI.png](ChatUI.png)
+
 Ollamaを安全にオンライン公開し、複数クライアントでリアルタイム同期・共同利用するためのWebUIおよびプロキシゲートウェイ / Web UI and proxy gateway to securely publish Ollama online for real-time synchronization and collaborative use across multiple clients.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square&logo=opensourceinitiative&logoColor=white)](LICENSE.MIT)
@@ -42,6 +44,10 @@ DDO Sabaは、ローカル環境で動作するOllamaの推論サーバーを、
   - 推論の完了時に、使用されたモデル名、プロンプトトークン数、出力トークン数、総推論時間、モデルロード時間、評価時間などをCSV形式（`data/token_usage.csv`）でローカルに自動記録します。
   > [!NOTE]
   > 生成された `data/token_usage.csv` を開くことで、過去の推論の使用量や消費トークン数の統計情報をいつでも手軽に確認できます。
+- **ステートレスなプライバシー保護設計**:
+  - サーバー側にはトークンの使用量統計（CSV）以外の情報（チャット履歴、プロンプト、パラメータ設定など）を一切保存・蓄積しない安全な設計になっています。
+  - チャットの履歴やパラメータ設定は、クライアント側のUIからローカルのJSONファイルとしてエクスポート/インポートして手元で安全に保存・復元する仕様となっています。
+
 
 - **エラーハンドリング**:
   - 認証エラー（403 Forbidden）発生時でも、クライアント側でCORSエラーによるハングアップが発生しないよう、Nginxレベルで確実にCORSヘッダーを保証する設計となっています。
@@ -154,6 +160,10 @@ To run this system, you need:
   - Automatically records the utilized model name, prompt tokens, completion tokens, total duration, model load duration, and evaluation duration in a CSV format (`data/token_usage.csv`) upon inference completion.
   > [!NOTE]
   > You can open the generated `data/token_usage.csv` at any time to review statistics regarding your inference usage and token consumption.
+- **Stateless Privacy-First Design**:
+  - The server stores no sensitive data (chat history, prompts, or configuration settings) except for basic token usage statistics (CSV), ensuring maximum privacy.
+  - Chat logs and parameter profiles are handled entirely client-side, allowing users to export or import them as local JSON files for secure storage and recovery.
+
 
 - **Error Handling**:
   - Designed to guarantee CORS headers at the Nginx level even on authentication errors (403 Forbidden), preventing client-side application hangs due to CORS issues.

@@ -52,7 +52,7 @@ To prevent browser `fetch` exceptions on non-ASCII characters, the `X-DDO-Userna
 - **`useFileIO`**: Provides `exportCassette`, `importCassette`, `exportPreset`, `importPreset`, `handleDropCassette`, `handleDragOver`.
 
 ### `handleUnloadModel`
-- **Description:** Unloads the currently active model from Ollama VRAM by hitting the API, and updates local state. The local state cleanup (clearing `activeModel` and `psInfo`) is placed in a `finally` block to ensure UI recovery even if the API call throws an error.
+- **Description:** Unloads the currently active model from Ollama VRAM by hitting the API, and updates local state. Dispatches `UNLOAD_MODEL` at the start, and `UNLOAD_SUCCESS` (or `UNLOAD_FAILURE` on error) to the XState `chatMachine` to properly transition the state. The local state cleanup (clearing `activeModel` and `psInfo`) is placed in a `finally` block to ensure UI recovery even if the API call throws an error.
 - **Arguments:** None.
 - **Return Value:** `Promise<void>`
 

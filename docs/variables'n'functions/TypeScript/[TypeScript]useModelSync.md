@@ -38,6 +38,7 @@ graph TD
 - `settings`: `DdoSettings` - 接続先URLやトークン、ユーザー名、共有モード設定などを含む設定オブジェクト。
 - `activeModel`: `string` - 現在選択されているローカルのモデル名。
 - `isModelLoading`: `boolean` - 現在モデルのロード処理中であるかを示すフラグ。
+- `isModelUnloading`: `boolean` - 現在モデルのアンロード（VRAM放出）処理中であるかを示すフラグ。
 - `lastModelChangeTime`: `number` - 最後にモデルが変更されたタイムスタンプ（ミリ秒単位）。
 - `lastModelSender`: `string` - 最後にモデル変更を送信したユーザー名。
 - `isGeneratingRef`: `React.RefObject<boolean>` - ローカルでの推論生成状態を保持する Ref オブジェクト。
@@ -66,7 +67,7 @@ graph TD
 - **引数:** なし
 - **戻り値:** `Promise<void>`
 
-### `startModelPolling` (L150-265)
+### `startModelPolling` (L150-273)
 - **役割:** 共有モードにおいて、`pollModel` を用いて他端末のモデル選択状態やリモート生成状態を同期します。また、自分が生成中でない場合において、自身が送信した完了ステータスを受信した際にはリモート生成中ステータスの強制リセットを行います。
 - **引数:** なし
 - **戻り値:** `Promise<void>`
@@ -84,6 +85,7 @@ graph TD
 1. **Ollamaサーバーポーリング (5秒毎)**:
    - `fetchModels` と `fetchPs` を定期実行し、モデル一覧と VRAM 上のロードモデル状態を更新。
    - VRAM からモデルが消えた際、最後にアクティブモデルを設定したユーザー（`lastModelSender`）が自クライアント自身（`settings.username`）である場合（大文字小文字・空白をトリムして正規化比較）に限り、一定の猶予時間（15秒）経過後にローカルの `activeModel` を自動でアンロードクリア（および共有モード時はクリアをブロードキャスト）する。自分以外のユーザーが設定したモデルは、自端末のVRAMに存在しなくてもクリアを要求しない。
+   - モデルのアンロード処理中（`isModelUnloading` が `true` の場合）は、Ollamaサーバー側の状態更新のタイムラグによる誤復旧を防ぐため、VRAMモデル情報からの `activeModel` の自動復旧（Auto-recover）処理を完全にスキップする。
 2. **共有モード時の他端末モデル・生成同期ポーリング (1.5秒毎)**:
    - `pollModel` を用いて他端末のモデル選択状態や、リモート生成状態（`isGenerating`, `generatingText`）を受信・同期。
    - 他人が推論中である場合は、`setIsRemoteGenerating(true)` や `setRemoteGeneratingText` を更新。

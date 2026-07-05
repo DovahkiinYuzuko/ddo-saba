@@ -2,6 +2,8 @@
 
 !.gitignore
 
+!ChatUI.png
+
 # Docs
 !README.md
 !NOTICE.md

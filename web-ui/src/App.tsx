@@ -407,12 +407,16 @@ export default function App() {
 
 
 
+  // Check if model is currently being unloaded via XState
+  const isModelUnloading = state.matches('local.unloadingModel');
+
   // Initial tags/ps fetch and interval polling
   const { fetchModelsAndPs } = useModelSync({
     isInitialized,
     settings,
     activeModel,
     isModelLoading,
+    isModelUnloading,
     lastModelChangeTime,
     lastModelSender,
     isGeneratingRef,
@@ -596,12 +600,15 @@ export default function App() {
   // Unload model from VRAM by calling API with keep_alive: 0
   const handleUnloadModel = async () => {
     if (!psInfo) return;
+    send({ type: 'UNLOAD_MODEL' });
     try {
       await apiUnloadModel(psInfo.name, settings.connectionUrl, settings.accessToken);
+      send({ type: 'UNLOAD_SUCCESS' });
     } catch (e) {
       console.error("Failed to unload model", e);
       // Bug#6修正: エラーをサイレントに吸収せずユーザーに表示する
       setModelLoadError(e instanceof Error ? e.message : "Failed to unload model");
+      send({ type: 'UNLOAD_FAILURE' });
     } finally {
       setPsInfo(null);
       setActiveModel('');

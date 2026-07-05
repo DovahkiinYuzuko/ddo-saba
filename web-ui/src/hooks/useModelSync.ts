@@ -9,6 +9,7 @@ interface UseModelSyncProps {
   settings: DdoSettings;
   activeModel: string;
   isModelLoading: boolean;
+  isModelUnloading: boolean;
   lastModelChangeTime: number;
   lastModelSender: string;
   isGeneratingRef: React.RefObject<boolean>;
@@ -34,6 +35,7 @@ export function useModelSync({
   settings,
   activeModel,
   isModelLoading,
+  isModelUnloading,
   lastModelChangeTime,
   lastModelSender,
   isGeneratingRef,
@@ -57,6 +59,7 @@ export function useModelSync({
   // Keep values current in refs for the async polling closures to prevent stale state issues
   const activeModelRef = useRef(activeModel);
   const isModelLoadingRef = useRef(isModelLoading);
+  const isModelUnloadingRef = useRef(isModelUnloading);
   const lastModelChangeTimeRef = useRef(lastModelChangeTime);
   const lastModelSenderRef = useRef(lastModelSender);
   const activeChatIdRef = useRef(activeChatId);
@@ -67,11 +70,12 @@ export function useModelSync({
   useEffect(() => {
     activeModelRef.current = activeModel;
     isModelLoadingRef.current = isModelLoading;
+    isModelUnloadingRef.current = isModelUnloading;
     lastModelChangeTimeRef.current = lastModelChangeTime;
     lastModelSenderRef.current = lastModelSender;
     activeChatIdRef.current = activeChatId;
     remoteGeneratingTextRef.current = remoteGeneratingText;
-  }, [activeModel, isModelLoading, lastModelChangeTime, lastModelSender, activeChatId, remoteGeneratingText]);
+  }, [activeModel, isModelLoading, isModelUnloading, lastModelChangeTime, lastModelSender, activeChatId, remoteGeneratingText]);
 
   // Ollama tags and ps info fetch logic
   const fetchModelsAndPs = useCallback(async () => {
@@ -90,7 +94,8 @@ export function useModelSync({
         consecutiveNullPsRef.current = 0;
         // Auto-recover activeModel from psInfo when activeModel is empty but model is actually loaded
         // This fixes the desync where UI shows blank model name but Ollama still has a model in VRAM
-        if (!activeModelRef.current && !isModelLoadingRef.current && fetchedPs.name) {
+        // Skip auto-recovery during unloading to prevent race conditions with pending Ollama state updates
+        if (!activeModelRef.current && !isModelLoadingRef.current && !isModelUnloadingRef.current && fetchedPs.name) {
           setActiveModel(fetchedPs.name);
           setLastModelSender(settings.username);
           const now = Date.now();
