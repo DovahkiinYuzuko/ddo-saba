@@ -4,6 +4,7 @@ import { broadcastMessage, broadcastModel } from '../api/broadcast';
 import { fetchQueue, joinQueue, cancelQueue, completeQueue } from '../api/queue';
 import { formatTimestamp } from '../utils/format';
 import { logUsage } from '../api/usage';
+import type { ChatMachineEvent } from '../machines/chatMachine';
 
 export interface UseChatActionsProps {
   chats: ChatSession[];
@@ -32,6 +33,7 @@ export interface UseChatActionsProps {
   startGenerate: () => void;
   completeGenerate: () => void;
   abortGenerate: () => void;
+  send: (event: ChatMachineEvent) => void;
 }
 
 export function useChatActions({
@@ -60,7 +62,8 @@ export function useChatActions({
   updateLastPolledMsgId,
   startGenerate,
   completeGenerate,
-  abortGenerate
+  abortGenerate,
+  send
 }: UseChatActionsProps) {
 
   const runInferenceStream = async (jobIdToComplete?: string) => {
@@ -493,31 +496,12 @@ export function useChatActions({
     const userMessageContent = inputText;
     setInputText('');
 
-    const nowStr = formatTimestamp(new Date());
-    const userMsgId = Date.now().toString() + "_user";
-
-    const userMsg: Message = {
-      id: userMsgId,
-      role: 'user',
-      content: userMessageContent,
-      sender: settings.username,
-      timestamp: nowStr
-    };
-
-    // ponytail: Render user message immediately to local chats for better UX and preventing test timeouts
-    setChats(prev => prev.map(c => {
-      if (c.id === activeChatId) {
-        return { ...c, messages: [...c.messages, userMsg] };
-      }
-      return c;
-    }));
-
     if (settings.isSharedMode) {
+      send({ type: 'SUBMIT_MESSAGE', content: userMessageContent });
+      
       const jobId = "job_" + Date.now().toString() + "_" + Math.floor(Math.random() * 1000);
-
       try {
         await joinQueue(settings.connectionUrl, settings.accessToken, jobId, settings.username);
-        setPendingMessage(userMessageContent);
         setMyJobId(jobId);
 
         const q = await fetchQueue(settings.connectionUrl, settings.accessToken);
@@ -526,6 +510,25 @@ export function useChatActions({
         console.error("Failed to join queue", err);
       }
     } else {
+      const nowStr = formatTimestamp(new Date());
+      const userMsgId = Date.now().toString() + "_user";
+
+      const userMsg: Message = {
+        id: userMsgId,
+        role: 'user',
+        content: userMessageContent,
+        sender: settings.username,
+        timestamp: nowStr
+      };
+
+      setChats(prev => prev.map(c => {
+        if (c.id === activeChatId) {
+          return { ...c, messages: [...c.messages, userMsg] };
+        }
+        return c;
+      }));
+
+      send({ type: 'SUBMIT_MESSAGE', content: userMessageContent });
       void runInferenceStream();
     }
   };
@@ -533,27 +536,11 @@ export function useChatActions({
   const handleCancelQueue = async () => {
     if (!myJobId || !settings.isSharedMode) return;
     const targetJobId = myJobId;
-    const restoredText = pendingMessage;
 
     try {
       await cancelQueue(settings.connectionUrl, settings.accessToken, targetJobId);
       
-      setMyJobId(null);
-      setInputText(restoredText);
-      setPendingMessage('');
-      
-      setChats(prev => prev.map(c => {
-        if (c.id === activeChatId) {
-          const lastMsg = c.messages[c.messages.length - 1];
-          if (lastMsg && lastMsg.role === 'user' && lastMsg.sender === settings.username) {
-            return {
-              ...c,
-              messages: c.messages.slice(0, -1)
-            };
-          }
-        }
-        return c;
-      }));
+      send({ type: 'CANCEL_QUEUE' });
 
       const q = await fetchQueue(settings.connectionUrl, settings.accessToken);
       setJobQueue(q);

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { ChatSession } from './types';
+import type { ChatSession, Message } from './types';
 import { useChatMachineState } from './hooks/useChatMachineState';
 import { 
   loadModelOnSelection as apiLoadModelOnSelection, 
@@ -139,6 +139,8 @@ export default function App() {
   const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prevIsSharedModeRef = useRef<boolean>(settings.isSharedMode);
   const triggeredJobIdRef = useRef<string | null>(null);
+  const lastLoadedModelRef = useRef<string | null>(null);
+
 
   const handleActiveCount = useCallback((count: number) => {
     setActiveUserCount(count);
@@ -189,12 +191,24 @@ export default function App() {
     
     const firstJob = jobQueue[0];
     if (firstJob.id === myJobId && firstJob.status === 'running') {
+      if (state.matches({ queue: 'waiting' })) {
+        const nowStr = formatTimestamp(new Date());
+        const userMsg: Message = {
+          id: myJobId,
+          role: 'user',
+          content: pendingMessage,
+          sender: settings.username,
+          timestamp: nowStr
+        };
+        send({ type: 'PROMOTE_QUEUE', userMsg });
+      }
+
       if (!isGeneratingRef.current && triggeredJobIdRef.current !== myJobId) {
         triggeredJobIdRef.current = myJobId;
         void runInferenceStream(myJobId);
       }
     }
-  }, [jobQueue, myJobId, pendingMessage, settings.isSharedMode]);
+  }, [jobQueue, myJobId, pendingMessage, settings.isSharedMode, state, send]);
 
   // Reset triggered job lock when myJobId changes or becomes null
   useEffect(() => {
@@ -426,11 +440,26 @@ export default function App() {
     if (!isInitialized || !activeModel || isModelLoading) return;
     const isLoadedByPeer = lastModelSender !== '' && lastModelSender !== settings.username;
     if (isLoadedByPeer) return; // Do not send load request for peer-triggered model changes
+    if (lastLoadedModelRef.current === activeModel) return; // Prevent duplicate load loop
+
     const isLoaded = psInfo && psInfo.name === activeModel;
     if (!isLoaded && !isGeneratingRef.current && !isRemoteGeneratingRef.current) {
+      lastLoadedModelRef.current = activeModel;
       void loadModelOnSelection(activeModel);
     }
   }, [activeModel, isInitialized, psInfo, isModelLoading, loadModelOnSelection, lastModelSender, settings.username]);
+
+  // Reset lastLoadedModelRef when model is successfully loaded in VRAM or selected model changes/cleared
+  useEffect(() => {
+    if (!activeModel) {
+      lastLoadedModelRef.current = null;
+    } else if (psInfo && psInfo.name === activeModel) {
+      lastLoadedModelRef.current = null;
+    } else if (lastLoadedModelRef.current !== activeModel) {
+      lastLoadedModelRef.current = null;
+    }
+  }, [activeModel, psInfo]);
+
 
   useQueueSync({
     isInitialized,
@@ -599,7 +628,8 @@ export default function App() {
     chats, activeChatId, settings, activeModel, systemPrompt, pendingMessage, parameters, thinkMode, numPredictEnabled, myJobId, inputText, isGeneratingRef, abortControllerRef, t,
     setChats, setModelLoadError, setPendingMessage, setMyJobId, setJobQueue, setInputText, setContextUsed,
     updateLastPolledMsgId: (id) => send({ type: 'UPDATE_CONTEXT', payload: { lastPolledMsgId: id } }),
-    startGenerate, completeGenerate, abortGenerate
+    startGenerate, completeGenerate, abortGenerate,
+    send
   });
 
   const {

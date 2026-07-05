@@ -1,5 +1,5 @@
 import { createMachine, assign } from 'xstate';
-import type { ChatSession, QueueJob } from '../types';
+import type { ChatSession, QueueJob, Message } from '../types';
 
 import type { DdoSettings, DdoParameters, OllamaModelInfo, PsModelInfo } from '../types';
 
@@ -58,6 +58,9 @@ export type ChatMachineEvent =
   | { type: 'STOP_POLLING' }
   | { type: 'PEER_START_GENERATE' }
   | { type: 'PEER_COMPLETE_GENERATE' }
+  | { type: 'SUBMIT_MESSAGE'; content: string }
+  | { type: 'PROMOTE_QUEUE'; userMsg: Message }
+  | { type: 'CANCEL_QUEUE' }
   | { type: 'UPDATE_CONTEXT'; payload: FunctionalUpdate<ChatMachineContext> };
 
 export const chatMachine = createMachine(
@@ -178,6 +181,9 @@ export const chatMachine = createMachine(
                 guard: ({ context }) => !context.isGenerating,
                 actions: assign({ isRemoteGenerating: true })
               },
+              PEER_COMPLETE_GENERATE: {
+                actions: assign({ isRemoteGenerating: false, remoteGeneratingText: '' })
+              },
               STOP_POLLING: 'idle'
             }
           },
@@ -194,6 +200,70 @@ export const chatMachine = createMachine(
               START_GENERATE: {
                 target: 'polling',
                 actions: assign({ isRemoteGenerating: false, remoteGeneratingText: '' })
+              }
+            }
+          }
+        }
+      },
+      queue: {
+        initial: 'idle',
+        states: {
+          idle: {
+            on: {
+              SUBMIT_MESSAGE: [
+                {
+                  target: 'waiting',
+                  guard: ({ context }) => context.settings.isSharedMode,
+                  actions: assign(({ event }) => ({
+                    pendingMessage: (event as any).content,
+                    inputText: ''
+                  }))
+                },
+                {
+                  target: 'running',
+                  actions: assign(({ event }) => ({
+                    pendingMessage: (event as any).content,
+                    inputText: ''
+                  }))
+                }
+              ]
+            }
+          },
+          waiting: {
+            on: {
+              PROMOTE_QUEUE: {
+                target: 'running',
+                actions: assign(({ context, event }) => {
+                  const userMsg = (event as any).userMsg;
+                  return {
+                    chats: context.chats.map(c => {
+                      if (c.id === context.activeChatId) {
+                        return { ...c, messages: [...c.messages, userMsg] };
+                      }
+                      return c;
+                    })
+                  };
+                })
+              },
+              CANCEL_QUEUE: {
+                target: 'idle',
+                actions: assign(({ context }) => ({
+                  inputText: context.pendingMessage,
+                  pendingMessage: '',
+                  myJobId: null
+                }))
+              }
+            }
+          },
+          running: {
+            on: {
+              GENERATE_COMPLETE: {
+                target: 'idle',
+                actions: assign({ pendingMessage: '' })
+              },
+              GENERATE_ABORT: {
+                target: 'idle',
+                actions: assign({ pendingMessage: '' })
               }
             }
           }

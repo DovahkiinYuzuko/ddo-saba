@@ -23,6 +23,12 @@ Refer to `chatMachine.md` for the core state variables (e.g., `chats`, `activeCh
 - **`triggeredJobIdRef`**: Tracks the currently running queue job ID to prevent duplicate `runInferenceStream` triggers.
 - **`isAutoScrollRef`**: Boolean ref indicating whether the container should automatically scroll down on new token messages.
 - **`scrollTimeoutRef`**: Stores the requestAnimationFrame request ID to throttle scroll events and optimize rendering performance.
+- **`lastLoadedModelRef`**: Ref holding the name of the model currently being loaded to prevent duplicate, rapid load requests before polling status updates.
+
+### `lastLoadedModelRef`
+- **Type:** `React.MutableRefObject<string | null>`
+- **Description:** Tracks the name of the model currently being loaded to prevent duplicate, rapid load requests before Ollama status updates.
+
 
 ---
 

@@ -99,6 +99,8 @@ export default function ChatInputArea({
             className="action-btn send-btn" 
             onClick={onSend} 
             disabled={!inputText.trim() || isModelLoading || (!isSharedMode && isRemoteGenerating) || !activeChatId}
+            aria-label={lang === 'ja' ? '送信' : 'Send'}
+            title={lang === 'ja' ? '送信' : 'Send'}
           >
             <Send size={16} />
           </button>

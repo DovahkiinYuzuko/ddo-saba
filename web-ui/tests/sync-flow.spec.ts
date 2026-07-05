@@ -26,7 +26,8 @@ test.describe('DDO Saba - Shared Mode Chaos E2E Test with Visual Evidence', () =
 
     // Define URLs matching Yuzuko's manual testing endpoints
     const ALICE_URL = `http://localhost:8088/?token=${TOKEN}&sharedMode=true`;
-    const BOB_URL = `${TUNNEL_URL}/?token=${TOKEN}&sharedMode=true`;
+    // Use localhost in automated tests to bypass Cloudflare bot checking
+    const BOB_URL = `http://localhost:8088/?token=${TOKEN}&sharedMode=true`;
 
     console.log('Resolved Alice URL:', ALICE_URL);
     console.log('Resolved Bob Tunnel URL:', BOB_URL);
@@ -198,8 +199,9 @@ test.describe('DDO Saba - Shared Mode Chaos E2E Test with Visual Evidence', () =
     await pageBob.locator('.input-textarea').fill(bobPrompt);
     await pageBob.locator('.send-btn').click();
 
-    // Wait for Bob's queued message to appear in the UI
-    await expect(pageBob.locator('.message.user').last()).toBeVisible({ timeout: 10000 });
+    // Wait for Bob's queued state to be reflected in the UI (input locked)
+    await expect(pageBob.locator('.input-textarea')).toBeDisabled({ timeout: 10000 });
+    await expect(pageBob.locator('.input-textarea')).toHaveAttribute('placeholder', /Waiting in queue|順番待ちしています/i);
 
     // Take screenshot: Bob is waiting in queue
     console.log('Saving screenshot: step4_bob_waiting_queue.png...');
@@ -207,10 +209,12 @@ test.describe('DDO Saba - Shared Mode Chaos E2E Test with Visual Evidence', () =
     await pageBob.screenshot({ path: path4 });
     console.log('step4 exists:', fs.existsSync(path4));
 
-    // 8. Wait for Alice to finish generation so Bob gets auto-promoted and starts generation
+    // 8. Wait for Alice to finish generation so Bob gets auto-promoted and completes generation
     console.log('Waiting for Alice to finish and Bob to get promoted...');
-    const bobSendButton = pageBob.getByRole('button', { name: /^(Send|送信)$/i });
-    await expect(bobSendButton).toBeEnabled({ timeout: 120000 });
+    const bobInput = pageBob.getByPlaceholder(/message|メッセージ/i);
+    await expect(bobInput).toBeEnabled({ timeout: 120000 });
+
+
 
     // Take screenshot: Bob has completed his promoted generation
     console.log('Saving screenshot: step5_bob_promoted.png...');

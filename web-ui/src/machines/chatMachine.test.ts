@@ -7,8 +7,8 @@ describe('chatMachine unit tests', () => {
     const actor = createActor(chatMachine).start();
     const state = actor.getSnapshot();
     
-    // Parallel states: local and sync should both be in idle initially
-    expect(state.value).toEqual({ local: 'idle', sync: 'idle' });
+    // Parallel states: local, sync, and queue should all be in idle initially
+    expect(state.value).toEqual({ local: 'idle', sync: 'idle', queue: 'idle' });
     expect(state.context.activeModel).toBe('');
     expect(state.context.isGenerating).toBe(false);
   });
@@ -19,7 +19,7 @@ describe('chatMachine unit tests', () => {
     actor.send({ type: 'SELECT_MODEL', modelName: 'Gemma4-E4B-QAT' });
     
     const state = actor.getSnapshot();
-    expect(state.value).toEqual({ local: 'loadingModel', sync: 'idle' });
+    expect(state.value).toEqual({ local: 'loadingModel', sync: 'idle', queue: 'idle' });
   });
 
   it('should support updating context fields via UPDATE_CONTEXT event', () => {
@@ -51,12 +51,12 @@ describe('chatMachine unit tests', () => {
     
     actor.send({ type: 'START_GENERATE' });
     let state = actor.getSnapshot();
-    expect(state.value).toEqual({ local: 'generating', sync: 'idle' });
+    expect(state.value).toEqual({ local: 'generating', sync: 'idle', queue: 'idle' });
     expect(state.context.isGenerating).toBe(true);
 
     actor.send({ type: 'GENERATE_COMPLETE' });
     state = actor.getSnapshot();
-    expect(state.value).toEqual({ local: 'idle', sync: 'idle' });
+    expect(state.value).toEqual({ local: 'idle', sync: 'idle', queue: 'idle' });
     expect(state.context.isGenerating).toBe(false);
   });
 
@@ -66,18 +66,18 @@ describe('chatMachine unit tests', () => {
     // Start polling to enable sync transitions
     actor.send({ type: 'START_POLLING' });
     let state = actor.getSnapshot();
-    expect(state.value).toEqual({ local: 'idle', sync: 'polling' });
+    expect(state.value).toEqual({ local: 'idle', sync: 'polling', queue: 'idle' });
 
     // Peer starts generating
     actor.send({ type: 'PEER_START_GENERATE' });
     state = actor.getSnapshot();
-    expect(state.value).toEqual({ local: 'idle', sync: 'remoteGenerating' });
+    expect(state.value).toEqual({ local: 'idle', sync: 'remoteGenerating', queue: 'idle' });
     expect(state.context.isRemoteGenerating).toBe(true);
 
     // Peer completes generating
     actor.send({ type: 'PEER_COMPLETE_GENERATE' });
     state = actor.getSnapshot();
-    expect(state.value).toEqual({ local: 'idle', sync: 'polling' });
+    expect(state.value).toEqual({ local: 'idle', sync: 'polling', queue: 'idle' });
     expect(state.context.isRemoteGenerating).toBe(false);
   });
 
@@ -88,13 +88,13 @@ describe('chatMachine unit tests', () => {
     actor.send({ type: 'START_GENERATE' });
     
     let state = actor.getSnapshot();
-    expect(state.value).toEqual({ local: 'generating', sync: 'polling' });
+    expect(state.value).toEqual({ local: 'generating', sync: 'polling', queue: 'idle' });
     expect(state.context.isGenerating).toBe(true);
 
     // Send PEER_START_GENERATE -> should be blocked by guard
     actor.send({ type: 'PEER_START_GENERATE' });
     state = actor.getSnapshot();
-    expect(state.value).toEqual({ local: 'generating', sync: 'polling' }); // Still in polling
+    expect(state.value).toEqual({ local: 'generating', sync: 'polling', queue: 'idle' }); // Still in polling
     expect(state.context.isRemoteGenerating).toBe(false);
   });
 
@@ -105,13 +105,51 @@ describe('chatMachine unit tests', () => {
     actor.send({ type: 'PEER_START_GENERATE' });
     
     let state = actor.getSnapshot();
-    expect(state.value).toEqual({ local: 'idle', sync: 'remoteGenerating' });
+    expect(state.value).toEqual({ local: 'idle', sync: 'remoteGenerating', queue: 'idle' });
     expect(state.context.isRemoteGenerating).toBe(true);
 
     // Local user starts generating -> forces sync to polling and resets isRemoteGenerating
     actor.send({ type: 'START_GENERATE' });
     state = actor.getSnapshot();
-    expect(state.value).toEqual({ local: 'generating', sync: 'polling' });
+    expect(state.value).toEqual({ local: 'generating', sync: 'polling', queue: 'idle' });
     expect(state.context.isRemoteGenerating).toBe(false);
+  });
+
+  it('should handle queue lifecycle transitions', () => {
+    const actor = createActor(chatMachine).start();
+    
+    // Simulate shared mode settings setup
+    actor.send({
+      type: 'UPDATE_CONTEXT',
+      payload: {
+        settings: {
+          connectionUrl: 'http://localhost:8088',
+          accessToken: 'test-token',
+          isSharedMode: true,
+          username: 'Bob'
+        },
+        activeChatId: 'chat_1',
+        chats: [{ id: 'chat_1', title: 'Test Chat', messages: [] }]
+      }
+    });
+
+    // Submit message while waiting in queue
+    actor.send({ type: 'SUBMIT_MESSAGE', content: 'Hello queue' });
+    let state = actor.getSnapshot();
+    expect(state.value).toEqual({ local: 'idle', sync: 'idle', queue: 'waiting' });
+    expect(state.context.pendingMessage).toBe('Hello queue');
+
+    // Promote job in queue
+    const userMsg = { id: 'msg_1', role: 'user' as const, content: 'Hello queue', sender: 'Bob', timestamp: '12:00' };
+    actor.send({ type: 'PROMOTE_QUEUE', userMsg });
+    state = actor.getSnapshot();
+    expect(state.value).toEqual({ local: 'idle', sync: 'idle', queue: 'running' });
+    expect(state.context.chats[0].messages).toEqual([userMsg]);
+
+    // Complete generation
+    actor.send({ type: 'GENERATE_COMPLETE' });
+    state = actor.getSnapshot();
+    expect(state.value).toEqual({ local: 'idle', sync: 'idle', queue: 'idle' });
+    expect(state.context.pendingMessage).toBe('');
   });
 });

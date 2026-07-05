@@ -103,6 +103,9 @@ Manages the user's message submission and queue sequence.
 ### `PEER_START_GENERATE`
 - **Description:** Emitted when a remote client starts generation. Guarded by `!isGenerating`.
 
+### `PEER_COMPLETE_GENERATE`
+- **Description:** Emitted when a remote client finishes generation, resetting remote generation flags.
+
 ### `UPDATE_CONTEXT`
 - **Description:** Generic event to update context fields.
 

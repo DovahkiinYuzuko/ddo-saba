@@ -169,20 +169,39 @@ export function useModelSync({
         const isNowGenerating = data.isGenerating === true;
         const isFromMe = data.sender === settings.username;
 
-        // 1. Update remote generating state only when NOT from myself
-        if (data.isGenerating !== undefined && !isFromMe) {
-          if (!wasRemoteGenerating && isNowGenerating) {
-            // Manually update ref BEFORE calling XState event to prevent stale value in next poll loop
-            isRemoteGeneratingRef.current = true;
-            peerStartGenerate();
-          } else if (wasRemoteGenerating && !isNowGenerating) {
-            // Manually update ref BEFORE calling XState event to prevent stale value in next poll loop
-            isRemoteGeneratingRef.current = false;
-            peerCompleteGenerate();
+        // 1. Update remote generating state
+        if (data.isGenerating !== undefined) {
+          if (isFromMe) {
+            // If the active generation was initiated by myself, it shouldn't lock my screen as "remote".
+            // If I am NOT currently local-generating but my screen is locked as remote, reset it.
+            if (!isGeneratingRef.current && wasRemoteGenerating) {
+              isRemoteGeneratingRef.current = false;
+              setIsRemoteGenerating(false);
+              setRemoteGeneratingText('');
+              peerCompleteGenerate();
+            }
+          } else {
+            if (!wasRemoteGenerating && isNowGenerating) {
+              // Manually update ref BEFORE calling XState event to prevent stale value in next poll loop
+              isRemoteGeneratingRef.current = true;
+              peerStartGenerate();
+            } else if (wasRemoteGenerating && !isNowGenerating) {
+              // Manually update ref BEFORE calling XState event to prevent stale value in next poll loop
+              isRemoteGeneratingRef.current = false;
+              peerCompleteGenerate();
+            }
+            setIsRemoteGenerating(data.isGenerating);
+            if (data.generatingText !== undefined) {
+              setRemoteGeneratingText(data.generatingText || '');
+            }
           }
-          setIsRemoteGenerating(data.isGenerating);
-          if (data.generatingText !== undefined) {
-            setRemoteGeneratingText(data.generatingText || '');
+
+          // Safety guard: If no one is generating globally according to data, but my local state is still locked as remote, reset it.
+          if (!data.isGenerating && !isGeneratingRef.current) {
+            isRemoteGeneratingRef.current = false;
+            setIsRemoteGenerating(false);
+            setRemoteGeneratingText('');
+            peerCompleteGenerate();
           }
         }
 
