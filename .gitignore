@@ -2,6 +2,11 @@
 
 !.gitignore
 
+# Docs
+!README.md
+!NOTICE.md
+!LICENSE.*
+
 # Docs variables and functions only
 !docs/
 !docs/variables'n'functions/
