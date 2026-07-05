@@ -3,6 +3,12 @@
 Ollamaを安全にオンライン公開し、複数クライアントでリアルタイム同期・共同利用するためのWebUIおよびプロキシゲートウェイ / Web UI and proxy gateway to securely publish Ollama online for real-time synchronization and collaborative use across multiple clients.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square&logo=opensourceinitiative&logoColor=white)](LICENSE.MIT)
+[![React](https://img.shields.io/badge/React-19.2-blue.svg?style=flat-square&logo=react&logoColor=white)](https://react.dev)
+[![XState](https://img.shields.io/badge/XState-5.32-black.svg?style=flat-square&logo=xstate&logoColor=white)](https://xstate.js.org)
+[![Vite](https://img.shields.io/badge/Vite-8.0-purple.svg?style=flat-square&logo=vite&logoColor=white)](https://vite.dev)
+[![Playwright](https://img.shields.io/badge/Playwright-E2E-green.svg?style=flat-square&logo=playwright&logoColor=white)](https://playwright.dev)
+[![PowerShell](https://img.shields.io/badge/PowerShell-Scripting-blue.svg?style=flat-square&logo=powershell&logoColor=white)](https://learn.microsoft.com/powershell/)
+[![Nginx](https://img.shields.io/badge/Nginx-Proxy-darkgreen.svg?style=flat-square&logo=nginx&logoColor=white)](https://nginx.org)
 
 [日本語](#日本語) | [English](#english)
 
