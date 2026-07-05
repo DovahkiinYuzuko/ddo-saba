@@ -35,16 +35,25 @@ start_server() {
     fi
 
     # Locate njs module
-    NJS_SO="/usr/lib/nginx/modules/ngx_http_js_module.so"
-    if [ ! -f "$NJS_SO" ]; then
-        NJS_SO="/usr/share/nginx/modules/ngx_http_js_module.so"
-        if [ ! -f "$NJS_SO" ]; then
-            NJS_SO="/usr/lib64/nginx/modules/ngx_http_js_module.so"
-            if [ ! -f "$NJS_SO" ]; then
-                echo "[WARNING] njs module (ngx_http_js_module.so) not found in default paths."
-                echo "Please make sure Nginx njs module is installed."
-            fi
+    NJS_PATHS=(
+        "/usr/lib/nginx/modules/ngx_http_js_module.so"
+        "/usr/share/nginx/modules/ngx_http_js_module.so"
+        "/usr/lib64/nginx/modules/ngx_http_js_module.so"
+        "/opt/homebrew/opt/njs/lib/nginx/modules/ngx_http_js_module.so"
+        "/opt/homebrew/lib/nginx/modules/ngx_http_js_module.so"
+        "/usr/local/lib/nginx/modules/ngx_http_js_module.so"
+    )
+    NJS_SO=""
+    for path in "${NJS_PATHS[@]}"; do
+        if [ -f "$path" ]; then
+            NJS_SO="$path"
+            break
         fi
+    done
+
+    if [ -z "$NJS_SO" ]; then
+        echo "[WARNING] njs module (ngx_http_js_module.so) not found in default paths."
+        echo "Please make sure Nginx njs module is installed."
     fi
 
     # Prompt or generate token securely
@@ -92,20 +101,29 @@ start_server() {
         echo "Ollama is already running."
     fi
 
+    # Detect OS and architecture
+    OS=$(uname -s | tr '[:upper:]' '[:lower:]')
+    ARCH=$(uname -m)
+    if [ "$ARCH" = "x86_64" ]; then
+        CF_ARCH="amd64"
+    elif [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+        CF_ARCH="arm64"
+    else
+        CF_ARCH="386"
+    fi
+
+    if [ "$OS" = "darwin" ]; then
+        CF_OS="darwin"
+    else
+        CF_OS="linux"
+    fi
+
     # Setup cloudflared binary
     CF_VER="2026.2.0"
     CF_BIN="/tmp/cloudflared"
     if [ ! -f "$CF_BIN" ]; then
-        echo "cloudflared binary not found. Downloading version $CF_VER..."
-        ARCH=$(uname -m)
-        if [ "$ARCH" = "x86_64" ]; then
-            CF_ARCH="amd64"
-        elif [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
-            CF_ARCH="arm64"
-        else
-            CF_ARCH="386"
-        fi
-        curl -L -o "$CF_BIN" "https://github.com/cloudflare/cloudflared/releases/download/${CF_VER}/cloudflared-linux-${CF_ARCH}"
+        echo "cloudflared binary not found. Downloading version $CF_VER for $CF_OS-$CF_ARCH..."
+        curl -L -o "$CF_BIN" "https://github.com/cloudflare/cloudflared/releases/download/${CF_VER}/cloudflared-${CF_OS}-${CF_ARCH}"
         chmod +x "$CF_BIN"
     fi
 

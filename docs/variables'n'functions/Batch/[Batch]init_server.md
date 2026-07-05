@@ -29,12 +29,12 @@ graph TD
   6. Nginxを生成された `nginx_active.conf` を用いてバックグラウンド起動。
   7. Cloudflare Tunnel（`bin/start_tunnel.ps1`）を起動（PIDは `bin/cloudflared.pid` に保存）。
 
-* **Linux (`init_server.sh`) の処理フロー**:
+* **Linux / macOS (`init_server.sh`) の処理フロー**:
   1. `DDO_SABA_TOKEN` が未定義の場合、自動生成（`openssl` または `python3` 等を用いて32文字のランダムトークンを生成）し、`DDO_SABA_TOKEN` 環境変数にエクスポート。
   2. システムに `nginx` コマンドが存在しない場合、親切な案内（apt/dnf/brewなどのインストール手順）を表示してエラー終了する。
-  3. `ngx_http_js_module.so` モジュールをシステムパス（`/usr/lib/nginx/modules/`, `/usr/share/nginx/modules/`, `/usr/lib64/nginx/modules/`）から自動探索する。
+  3. `ngx_http_js_module.so` モジュールを、Linuxシステムパス（`/usr/lib/nginx/modules/`, `/usr/share/nginx/modules/`, `/usr/lib64/nginx/modules/`）および macOS (Homebrew) の標準パス（`/opt/homebrew/opt/njs/lib/nginx/modules/`, `/opt/homebrew/lib/nginx/modules/`, `/usr/local/lib/nginx/modules/`）から自動探索する。
   4. `nginx/conf/nginx_linux.conf.template` を元にプレースホルダー置換を行い、`nginx/conf/nginx_active.conf` を生成。
-  5. cloudflared が存在しない場合、GitHubから環境（x86_64, arm64等）に適したバイナリを `/tmp/cloudflared` に自動ダウンロードして権限付与。
+  5. cloudflared が存在しない場合、OS（Linux / macOS (Darwin)）およびCPUアーキテクチャ（x86_64, arm64等）に応じた適切なバイナリを GitHub から `/tmp/cloudflared` に自動ダウンロードして権限付与。
   6. Nginx および cloudflared をバックグラウンドで起動し、トンネルURLを表示してブラウザ自動起動を試みる。
 
 
