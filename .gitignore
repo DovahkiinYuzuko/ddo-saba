@@ -51,3 +51,9 @@ web-ui/src/assets
 !web-ui/vite.config.ts
 !web-ui/eslint.config.js
 
+# Web UI Entry & Public Assets
+!web-ui/index.html
+!web-ui/public/
+!web-ui/public/**
+
+
