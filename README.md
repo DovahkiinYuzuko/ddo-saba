@@ -95,6 +95,21 @@ npm run build
   node scripts/test_autoci_integration.js
   ```
 
+> [!NOTE]
+> **動作環境と検証ステータス**
+> - **Windows**: Windows 11実機にて、Playwright E2Eテストを含む完全な動作検証が完了しています。
+> - **Linux (Unix系)**: 設計上およびNginx JavaScriptモジュール（njs）実装として対応していますが、実機での動作検証は未実施です。
+
+### ２つの中継サーバー実装（PowerShell / JavaScript）
+マルチOS環境で同じように協調動作させるため、中継サーバーのAPI（キュー処理、差分ポーリング、使用ログCSV保存など）は、仕様が全く等価な2つの言語で実装されています。
+- **Windows環境**: 独立したバックグラウンドのPowerShellプロセス（`bin/broadcast_server.ps1`）が起動し、Nginxがそこにプロキシします。
+- **Linux環境**: 外部プロセスを使わず、NginxのJavaScriptモジュール（`njs`）がNginxのワーカープロセス内（`nginx/conf/broadcast.js`）で直接APIリクエストを処理します。
+
+> [!WARNING]
+> **免責事項と利用ガイドライン**
+> 本ソフトウェアは、誰でも簡単かつ安全にローカルのOllamaサーバーを外部公開できるようにパッケージングする目的で作成されました。
+> 本ソフトウェアの変更、改造、および商用利用を含む二次利用は自由ですが、ご利用にあたっては適用されるすべての各種法令を遵守してください。本ソフトウェアの使用または改造によって発生した一切の損害やトラブルについて、作者は一切の責任を負いません。
+
 ### LICENSE
 このプロジェクトのライセンスはMITです。詳しくは[LICENSE.MIT](LICENSE.MIT)をお読みください。また、サードパーティライセンスはNOTICE.mdに表記してあります。
 
@@ -182,6 +197,21 @@ npm run build
   ```bash
   node scripts/test_autoci_integration.js
   ```
+
+> [!NOTE]
+> **Operating Environment & Verification Status**
+> - **Windows**: Fully verified and tested (including Playwright E2E tests) on actual Windows 11 machines.
+> - **Linux (Unix-like)**: Designed and supported through native startup scripts and the Nginx JavaScript (njs) module, but operation on actual Linux machines has not yet been verified.
+
+### Dual Broadcast Server Architectures (PowerShell / JavaScript)
+To ensure identical behavior across different operating systems, the broadcast API (queue control, delta polling, and usage logs) is implemented in two equivalent forms:
+- **Windows Environment**: Runs as a standalone background PowerShell process (`bin/broadcast_server.ps1`), which Nginx reverse-proxies.
+- **Linux Environment**: Runs directly inside Nginx worker processes via the Nginx JavaScript module (`njs` with `nginx/conf/broadcast.js`), requiring no external runner processes.
+
+> [!WARNING]
+> **Disclaimer & Usage Guidelines**
+> This software was created to package a local Ollama server so that anyone can easily and securely expose it.
+> You are free to modify, customize, and utilize this software for commercial purposes; however, you must comply with all applicable local laws and regulations. The author assumes no responsibility or liability for any issues, damages, or losses resulting from the use or modification of this software.
 
 ### LICENSE
 The license for this project is MIT. For details, please read [LICENSE.MIT](LICENSE.MIT). Third-party licenses are also noted in NOTICE.md.
